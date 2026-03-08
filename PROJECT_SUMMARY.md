@@ -31,6 +31,7 @@
 - ✅ 安装 ClawdHub CLI (v0.3.0)
 - ✅ 成功登录为 @JuneYaooo
 - ⚠️ 发布遇到持续的 API 速率限制
+- ℹ️ Skill 可能已部分注册（sync 显示从 1.0.0 更新）
 
 ---
 
@@ -75,27 +76,53 @@ clawdhub install mediwise-health-suite
 
 **API 速率限制（Rate Limit Exceeded）**
 
-由于多次尝试发布，触发了 ClawdHub 的 API 速率限制。即使等待 5 分钟后重试，限制仍然存在。
+由于多次尝试发布，触发了 ClawdHub 的 API 速率限制。多次重试后（包括等待10分钟+），所有 API 操作仍然受限：
+- ❌ `clawdhub publish` - Timeout 错误
+- ❌ `clawdhub sync` - Timeout 错误
+- ❌ `clawdhub search` - Rate limit exceeded
+- ❌ `clawdhub explore` - Rate limit exceeded
+
+### 重要发现
+
+**Skill 可能已部分注册**
+
+运行 `clawdhub sync --dry-run` 时显示：
+```
+To sync: - mediwise-health-suite  UPDATE 1.0.0 → 1.0.1  (120 files)
+```
+
+这说明 skill 可能已经在 ClawdHub 注册为 1.0.0 版本，但由于速率限制无法验证。
 
 ### 可能的原因
 
-1. ClawdHub API 的速率限制时间窗口较长（可能需要 1-24 小时）
-2. 项目文件较多（536 个文件）可能导致上传超时
-3. ClawdHub CLI 可能存在已知的超时问题
+1. ClawdHub API 的速率限制时间窗口很长（可能需要 24 小时或更久）
+2. 之前的多次尝试可能已部分成功注册
+3. ClawdHub CLI v0.3.0 可能存在超时处理的 bug
 
 ### 解决方案
 
-**方案 1：稍后重试（明天或几小时后）**
+**方案 1：等待 24 小时后重试（推荐）**
 ```bash
+# 等待 24 小时后执行
 cd /home/ubuntu/github/mediwise-health-suite
-clawdhub publish . --version "1.0.0" --slug "mediwise-health-suite" --name "MediWise Health Suite"
+clawdhub sync --root . --all --changelog "Initial release"
 ```
 
-**方案 2：通过 ClawdHub 官网手动提交**
+**方案 2：验证 Skill 是否已注册**
+```bash
+# 等速率限制解除后，尝试搜索
+clawdhub search mediwise-health-suite
+
+# 或尝试直接安装测试
+clawdhub install mediwise-health-suite
+```
+
+**方案 3：通过 ClawdHub 官网手动提交**
 1. 访问 https://clawdhub.com
 2. 登录账号（@JuneYaooo）
-3. 找到"Publish Skill"按钮
-4. 填写以下信息：
+3. 检查是否已有 mediwise-health-suite
+4. 如果没有，点击"Publish Skill"按钮
+5. 填写以下信息：
 
 ```
 Slug: mediwise-health-suite
@@ -111,9 +138,10 @@ Tags:
 health, medical, family, tracking, diet, weight, wearable, triage, first-aid, chinese, 健康管理, 医疗
 ```
 
-**方案 3：联系 ClawdHub 支持**
-- 说明遇到的速率限制问题
-- 请求手动审核或提高限制
+**方案 4：联系 ClawdHub 支持**
+- 说明遇到的持续速率限制问题
+- 询问 skill 是否已部分注册
+- 请求手动审核或协助完成发布
 
 ---
 
@@ -169,9 +197,10 @@ clawdhub install JuneYaooo/mediwise-health-suite
 **项目状态：完全可用，推荐通过 GitHub 安装**
 
 **下一步建议**：
-1. 明天或几小时后重试 `clawdhub publish`
-2. 或通过 ClawdHub 官网手动提交
-3. 或保持现状，用户通过 GitHub 安装（完全可行）
+1. **等待 24 小时后重试** `clawdhub sync` 或 `clawdhub search mediwise-health-suite`
+2. **检查 Skill 是否已注册**：速率限制解除后，先搜索确认状态
+3. **通过 ClawdHub 官网手动提交**（如果未注册）
+4. **或保持现状**：用户通过 GitHub 安装（完全可行，功能完整）
 
 ---
 
