@@ -1,0 +1,4 @@
+interface:
+  display_name: "症状分诊"
+  short_description: "通过多轮问诊评估症状，并给出就诊方向和分诊建议说明"
+  default_prompt: "Use $symptom-triage to assess symptoms, ask follow-up questions, and suggest care direction."

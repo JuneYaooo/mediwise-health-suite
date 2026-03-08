@@ -1,0 +1,10 @@
+{
+  "name": "@mediwise/diet-tracker-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "日常饮食记录与营养分析 OpenClaw Skill",
+  "author": "mediwise",
+  "license": "MIT",
+  "keywords": ["openclaw", "skill", "health", "diet", "nutrition"]
+}

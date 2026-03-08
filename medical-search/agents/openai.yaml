@@ -1,0 +1,4 @@
+interface:
+  display_name: "医学搜索"
+  short_description: "搜索权威药物安全、交互禁忌与疾病知识的参考来源信息"
+  default_prompt: "Use $medical-search to verify a medical or drug-safety question with authoritative sources."

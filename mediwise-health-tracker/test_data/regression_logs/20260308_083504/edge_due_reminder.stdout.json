@@ -1,0 +1,28 @@
+{
+  "due_reminders": [
+    {
+      "id": "rem_edge_due_now",
+      "member_id": "mem_edge_guo_tao",
+      "type": "custom",
+      "title": "立即复测血氧",
+      "content": "请现在复测血氧并记录。",
+      "schedule_type": "once",
+      "schedule_value": "2026-03-07 23:30",
+      "next_trigger_at": "2026-03-07 23:30:00",
+      "last_triggered_at": null,
+      "related_record_id": null,
+      "related_record_type": null,
+      "is_active": 1,
+      "priority": "urgent",
+      "created_at": "2026-03-08 08:00:00",
+      "updated_at": "2026-03-08 08:00:00",
+      "is_deleted": 0,
+      "member_name": "郭涛"
+    }
+  ],
+  "count": 1,
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

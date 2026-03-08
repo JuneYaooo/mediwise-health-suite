@@ -1,0 +1,43 @@
+{
+  "status": "ok",
+  "keyword": "糖化血红蛋白",
+  "total_matches": 2,
+  "results": {
+    "visits": [
+      {
+        "id": "visit_self_physical",
+        "member_id": "mem_self_li_chen",
+        "visit_type": "体检",
+        "visit_date": "2025-10-09",
+        "end_date": null,
+        "hospital": "协和国际体检中心",
+        "department": "体检中心",
+        "chief_complaint": "年度体检",
+        "diagnosis": "高血压2级；2型糖尿病；高脂血症",
+        "summary": "空腹血糖、糖化血红蛋白和血脂偏高，建议控制饮食并规律复诊。",
+        "created_at": "2025-08-20 10:00:00",
+        "updated_at": "2026-03-08 10:00:00",
+        "is_deleted": 0
+      }
+    ],
+    "symptoms": [],
+    "medications": [],
+    "lab_results": [
+      {
+        "id": "lab_self_metabolic",
+        "member_id": "mem_self_li_chen",
+        "visit_id": "visit_self_cardiology",
+        "test_name": "代谢与血脂组合",
+        "test_date": "2026-03-05",
+        "items": "[{\"name\": \"空腹血糖\", \"value\": \"8.3\", \"unit\": \"mmol/L\", \"reference\": \"3.9-6.1\", \"is_abnormal\": true}, {\"name\": \"糖化血红蛋白\", \"value\": \"7.4\", \"unit\": \"%\", \"reference\": \"4.0-6.0\", \"is_abnormal\": true}, {\"name\": \"总胆固醇\", \"value\": \"5.9\", \"unit\": \"mmol/L\", \"reference\": \"<5.2\", \"is_abnormal\": true}, {\"name\": \"低密度脂蛋白\", \"value\": \"3.8\", \"unit\": \"mmol/L\", \"reference\": \"<3.4\", \"is_abnormal\": true}, {\"name\": \"丙氨酸氨基转移酶\", \"value\": \"36\", \"unit\": \"U/L\", \"reference\": \"9-50\", \"is_abnormal\": false}]",
+        "created_at": "2026-02-16 11:00:00",
+        "is_deleted": 0
+      }
+    ],
+    "imaging": []
+  },
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

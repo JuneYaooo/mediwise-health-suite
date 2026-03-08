@@ -1,0 +1,62 @@
+{
+  "status": "ok",
+  "count": 4,
+  "alerts": [
+    {
+      "id": "950838781c8d",
+      "member_id": "mem_edge_guo_tao",
+      "metric_type": "blood_pressure_diastolic",
+      "level": "emergency",
+      "title": "郭涛 blood_pressure_diastolic 高于阈值",
+      "detail": "blood_pressure_diastolic: 112.0 mmHg，emergency 阈值: 110 mmHg",
+      "metric_value": "112.0",
+      "threshold_value": 110.0,
+      "is_resolved": 0,
+      "resolved_at": null,
+      "created_at": "2026-03-08 08:35:09"
+    },
+    {
+      "id": "c778f482b40d",
+      "member_id": "mem_edge_guo_tao",
+      "metric_type": "heart_rate",
+      "level": "emergency",
+      "title": "郭涛 heart_rate 高于阈值",
+      "detail": "heart_rate: 154.0 bpm，emergency 阈值: 150 bpm",
+      "metric_value": "154.0",
+      "threshold_value": 150.0,
+      "is_resolved": 0,
+      "resolved_at": null,
+      "created_at": "2026-03-08 08:35:09"
+    },
+    {
+      "id": "ff20ede09bd2",
+      "member_id": "mem_edge_guo_tao",
+      "metric_type": "blood_oxygen",
+      "level": "emergency",
+      "title": "郭涛 blood_oxygen 低于阈值",
+      "detail": "blood_oxygen: 83.0 %，emergency 阈值: 85 %",
+      "metric_value": "83.0",
+      "threshold_value": 85.0,
+      "is_resolved": 0,
+      "resolved_at": null,
+      "created_at": "2026-03-08 08:35:09"
+    },
+    {
+      "id": "6fec4156db44",
+      "member_id": "mem_edge_guo_tao",
+      "metric_type": "temperature",
+      "level": "emergency",
+      "title": "郭涛 temperature 高于阈值",
+      "detail": "temperature: 39.8 °C，emergency 阈值: 39.5 °C",
+      "metric_value": "39.8",
+      "threshold_value": 39.5,
+      "is_resolved": 0,
+      "resolved_at": null,
+      "created_at": "2026-03-08 08:35:09"
+    }
+  ],
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

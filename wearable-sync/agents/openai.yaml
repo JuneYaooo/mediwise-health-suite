@@ -1,0 +1,4 @@
+interface:
+  display_name: "设备同步"
+  short_description: "同步手环手表健康数据，并标准化写入健康档案系统之中"
+  default_prompt: "Use $wearable-sync to sync wearable data and normalize it into health records."

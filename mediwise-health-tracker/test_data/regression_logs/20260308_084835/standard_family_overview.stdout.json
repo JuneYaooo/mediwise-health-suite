@@ -1,0 +1,70 @@
+{
+  "status": "ok",
+  "family_size": 4,
+  "members": [
+    {
+      "id": "mem_self_li_chen",
+      "name": "李晨",
+      "relation": "本人",
+      "gender": "男",
+      "birth_date": "1987-04-18",
+      "allergies": "青霉素,海鲜",
+      "total_visits": 2,
+      "active_medications": 3,
+      "last_visit": {
+        "visit_date": "2026-02-14",
+        "hospital": "市人民医院",
+        "diagnosis": "原发性高血压；2型糖尿病控制欠佳"
+      }
+    },
+    {
+      "id": "mem_spouse_wang_min",
+      "name": "王敏",
+      "relation": "配偶",
+      "gender": "女",
+      "birth_date": "1990-09-12",
+      "allergies": "花粉",
+      "total_visits": 2,
+      "active_medications": 2,
+      "last_visit": {
+        "visit_date": "2026-02-25",
+        "hospital": "市第三医院",
+        "diagnosis": "季节性过敏性鼻炎"
+      }
+    },
+    {
+      "id": "mem_child_li_xiaoyu",
+      "name": "李小宇",
+      "relation": "子女",
+      "gender": "男",
+      "birth_date": "2018-02-03",
+      "allergies": "无",
+      "total_visits": 1,
+      "active_medications": 1,
+      "last_visit": {
+        "visit_date": "2026-03-06",
+        "hospital": "儿童医院",
+        "diagnosis": "急性上呼吸道感染"
+      }
+    },
+    {
+      "id": "mem_mother_chen_xiulan",
+      "name": "陈秀兰",
+      "relation": "母亲",
+      "gender": "女",
+      "birth_date": "1958-11-26",
+      "allergies": "磺胺类",
+      "total_visits": 2,
+      "active_medications": 3,
+      "last_visit": {
+        "visit_date": "2026-02-24",
+        "hospital": "市人民医院",
+        "diagnosis": "冠心病稳定期"
+      }
+    }
+  ],
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

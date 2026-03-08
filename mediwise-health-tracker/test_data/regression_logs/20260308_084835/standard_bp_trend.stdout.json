@@ -1,0 +1,42 @@
+{
+  "status": "ok",
+  "metric_type": "blood_pressure",
+  "days": 14,
+  "data_points": 15,
+  "statistics": {
+    "mean": 154.13,
+    "max": 168.0,
+    "min": 145.0,
+    "std_dev": 6.75,
+    "slope": 1.3607
+  },
+  "trend": "stable",
+  "trend_cn": "稳定",
+  "sustained_abnormal": true,
+  "first_date": "2026-02-23",
+  "last_date": "2026-03-08",
+  "components": {
+    "systolic": {
+      "mean": 154.13,
+      "max": 168.0,
+      "min": 145.0,
+      "std_dev": 6.75,
+      "slope": 1.3607,
+      "trend": "stable",
+      "trend_cn": "稳定"
+    },
+    "diastolic": {
+      "mean": 97.4,
+      "max": 104.0,
+      "min": 92.0,
+      "std_dev": 3.33,
+      "slope": 0.5964,
+      "trend": "stable",
+      "trend_cn": "稳定"
+    }
+  },
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

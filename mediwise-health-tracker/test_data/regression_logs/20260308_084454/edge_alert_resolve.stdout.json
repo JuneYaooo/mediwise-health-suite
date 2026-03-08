@@ -1,0 +1,9 @@
+{
+  "status": "ok",
+  "message": "告警已标记为已解决",
+  "alert_id": "96f094ecafb4",
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

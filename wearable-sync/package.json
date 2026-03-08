@@ -1,0 +1,9 @@
+{
+  "name": "@mediwise/wearable-sync-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "可穿戴设备数据同步 OpenClaw Skill",
+  "author": "mediwise",
+  "license": "MIT",
+  "keywords": ["openclaw", "skill", "wearable", "sync", "gadgetbridge", "health"]
+}

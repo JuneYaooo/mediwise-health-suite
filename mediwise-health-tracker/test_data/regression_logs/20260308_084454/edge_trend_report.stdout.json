@@ -1,0 +1,141 @@
+{
+  "status": "ok",
+  "member_id": "mem_edge_guo_tao",
+  "member_name": "郭涛",
+  "period_days": 7,
+  "trends": [
+    {
+      "metric_type": "blood_oxygen",
+      "days": 7,
+      "data_points": 7,
+      "statistics": {
+        "mean": 88.71,
+        "max": 93.0,
+        "min": 83.0,
+        "std_dev": 3.68,
+        "slope": -1.6786
+      },
+      "trend": "stable",
+      "trend_cn": "稳定",
+      "sustained_abnormal": true,
+      "first_date": "2026-03-02",
+      "last_date": "2026-03-08"
+    },
+    {
+      "metric_type": "blood_pressure",
+      "days": 7,
+      "data_points": 2,
+      "statistics": {
+        "mean": 184.0,
+        "max": 186.0,
+        "min": 182.0,
+        "std_dev": 2.83,
+        "slope": -4.0
+      },
+      "trend": "declining",
+      "trend_cn": "下降",
+      "sustained_abnormal": false,
+      "first_date": "2026-03-07",
+      "last_date": "2026-03-08",
+      "components": {
+        "systolic": {
+          "mean": 184.0,
+          "max": 186.0,
+          "min": 182.0,
+          "std_dev": 2.83,
+          "slope": -4.0,
+          "trend": "declining",
+          "trend_cn": "下降"
+        },
+        "diastolic": {
+          "mean": 115.0,
+          "max": 118.0,
+          "min": 112.0,
+          "std_dev": 4.24,
+          "slope": -6.0,
+          "trend": "declining",
+          "trend_cn": "下降"
+        }
+      }
+    },
+    {
+      "metric_type": "blood_sugar",
+      "days": 7,
+      "data_points": 7,
+      "statistics": {
+        "mean": 10.04,
+        "max": 12.6,
+        "min": 8.4,
+        "std_dev": 1.48,
+        "slope": 0.6643
+      },
+      "trend": "rising",
+      "trend_cn": "上升",
+      "sustained_abnormal": true,
+      "first_date": "2026-03-02",
+      "last_date": "2026-03-08"
+    },
+    {
+      "metric_type": "heart_rate",
+      "days": 7,
+      "data_points": 7,
+      "statistics": {
+        "mean": 126.71,
+        "max": 154.0,
+        "min": 102.0,
+        "std_dev": 18.59,
+        "slope": 8.5714
+      },
+      "trend": "rising",
+      "trend_cn": "上升",
+      "sustained_abnormal": true,
+      "first_date": "2026-03-02",
+      "last_date": "2026-03-08"
+    },
+    {
+      "metric_type": "temperature",
+      "days": 7,
+      "data_points": 7,
+      "statistics": {
+        "mean": 38.9,
+        "max": 39.8,
+        "min": 37.6,
+        "std_dev": 0.81,
+        "slope": 0.3679
+      },
+      "trend": "stable",
+      "trend_cn": "稳定",
+      "sustained_abnormal": true,
+      "first_date": "2026-03-02",
+      "last_date": "2026-03-08"
+    },
+    {
+      "metric_type": "weight",
+      "days": 7,
+      "data_points": 1,
+      "statistics": {
+        "mean": 92.0,
+        "max": 92.0,
+        "min": 92.0,
+        "std_dev": 0.0,
+        "slope": 0.0
+      },
+      "trend": "stable",
+      "trend_cn": "稳定",
+      "sustained_abnormal": false,
+      "first_date": "2026-03-06",
+      "last_date": "2026-03-06"
+    }
+  ],
+  "warnings": [
+    "blood_oxygen 持续异常（7天内）",
+    "blood_sugar 持续异常（7天内）",
+    "heart_rate 持续异常（7天内）",
+    "temperature 持续异常（7天内）"
+  ],
+  "warning_count": 4,
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

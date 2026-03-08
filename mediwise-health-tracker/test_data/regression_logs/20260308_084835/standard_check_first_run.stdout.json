@@ -1,0 +1,45 @@
+{
+  "status": "ok",
+  "member_id": "mem_self_li_chen",
+  "window": "24h",
+  "metrics_checked": 8,
+  "alerts_generated": 4,
+  "alerts": [
+    {
+      "alert_id": "d2eebf462d1e",
+      "metric_type": "heart_rate",
+      "level": "urgent",
+      "title": "李晨 heart_rate 高于阈值",
+      "value": 123.0,
+      "threshold": 120
+    },
+    {
+      "alert_id": "c1b05e3194f4",
+      "metric_type": "blood_pressure_systolic",
+      "level": "urgent",
+      "title": "李晨 blood_pressure_systolic 高于阈值",
+      "value": 168.0,
+      "threshold": 155.0
+    },
+    {
+      "alert_id": "a2477cdc418f",
+      "metric_type": "blood_pressure_diastolic",
+      "level": "urgent",
+      "title": "李晨 blood_pressure_diastolic 高于阈值",
+      "value": 104.0,
+      "threshold": 100
+    },
+    {
+      "alert_id": "4284fbce3be1",
+      "metric_type": "blood_sugar",
+      "level": "urgent",
+      "title": "李晨 blood_sugar 高于阈值",
+      "value": 8.4,
+      "threshold": 7.8
+    }
+  ],
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "records": [],
+  "source_summary": "提取失败: 所有模型均调用失败。最后错误: LLM 未配置。请先配置 vision 或 llm：\n  python3 scripts/setup.py set-vision --provider <provider> --model <model> --api-key <key> --base-url <url>",
+  "error": "所有模型均调用失败。最后错误: LLM 未配置。请先配置 vision 或 llm：\n  python3 scripts/setup.py set-vision --provider <provider> --model <model> --api-key <key> --base-url <url>",
+  "text_preview": "2026-03-07 夜间突发胸闷和气促，体温39.8℃，血氧83%，心率154次/分。"
+}

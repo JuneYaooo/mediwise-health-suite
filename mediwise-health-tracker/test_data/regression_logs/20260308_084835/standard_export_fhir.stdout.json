@@ -1,0 +1,2294 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "timestamp": "2026-03-08T08:48:40+00:00",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "mem_self_li_chen",
+        "name": [
+          {
+            "text": "成员A"
+          }
+        ],
+        "gender": "male",
+        "birthDate": "1987-04-18",
+        "extension": [
+          {
+            "url": "http://mediwise.local/fhir/blood-type",
+            "valueString": "B+"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "mem_self_li_chen-allergy-0",
+        "patient": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "青霉素"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "mem_self_li_chen-allergy-1",
+        "patient": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "海鲜"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "visit_self_physical",
+        "status": "finished",
+        "class": {
+          "code": "AMB",
+          "display": "体检"
+        },
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "period": {
+          "start": "2025-10-09"
+        },
+        "serviceProvider": {
+          "display": "协和国际体检中心"
+        },
+        "type": [
+          {
+            "text": "体检中心"
+          }
+        ],
+        "diagnosis": [
+          {
+            "condition": {
+              "display": "高血压2级；2型糖尿病；高脂血症"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "visit_self_cardiology",
+        "status": "finished",
+        "class": {
+          "code": "AMB",
+          "display": "门诊"
+        },
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "period": {
+          "start": "2026-02-14"
+        },
+        "serviceProvider": {
+          "display": "市人民医院"
+        },
+        "type": [
+          {
+            "text": "心内科"
+          }
+        ],
+        "diagnosis": [
+          {
+            "condition": {
+              "display": "原发性高血压；2型糖尿病控制欠佳"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "sym_self_dizzy",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "头晕"
+        },
+        "severity": {
+          "text": "中度"
+        },
+        "onsetDateTime": "2026-02-22",
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "sym_self_headache",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "头痛"
+        },
+        "severity": {
+          "text": "轻度"
+        },
+        "onsetDateTime": "2026-03-04"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "med_self_nifedipine_old",
+        "status": "completed",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "medicationCodeableConcept": {
+          "text": null
+        },
+        "effectivePeriod": {
+          "start": "2025-09-09",
+          "end": "2025-12-08"
+        },
+        "dosage": [
+          {
+            "text": "30mg",
+            "timing": {
+              "code": {
+                "text": "每日一次"
+              }
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "控制血压"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "med_self_amlodipine",
+        "status": "active",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "medicationCodeableConcept": {
+          "text": null
+        },
+        "effectivePeriod": {
+          "start": "2025-11-08"
+        },
+        "dosage": [
+          {
+            "text": "5mg",
+            "timing": {
+              "code": {
+                "text": "每日一次 早晨"
+              }
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "控制血压"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "med_self_metformin",
+        "status": "active",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "medicationCodeableConcept": {
+          "text": null
+        },
+        "effectivePeriod": {
+          "start": "2025-11-18"
+        },
+        "dosage": [
+          {
+            "text": "500mg",
+            "timing": {
+              "code": {
+                "text": "每日两次 餐后"
+              }
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "控制血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "med_self_rosuvastatin",
+        "status": "active",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "medicationCodeableConcept": {
+          "text": null
+        },
+        "effectivePeriod": {
+          "start": "2025-11-23"
+        },
+        "dosage": [
+          {
+            "text": "10mg",
+            "timing": {
+              "code": {
+                "text": "每晚一次"
+              }
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "降脂"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab_self_metabolic-item-0",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "空腹血糖"
+        },
+        "effectiveDateTime": "2026-03-05",
+        "valueQuantity": {
+          "value": "8.3",
+          "unit": "mmol/L"
+        },
+        "referenceRange": [
+          {
+            "text": "3.9-6.1"
+          }
+        ],
+        "interpretation": [
+          {
+            "text": "异常"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab_self_metabolic-item-1",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "糖化血红蛋白"
+        },
+        "effectiveDateTime": "2026-03-05",
+        "valueQuantity": {
+          "value": "7.4",
+          "unit": "%"
+        },
+        "referenceRange": [
+          {
+            "text": "4.0-6.0"
+          }
+        ],
+        "interpretation": [
+          {
+            "text": "异常"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab_self_metabolic-item-2",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "总胆固醇"
+        },
+        "effectiveDateTime": "2026-03-05",
+        "valueQuantity": {
+          "value": "5.9",
+          "unit": "mmol/L"
+        },
+        "referenceRange": [
+          {
+            "text": "<5.2"
+          }
+        ],
+        "interpretation": [
+          {
+            "text": "异常"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab_self_metabolic-item-3",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "低密度脂蛋白"
+        },
+        "effectiveDateTime": "2026-03-05",
+        "valueQuantity": {
+          "value": "3.8",
+          "unit": "mmol/L"
+        },
+        "referenceRange": [
+          {
+            "text": "<3.4"
+          }
+        ],
+        "interpretation": [
+          {
+            "text": "异常"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab_self_metabolic-item-4",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "丙氨酸氨基转移酶"
+        },
+        "effectiveDateTime": "2026-03-05",
+        "valueQuantity": {
+          "value": "36",
+          "unit": "U/L"
+        },
+        "referenceRange": [
+          {
+            "text": "9-50"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "img_self_carotid",
+        "status": "final",
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "text": "颈动脉超声"
+        },
+        "effectiveDateTime": "2026-03-04",
+        "conclusion": "颈动脉粥样硬化早期改变。",
+        "presentedForm": [
+          {
+            "data": "双侧颈动脉内中膜轻度增厚，左侧颈总动脉可见小斑块。"
+          }
+        ],
+        "encounter": {
+          "reference": "Encounter/visit_self_cardiology"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_037",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8302-2",
+              "display": "Body height"
+            }
+          ]
+        },
+        "effectiveDateTime": "2025-10-09 08:10:00",
+        "valueQuantity": {
+          "value": 174.0,
+          "unit": "cm"
+        },
+        "note": [
+          {
+            "text": "体检身高"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_029",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-23 06:55:00",
+        "valueString": "{\"fasting\": 7.4}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_014",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-23 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 148,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 96,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_028",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-24 06:55:00",
+        "valueString": "{\"fasting\": 7.1}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_036",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-24 07:05:00",
+        "valueQuantity": {
+          "value": 78.6,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_013",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-24 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 146,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 94,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_027",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-25 06:55:00",
+        "valueString": "{\"fasting\": 7.6}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_012",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-25 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 149,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 95,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_026",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-26 06:55:00",
+        "valueString": "{\"fasting\": 7.2}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_035",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-26 07:05:00",
+        "valueQuantity": {
+          "value": 78.4,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_011",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-26 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 151,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 96,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_025",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-27 06:55:00",
+        "valueString": "{\"fasting\": 7.8}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_010",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-27 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 145,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 92,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_024",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-28 06:55:00",
+        "valueString": "{\"fasting\": 7.5}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_034",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-28 07:05:00",
+        "valueQuantity": {
+          "value": 78.2,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_009",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-02-28 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 152,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 97,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_023",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-01 06:55:00",
+        "valueString": "{\"fasting\": 7.9}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_008",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-01 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 154,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 98,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_022",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-02 06:55:00",
+        "valueString": "{\"fasting\": 8.1}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_033",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-02 07:05:00",
+        "valueQuantity": {
+          "value": 78.0,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_007",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-02 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 150,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 94,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_021",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-03 06:55:00",
+        "valueString": "{\"fasting\": 7.7}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-03 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 153,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 95,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_020",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-04 06:55:00",
+        "valueString": "{\"fasting\": 7.9}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_032",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-04 07:05:00",
+        "valueQuantity": {
+          "value": 77.8,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-04 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 156,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 99,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_019",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-05 06:55:00",
+        "valueString": "{\"fasting\": 8.0}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-05 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 158,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 100,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_018",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-06 06:55:00",
+        "valueString": "{\"fasting\": 8.2}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_031",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-06 07:05:00",
+        "valueQuantity": {
+          "value": 77.6,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-06 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 155,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 98,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_017",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-07 06:55:00",
+        "valueString": "{\"fasting\": 8.1}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-07 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 162,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 101,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_038",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8867-4",
+              "display": "Heart rate"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-07 22:00:00",
+        "valueQuantity": {
+          "value": 82.0,
+          "unit": "/min"
+        },
+        "note": [
+          {
+            "text": "静息"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_016",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 06:55:00",
+        "valueString": "{\"fasting\": 8.4}",
+        "note": [
+          {
+            "text": "空腹血糖"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_030",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 07:05:00",
+        "valueQuantity": {
+          "value": 77.4,
+          "unit": "kg"
+        },
+        "note": [
+          {
+            "text": "晨起空腹"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 07:20:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 165,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 102,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "家用上臂式血压计"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_015",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "Blood pressure panel"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 08:40:00",
+        "component": [
+          {
+            "code": {
+              "text": "Systolic"
+            },
+            "valueQuantity": {
+              "value": 168,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "text": "Diastolic"
+            },
+            "valueQuantity": {
+              "value": 104,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "note": [
+          {
+            "text": "晨起复测偏高"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_039",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8867-4",
+              "display": "Heart rate"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 08:45:00",
+        "valueQuantity": {
+          "value": 123.0,
+          "unit": "/min"
+        },
+        "note": [
+          {
+            "text": "头晕时心率"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_040",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2708-6",
+              "display": "Oxygen saturation"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 08:46:00",
+        "valueQuantity": {
+          "value": 97.0,
+          "unit": "%"
+        },
+        "note": [
+          {
+            "text": "指夹式血氧仪"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "metric_041",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "Patient/mem_self_li_chen"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8310-5",
+              "display": "Body temperature"
+            }
+          ]
+        },
+        "effectiveDateTime": "2026-03-08 08:47:00",
+        "valueQuantity": {
+          "value": 36.6,
+          "unit": "°C"
+        },
+        "note": [
+          {
+            "text": "额温枪"
+          }
+        ]
+      }
+    }
+  ]
+}

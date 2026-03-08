@@ -1,0 +1,4 @@
+interface:
+  display_name: "饮食记录"
+  short_description: "记录每日饮食、食物条目，并分析热量与营养趋势变化情况"
+  default_prompt: "Use $diet-tracker to log meals and summarize calorie and nutrition trends."

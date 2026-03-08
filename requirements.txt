@@ -1,0 +1,8 @@
+# MediWise Health Suite - Python Dependencies
+
+# No external Python packages required for basic functionality
+# All skills use Python standard library and SQLite3 (built-in)
+
+# Optional dependencies for enhanced features:
+# requests>=2.28.0  # For medical search API calls (if needed)
+# pillow>=9.0.0     # For image processing (if needed)

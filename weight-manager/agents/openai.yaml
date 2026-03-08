@@ -1,0 +1,4 @@
+interface:
+  display_name: "体重管理"
+  short_description: "追踪体重目标、运动记录和热量收支与身体变化趋势情况"
+  default_prompt: "Use $weight-manager to track weight goals, exercise, and calorie balance."

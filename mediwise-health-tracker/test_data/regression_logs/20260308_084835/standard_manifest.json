@@ -1,0 +1,58 @@
+{
+  "dataset_name": "mediwise-synthetic-household",
+  "generated_at": "2026-03-08 08:48:36",
+  "data_dir": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset",
+  "db_path": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset/health.db",
+  "config_path": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset/config.json",
+  "owner_ids": {
+    "primary": "owner_demo_a",
+    "secondary": "owner_demo_b"
+  },
+  "members": {
+    "self": "mem_self_li_chen",
+    "spouse": "mem_spouse_wang_min",
+    "child": "mem_child_li_xiaoyu",
+    "mother": "mem_mother_chen_xiulan",
+    "tenant_b": "mem_owner_b_zhao_lin"
+  },
+  "key_record_ids": {
+    "self_cardiology_visit": "visit_self_cardiology",
+    "self_metabolic_lab": "lab_self_metabolic",
+    "mother_echo": "img_mother_echo",
+    "child_urgent_visit": "visit_child_urgent",
+    "weight_goal": "weight_goal_self_cut"
+  },
+  "fixture_paths": {
+    "fixtures_dir": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset/fixtures",
+    "sources_dir": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset/fixtures/attachment_sources",
+    "intake_dir": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_dataset/fixtures/intake_inputs"
+  },
+  "record_counts": {
+    "members": 5,
+    "visits": 8,
+    "symptoms": 7,
+    "medications": 10,
+    "lab_results": 4,
+    "imaging_results": 3,
+    "health_metrics": 63,
+    "observations": 4,
+    "reminders": 13,
+    "cycle_records": 22,
+    "attachments": 4,
+    "attachment_links": 4,
+    "diet_records": 3,
+    "diet_items": 9,
+    "weight_goals": 1,
+    "exercise_records": 3,
+    "monitor_thresholds": 3,
+    "monitor_alerts": 3,
+    "member_summaries": 12
+  },
+  "suggested_keywords": [
+    "糖化血红蛋白",
+    "偏头痛",
+    "胸闷",
+    "阿司匹林",
+    "花粉"
+  ]
+}

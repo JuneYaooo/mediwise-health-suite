@@ -1,0 +1,4 @@
+interface:
+  display_name: "家庭健康档案"
+  short_description: "管理健康档案、病程记录、简报和就医前摘要图生成"
+  default_prompt: "Use $mediwise-health-tracker to manage records, summarize health history, or generate a doctor-visit summary image."

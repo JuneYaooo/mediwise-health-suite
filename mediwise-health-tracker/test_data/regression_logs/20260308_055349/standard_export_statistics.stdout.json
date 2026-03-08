@@ -1,0 +1,296 @@
+{
+  "diagnosis_distribution": [
+    {
+      "diagnosis": "高血压2级；2型糖尿病；高脂血症",
+      "count": 1
+    },
+    {
+      "diagnosis": "轻度贫血",
+      "count": 1
+    },
+    {
+      "diagnosis": "急性上呼吸道感染",
+      "count": 1
+    },
+    {
+      "diagnosis": "季节性过敏性鼻炎",
+      "count": 1
+    },
+    {
+      "diagnosis": "原发性高血压；2型糖尿病控制欠佳",
+      "count": 1
+    },
+    {
+      "diagnosis": "冠状动脉粥样硬化性心脏病",
+      "count": 1
+    },
+    {
+      "diagnosis": "冠心病稳定期",
+      "count": 1
+    },
+    {
+      "diagnosis": "偏头痛",
+      "count": 1
+    }
+  ],
+  "medication_categories": [
+    {
+      "purpose": "控制血压",
+      "count": 2
+    },
+    {
+      "purpose": "降脂稳定斑块",
+      "count": 1
+    },
+    {
+      "purpose": "降脂",
+      "count": 1
+    },
+    {
+      "purpose": "退热",
+      "count": 1
+    },
+    {
+      "purpose": "缓解过敏性鼻炎",
+      "count": 1
+    },
+    {
+      "purpose": "缓解偏头痛急性发作",
+      "count": 1
+    },
+    {
+      "purpose": "控制血糖",
+      "count": 1
+    },
+    {
+      "purpose": "控制心率并改善心绞痛症状",
+      "count": 1
+    },
+    {
+      "purpose": "冠心病二级预防",
+      "count": 1
+    }
+  ],
+  "active_medication_count": 9,
+  "visit_frequency": [
+    {
+      "visit_type": "门诊",
+      "count": 4
+    },
+    {
+      "visit_type": "体检",
+      "count": 2
+    },
+    {
+      "visit_type": "急诊",
+      "count": 1
+    },
+    {
+      "visit_type": "住院",
+      "count": 1
+    }
+  ],
+  "total_visits": 8,
+  "metric_trends": {
+    "blood_pressure": [
+      {
+        "value": "{\"systolic\": 168, \"diastolic\": 104}",
+        "measured_at": "2026-03-08 08:40:00"
+      },
+      {
+        "value": "{\"systolic\": 165, \"diastolic\": 102}",
+        "measured_at": "2026-03-08 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 134, \"diastolic\": 76}",
+        "measured_at": "2026-03-07 08:15:00"
+      },
+      {
+        "value": "{\"systolic\": 162, \"diastolic\": 101}",
+        "measured_at": "2026-03-07 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 155, \"diastolic\": 98}",
+        "measured_at": "2026-03-06 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 158, \"diastolic\": 100}",
+        "measured_at": "2026-03-05 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 156, \"diastolic\": 99}",
+        "measured_at": "2026-03-04 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 136, \"diastolic\": 78}",
+        "measured_at": "2026-03-03 08:10:00"
+      },
+      {
+        "value": "{\"systolic\": 153, \"diastolic\": 95}",
+        "measured_at": "2026-03-03 07:20:00"
+      },
+      {
+        "value": "{\"systolic\": 112, \"diastolic\": 72}",
+        "measured_at": "2026-03-02 07:30:00"
+      }
+    ],
+    "blood_sugar": [
+      {
+        "value": "{\"fasting\": 8.4}",
+        "measured_at": "2026-03-08 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 8.1}",
+        "measured_at": "2026-03-07 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 8.2}",
+        "measured_at": "2026-03-06 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 8.0}",
+        "measured_at": "2026-03-05 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 7.9}",
+        "measured_at": "2026-03-04 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 7.7}",
+        "measured_at": "2026-03-03 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 8.1}",
+        "measured_at": "2026-03-02 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 7.9}",
+        "measured_at": "2026-03-01 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 7.5}",
+        "measured_at": "2026-02-28 06:55:00"
+      },
+      {
+        "value": "{\"fasting\": 7.8}",
+        "measured_at": "2026-02-27 06:55:00"
+      }
+    ],
+    "weight": [
+      {
+        "value": "77.4",
+        "measured_at": "2026-03-08 07:05:00"
+      },
+      {
+        "value": "77.6",
+        "measured_at": "2026-03-06 07:05:00"
+      },
+      {
+        "value": "77.8",
+        "measured_at": "2026-03-04 07:05:00"
+      },
+      {
+        "value": "78.0",
+        "measured_at": "2026-03-02 07:05:00"
+      },
+      {
+        "value": "78.2",
+        "measured_at": "2026-02-28 07:05:00"
+      },
+      {
+        "value": "63.2",
+        "measured_at": "2026-02-26 08:05:00"
+      },
+      {
+        "value": "78.4",
+        "measured_at": "2026-02-26 07:05:00"
+      },
+      {
+        "value": "78.6",
+        "measured_at": "2026-02-24 07:05:00"
+      },
+      {
+        "value": "56.1",
+        "measured_at": "2026-02-07 07:00:00"
+      },
+      {
+        "value": "24.5",
+        "measured_at": "2026-02-06 08:00:00"
+      }
+    ],
+    "height": [
+      {
+        "value": "174",
+        "measured_at": "2025-10-09 08:10:00"
+      }
+    ],
+    "heart_rate": [
+      {
+        "value": "123",
+        "measured_at": "2026-03-08 08:45:00"
+      },
+      {
+        "value": "82",
+        "measured_at": "2026-03-07 22:00:00"
+      },
+      {
+        "value": "58",
+        "measured_at": "2026-03-07 08:16:00"
+      },
+      {
+        "value": "128",
+        "measured_at": "2026-03-06 07:35:00"
+      },
+      {
+        "value": "76",
+        "measured_at": "2026-03-02 07:31:00"
+      },
+      {
+        "value": "72",
+        "measured_at": "2026-02-01 09:00:00"
+      }
+    ],
+    "blood_oxygen": [
+      {
+        "value": "89",
+        "measured_at": "2026-03-08 08:50:00"
+      },
+      {
+        "value": "97",
+        "measured_at": "2026-03-08 08:46:00"
+      },
+      {
+        "value": "92",
+        "measured_at": "2026-03-08 08:20:00"
+      },
+      {
+        "value": "97",
+        "measured_at": "2026-03-06 07:36:00"
+      }
+    ],
+    "temperature": [
+      {
+        "value": "36.6",
+        "measured_at": "2026-03-08 08:47:00"
+      },
+      {
+        "value": "37.8",
+        "measured_at": "2026-03-07 19:40:00"
+      },
+      {
+        "value": "39.1",
+        "measured_at": "2026-03-06 07:30:00"
+      },
+      {
+        "value": "38.3",
+        "measured_at": "2026-03-05 20:00:00"
+      },
+      {
+        "value": "36.5",
+        "measured_at": "2026-03-02 07:32:00"
+      }
+    ]
+  },
+  "total_symptoms": 7,
+  "member_count": 5
+}

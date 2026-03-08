@@ -1,0 +1,4 @@
+interface:
+  display_name: "健康监测"
+  short_description: "监测健康指标异常情况，并生成分级告警和趋势变化摘要"
+  default_prompt: "Use $health-monitor to review health metrics, detect anomalies, and summarize alerts."

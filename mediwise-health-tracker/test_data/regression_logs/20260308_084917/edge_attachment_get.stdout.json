@@ -1,0 +1,33 @@
+{
+  "status": "ok",
+  "attachment": {
+    "id": "6f4ace0fd983",
+    "member_id": "mem_edge_guo_tao",
+    "original_filename": "edge_chest_ct.txt",
+    "stored_filename": "6f4ace0fd983_edge_chest_ct.txt",
+    "file_path": "/home/ubuntu/github/openclaw-project/mediwise-health-tracker/test_data/generated_edge_dataset/attachments/mem_edge_guo_tao/6f4ace0fd983_edge_chest_ct.txt",
+    "file_size": 84,
+    "mime_type": "text/plain",
+    "category": "medical_image",
+    "sha256": "7755c1feead9889e3eee6ec7d5b04842887db244bcdd7b2e1a3629f9be0b23d9",
+    "description": "胸部 CT 文本摘要",
+    "created_at": "2026-03-08 08:49:24",
+    "updated_at": "2026-03-08 08:49:24",
+    "is_deleted": 0,
+    "file_exists": true
+  },
+  "links": [
+    {
+      "id": "98f698a030c2",
+      "attachment_id": "6f4ace0fd983",
+      "record_type": "imaging_result",
+      "record_id": "img_edge_ct",
+      "created_at": "2026-03-08 08:49:24",
+      "is_deleted": 0
+    }
+  ],
+  "_config_issues": [
+    "多模态视觉模型未配置（可选，用于识别体检报告图片/PDF）",
+    "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。建议运行 setup.py check-pdf 查看安装指引"
+  ]
+}
