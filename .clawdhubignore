@@ -1,0 +1,26 @@
+# Git files
+.git/
+.gitignore
+
+# Documentation (keep only essential)
+DELIVERY_SUMMARY.md
+PROJECT_COMPLETE.md
+FINAL_REPORT.md
+RELEASE_SUMMARY.md
+
+# Test data
+**/test_data/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
