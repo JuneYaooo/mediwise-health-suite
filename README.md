@@ -3,8 +3,15 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![OpenClaw Compatible](https://img.shields.io/badge/OpenClaw-Compatible-blue.svg)](https://openclaw.ai)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+
+**支持的 Claw 框架**
+
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-Compatible-blue.svg)](https://openclaw.ai)
+[![ZeroClaw](https://img.shields.io/badge/ZeroClaw-Compatible-green.svg)](https://zeroclaw.ai)
+[![NanoClaw](https://img.shields.io/badge/NanoClaw-Compatible-orange.svg)](https://nanoclaw.ai)
+[![IronClaw](https://img.shields.io/badge/IronClaw-Compatible-red.svg)](https://ironclaw.ai)
+[![PicoClaw](https://img.shields.io/badge/PicoClaw-Compatible-purple.svg)](https://picoclaw.ai)
 
 **一个完整的家庭健康管理助手**
 
@@ -18,7 +25,9 @@
 
 ## 📋 简介
 
-MediWise Health Suite 是一个为 OpenClaw AI 设计的完整家庭健康管理助手。它不仅能记录和管理健康数据，还能在你不舒服时提供症状分诊，在准备就医时自动整理病情摘要。
+MediWise Health Suite 是一个为 Claw AI 框架设计的完整家庭健康管理助手。它不仅能记录和管理健康数据，还能在你不舒服时提供症状分诊，在准备就医时自动整理病情摘要。
+
+**支持所有 Claw 框架**: OpenClaw、ZeroClaw、NanoClaw、IronClaw、PicoClaw
 
 **核心价值**：平时能记、能查、能提醒；不舒服时能分诊；准备看医生时还能帮你整理就医摘要。
 
@@ -157,9 +166,18 @@ clawdhub install mediwise-health-suite
 
 ## 📋 系统要求
 
+### 支持的 Claw 框架
+
+- **OpenClaw** (430K LoC, 1GB+) - 完整功能支持
+- **ZeroClaw** (3.4MB, <5MB) - 轻量级部署
+- **NanoClaw** (2.6K LoC, ~100MB) - 精简版本
+- **IronClaw** (Rust, TEE) - 安全增强
+- **PicoClaw** (8MB, <10MB) - 超轻量级
+
+### 基础要求
+
 - Python 3.8+
 - SQLite 3.x
-- OpenClaw 2026.3.0+
 - 操作系统：Linux / macOS / Windows
 
 ---

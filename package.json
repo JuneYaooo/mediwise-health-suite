@@ -1,7 +1,7 @@
 {
   "name": "mediwise-health-suite",
   "version": "1.0.0",
-  "description": "Complete family health management suite for OpenClaw AI",
+  "description": "Complete family health management suite for Claw AI frameworks (OpenClaw, ZeroClaw, NanoClaw, IronClaw, PicoClaw)",
   "main": "SKILL.md",
   "scripts": {
     "test": "echo \"No tests specified yet\" && exit 0"
@@ -17,6 +17,11 @@
     "triage",
     "first-aid",
     "openclaw",
+    "zeroclaw",
+    "nanoclaw",
+    "ironclaw",
+    "picoclaw",
+    "claw-framework",
     "skill",
     "chinese",
     "健康管理",
@@ -26,12 +31,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/mediwise-health-suite.git"
+    "url": "https://github.com/JuneYaooo/mediwise-health-suite.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/mediwise-health-suite/issues"
+    "url": "https://github.com/JuneYaooo/mediwise-health-suite/issues"
   },
-  "homepage": "https://github.com/your-username/mediwise-health-suite#readme",
+  "homepage": "https://github.com/JuneYaooo/mediwise-health-suite#readme",
   "engines": {
     "node": ">=14.0.0",
     "python": ">=3.8.0"
