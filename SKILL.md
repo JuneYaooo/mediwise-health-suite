@@ -3,12 +3,11 @@ name: mediwise-health-suite
 description: >-
   家庭健康管理套件。已实现：健康档案管理（成员、病程、用药、指标、就医摘要）、
   饮食追踪（营养分析、热量计算）、体重管理（BMI/BMR/TDEE、趋势分析）。
-  部分实现：健康监测、可穿戴设备同步。待开发：症状分诊、急救指导、医学搜索、
-  多源对比、健康科普。所有数据本地存储，保护隐私。
+  部分实现：健康监测、可穿戴设备同步。所有数据本地存储，保护隐私。
   Family health management suite. Implemented: health records (members, visits, medications,
   metrics, doctor visit summaries), diet tracking (nutrition analysis, calorie calculation),
   weight management (BMI/BMR/TDEE, trend analysis). Partial: health monitoring, wearable sync.
-  Planned: symptom triage, first aid, medical search, diagnosis comparison, health education.
+  All data stored locally for privacy.
 version: 1.0.0
 author: MediWise Team
 license: MIT

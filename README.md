@@ -47,26 +47,14 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 - BMI/BMR/TDEE 计算
 - 目标设定与进度追踪
 
-### 🔜 计划开发功能
+### ⚠️ 部分实现功能
 
-#### 🔍 症状分诊与急救（待开发）
-- 结构化症状问诊
-- 危险信号识别
-- 可能方向分析与建议科室
-- 标准化急救指导（CPR、烫伤、骨折等）
-
-#### 🔬 医学搜索与安全（待开发）
-- 药物安全查询（交互、禁忌、不良反应）
-- 疾病知识搜索
-- 权威来源验证
-- 健康科普内容推荐
-
-#### 📊 智能监测与提醒（部分实现）
+#### 📊 智能监测与提醒
 - 多级健康告警
 - 趋势分析与异常检测
 - 用药提醒、复查提醒
 
-#### ⌚ 可穿戴设备同步（部分实现）
+#### ⌚ 可穿戴设备同步
 - 小米手环、华为手表等数据同步
 - 运动数据导入
 
@@ -149,11 +137,6 @@ clawdhub install mediwise-health-suite
 | 体重管理 | ✅ 已实现 | 体重记录、BMI/BMR/TDEE 计算、趋势分析 |
 | 健康监测 | ⚠️ 部分实现 | 智能告警、趋势分析 |
 | 可穿戴设备 | ⚠️ 部分实现 | 小米手环、华为手表数据同步 |
-| 医学搜索 | 🔜 待开发 | 药物安全、疾病知识 |
-| 症状分诊 | 🔜 待开发 | 结构化问诊、危险信号识别 |
-| 急救指导 | 🔜 待开发 | 标准化急救步骤 |
-| 多源对比 | 🔜 待开发 | 第二意见、交叉验证 |
-| 健康科普 | 🔜 待开发 | 个性化健康教育内容 |
 
 ---
 
@@ -171,31 +154,6 @@ clawdhub install mediwise-health-suite
 - SQLite 3.x
 - OpenClaw 2026.3.0+
 - 操作系统：Linux / macOS / Windows
-
-- Python 3.8+
-- SQLite 3.x
-- 操作系统：Linux / macOS / Windows
-
----
-
-## 📖 文档
-
-- [快速开始指南](QUICKSTART.md) - 详细的使用教程
-- [安装指南](docs/INSTALLATION.md) - 完整的安装说明
-- [系统概览](docs/HEALTH-MANAGEMENT-OVERVIEW.md) - 功能详解
-- [贡献指南](CONTRIBUTING.md) - 如何参与贡献
-
----
-
-## 🤝 贡献
-
-欢迎贡献代码、报告问题或提出建议！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
 
 ---
 
