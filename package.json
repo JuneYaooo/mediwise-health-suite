@@ -1,7 +1,7 @@
 {
   "name": "mediwise-health-suite",
   "version": "1.0.0",
-  "description": "Complete family health management suite for Claw AI frameworks (OpenClaw, ZeroClaw, NanoClaw, IronClaw, PicoClaw)",
+  "description": "Family health management suite for OpenClaw AI. Implemented: health records, diet tracking, weight management. Partial: health monitoring, wearable sync. Planned: symptom triage, first aid, medical search.",
   "main": "SKILL.md",
   "scripts": {
     "test": "echo \"No tests specified yet\" && exit 0"
@@ -13,15 +13,8 @@
     "tracking",
     "diet",
     "weight",
-    "wearable",
-    "triage",
-    "first-aid",
+    "records",
     "openclaw",
-    "zeroclaw",
-    "nanoclaw",
-    "ironclaw",
-    "picoclaw",
-    "claw-framework",
     "skill",
     "chinese",
     "健康管理",

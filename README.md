@@ -3,19 +3,13 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-
-**支持的 Claw 框架**
-
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-Compatible-blue.svg)](https://openclaw.ai)
-[![ZeroClaw](https://img.shields.io/badge/ZeroClaw-Compatible-green.svg)](https://zeroclaw.ai)
-[![NanoClaw](https://img.shields.io/badge/NanoClaw-Compatible-orange.svg)](https://nanoclaw.ai)
-[![IronClaw](https://img.shields.io/badge/IronClaw-Compatible-red.svg)](https://ironclaw.ai)
-[![PicoClaw](https://img.shields.io/badge/PicoClaw-Compatible-purple.svg)](https://picoclaw.ai)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Status](https://img.shields.io/badge/Status-Active%20Development-green.svg)]()
 
-**一个完整的家庭健康管理助手**
+**家庭健康管理助手**
 
-从日常记录到就医准备的完整健康管理闭环
+从日常记录到健康追踪的完整解决方案
 
 [快速开始](#快速开始) • [功能介绍](#功能介绍) • [安装方法](#安装方法) • [使用示例](#使用示例)
 
@@ -25,47 +19,56 @@
 
 ## 📋 简介
 
-MediWise Health Suite 是一个为 Claw AI 框架设计的完整家庭健康管理助手。它不仅能记录和管理健康数据，还能在你不舒服时提供症状分诊，在准备就医时自动整理病情摘要。
+MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手。帮助你记录和管理健康数据，追踪饮食和体重，为家庭健康保驾护航。
 
-**支持所有 Claw 框架**: OpenClaw、ZeroClaw、NanoClaw、IronClaw、PicoClaw
-
-**核心价值**：平时能记、能查、能提醒；不舒服时能分诊；准备看医生时还能帮你整理就医摘要。
+**核心价值**：平时能记、能查、能追踪；数据本地存储，保护隐私。
 
 ---
 
-## ✨ 主要功能
+## ✨ 功能状态
 
-### 🏥 健康档案管理
+### ✅ 已实现功能
+
+#### 🏥 健康档案管理
 - 家庭成员信息管理
 - 病程记录（门诊、住院、急诊）
 - 用药追踪与提醒
 - 日常健康指标（血压、血糖、心率等）
 - 图片识别（化验单、体检报告、处方）
-- **就医前摘要生成**（文本/图片/PDF）
+- 就医前摘要生成（文本/图片/PDF）
 
-### 🔍 症状分诊与急救
+#### 🍎 饮食追踪
+- 饮食记录与营养分析
+- 热量计算
+- 营养素统计
+
+#### ⚖️ 体重管理
+- 体重记录与趋势分析
+- BMI/BMR/TDEE 计算
+- 目标设定与进度追踪
+
+### 🔜 计划开发功能
+
+#### 🔍 症状分诊与急救（待开发）
 - 结构化症状问诊
 - 危险信号识别
 - 可能方向分析与建议科室
 - 标准化急救指导（CPR、烫伤、骨折等）
 
-### 🔬 医学搜索与安全
+#### 🔬 医学搜索与安全（待开发）
 - 药物安全查询（交互、禁忌、不良反应）
 - 疾病知识搜索
 - 权威来源验证
 - 健康科普内容推荐
 
-### 🍎 生活方式管理
-- 饮食记录与营养分析
-- 体重管理（BMI/BMR/TDEE）
-- 运动记录与消耗追踪
-- 可穿戴设备数据同步（小米手环、华为手表等）
-
-### 📊 智能监测与提醒
+#### 📊 智能监测与提醒（部分实现）
 - 多级健康告警
 - 趋势分析与异常检测
 - 用药提醒、复查提醒
-- 每日健康简报
+
+#### ⌚ 可穿戴设备同步（部分实现）
+- 小米手环、华为手表等数据同步
+- 运动数据导入
 
 ---
 
@@ -96,7 +99,8 @@ clawdhub install mediwise-health-suite
 "帮我添加一个家庭成员，叫张三，是我爸爸"
 "帮我记录今天血压 130/85，心率 72"
 "帮我看看最近的健康情况"
-"我最近老是头晕"
+"记录今天吃了一碗米饭和一份青菜"
+"记录今天体重 65kg"
 "我准备去看医生，帮我整理一下最近的情况"
 ```
 
@@ -116,18 +120,16 @@ clawdhub install mediwise-health-suite
 助手：已为您记录今天的健康指标...
 ```
 
-### 症状咨询
+### 饮食追踪
 ```
-用户："我最近老是头晕"
-助手：我来帮您分析一下。请问头晕是什么时候开始的？
+用户："记录今天吃了一碗米饭和一份青菜"
+助手：已为您记录今天的饮食...
 ```
 
-### 急救指导
+### 体重管理
 ```
-用户："有人晕倒了怎么办"
-助手：🚨 意识丧失急救步骤：
-1️⃣ 立即拨打 120
-2️⃣ 检查呼吸和脉搏...
+用户："记录今天体重 65kg"
+助手：已记录体重，您的 BMI 是...
 ```
 
 ### 就医前准备
@@ -140,18 +142,18 @@ clawdhub install mediwise-health-suite
 
 ## 📦 包含的功能模块
 
-| 模块 | 功能 |
-|------|------|
-| 健康档案 | 成员管理、病程记录、用药追踪 |
-| 健康监测 | 智能告警、趋势分析 |
-| 医学搜索 | 药物安全、疾病知识 |
-| 症状分诊 | 结构化问诊、危险信号识别 |
-| 急救指导 | 标准化急救步骤 |
-| 多源对比 | 第二意见、交叉验证 |
-| 健康科普 | 权威内容推荐 |
-| 饮食追踪 | 营养分析、热量管理 |
-| 体重管理 | BMI/BMR/TDEE、运动记录 |
-| 设备同步 | 可穿戴设备数据导入 |
+| 模块 | 状态 | 功能 |
+|------|------|------|
+| 健康档案 | ✅ 已实现 | 成员管理、病程记录、用药追踪、健康指标 |
+| 饮食追踪 | ✅ 已实现 | 饮食记录、营养分析、热量计算 |
+| 体重管理 | ✅ 已实现 | 体重记录、BMI/BMR/TDEE 计算、趋势分析 |
+| 健康监测 | ⚠️ 部分实现 | 智能告警、趋势分析 |
+| 可穿戴设备 | ⚠️ 部分实现 | 小米手环、华为手表数据同步 |
+| 医学搜索 | 🔜 待开发 | 药物安全、疾病知识 |
+| 症状分诊 | 🔜 待开发 | 结构化问诊、危险信号识别 |
+| 急救指导 | 🔜 待开发 | 标准化急救步骤 |
+| 多源对比 | 🔜 待开发 | 第二意见、交叉验证 |
+| 健康科普 | 🔜 待开发 | 个性化健康教育内容 |
 
 ---
 
@@ -159,22 +161,16 @@ clawdhub install mediwise-health-suite
 
 - ✅ 所有数据存储在本地 SQLite 数据库
 - ✅ 不上传任何个人健康信息到云端
-- ✅ 医学搜索使用公开的权威来源
 - ✅ 支持多租户隔离
 
 ---
 
 ## 📋 系统要求
 
-### 支持的 Claw 框架
-
-- **OpenClaw** (430K LoC, 1GB+) - 完整功能支持
-- **ZeroClaw** (3.4MB, <5MB) - 轻量级部署
-- **NanoClaw** (2.6K LoC, ~100MB) - 精简版本
-- **IronClaw** (Rust, TEE) - 安全增强
-- **PicoClaw** (8MB, <10MB) - 超轻量级
-
-### 基础要求
+- Python 3.8+
+- SQLite 3.x
+- OpenClaw 2026.3.0+
+- 操作系统：Linux / macOS / Windows
 
 - Python 3.8+
 - SQLite 3.x

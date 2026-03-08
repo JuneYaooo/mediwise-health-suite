@@ -1,15 +1,14 @@
 ---
 name: mediwise-health-suite
 description: >-
-  完整的家庭健康管理套件。包含健康档案管理、病程记录、用药追踪、指标监测、症状分诊、
-  急救指导、多源问诊对比、健康科普、饮食追踪、体重管理、可穿戴设备同步等功能。
-  支持图片识别、就医前摘要生成（文本/图片/PDF）、药物安全检索、主动健康提醒。
-  支持所有 Claw 框架：OpenClaw、ZeroClaw、NanoClaw、IronClaw、PicoClaw。
-  Complete family health management suite with medical records, symptom triage,
-  medication tracking, health monitoring, diagnosis comparison, first aid guidance,
-  health education, diet tracking, weight management, and wearable device sync.
-  Supports image recognition, doctor visit summary generation, drug safety search, and proactive health reminders.
-  Compatible with all Claw frameworks: OpenClaw, ZeroClaw, NanoClaw, IronClaw, PicoClaw.
+  家庭健康管理套件。已实现：健康档案管理（成员、病程、用药、指标、就医摘要）、
+  饮食追踪（营养分析、热量计算）、体重管理（BMI/BMR/TDEE、趋势分析）。
+  部分实现：健康监测、可穿戴设备同步。待开发：症状分诊、急救指导、医学搜索、
+  多源对比、健康科普。所有数据本地存储，保护隐私。
+  Family health management suite. Implemented: health records (members, visits, medications,
+  metrics, doctor visit summaries), diet tracking (nutrition analysis, calorie calculation),
+  weight management (BMI/BMR/TDEE, trend analysis). Partial: health monitoring, wearable sync.
+  Planned: symptom triage, first aid, medical search, diagnosis comparison, health education.
 version: 1.0.0
 author: MediWise Team
 license: MIT
@@ -22,20 +21,14 @@ keywords:
   - tracking
   - diet
   - weight
-  - wearable
-  - triage
-  - first-aid
+  - records
   - chinese
   - 健康管理
   - 医疗
   - 家庭健康
   - 饮食
+  - 体重
   - openclaw
-  - zeroclaw
-  - nanoclaw
-  - ironclaw
-  - picoclaw
-  - claw-framework
   - 体重
   - 急救
 ---
