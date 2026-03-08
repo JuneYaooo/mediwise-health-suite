@@ -197,13 +197,6 @@ clawdhub install mediwise-health-suite
 
 ---
 
-## 📞 联系方式
-
-- GitHub Issues: https://github.com/JuneYaooo/mediwise-health-suite/issues
-- GitHub Repo: https://github.com/JuneYaooo/mediwise-health-suite
-
----
-
 <div align="center">
 
 **⭐ 如果这个项目对你有帮助，请给个 Star！**
