@@ -1,4 +1,0 @@
-interface:
-  display_name: "健康科普"
-  short_description: "分层推荐权威科普图文、视频与精选健康教育内容资源库"
-  default_prompt: "Use $health-education to find trustworthy health education content and videos."

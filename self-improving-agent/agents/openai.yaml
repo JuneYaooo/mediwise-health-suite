@@ -1,4 +1,0 @@
-interface:
-  display_name: "自我改进"
-  short_description: "记录错误、修正、经验和改进建议，以持续优化技能表现"
-  default_prompt: "Use $self-improving-agent to log a failure, correction, or learning for future improvement."

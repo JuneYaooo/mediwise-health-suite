@@ -1,4 +1,0 @@
-interface:
-  display_name: "意见对比"
-  short_description: "对比多平台症状分析结果，并展示一致意见与关键分歧点"
-  default_prompt: "Use $diagnosis-comparison to compare symptom analyses from multiple medical sources."

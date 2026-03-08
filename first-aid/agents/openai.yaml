@@ -1,4 +1,0 @@
-interface:
-  display_name: "急救指导"
-  short_description: "提供紧急情况下可立即执行的一步一步急救处理步骤说明"
-  default_prompt: "Use $first-aid to give immediate first-aid steps for an emergency situation."
