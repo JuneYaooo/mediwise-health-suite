@@ -56,11 +56,11 @@ openclaw agents add health
     {
       agentId: "health",
       match: {
-        channel: "whatsapp",
-        peer: { kind: "group", id: "YOUR_GROUP_ID@g.us" },
+        channel: "qq",
+        peer: { kind: "group", id: "123456789" },
       },
     },
-    { agentId: "main", match: { channel: "whatsapp" } },
+    { agentId: "main", match: { channel: "qq" } },
   ],
 }
 ```
@@ -69,7 +69,7 @@ openclaw agents add health
 
 ### 方案 A：家庭健康群组（推荐）
 
-创建专门的 WhatsApp/Telegram 群组：
+创建专门的群组用于健康管理（支持 QQ、飞书、企业微信、钉钉、WhatsApp、Telegram 等）：
 
 ```json5
 {
@@ -87,11 +87,28 @@ openclaw agents add health
     ],
   },
   bindings: [
+    // QQ 群组示例
     {
       agentId: "health",
       match: {
-        channel: "whatsapp",
-        peer: { kind: "group", id: "YOUR_GROUP_ID@g.us" },
+        channel: "qq",
+        peer: { kind: "group", id: "123456789" },
+      },
+    },
+    // 或飞书群组
+    {
+      agentId: "health",
+      match: {
+        channel: "feishu",
+        peer: { kind: "group", id: "oc_xxx" },
+      },
+    },
+    // 或企业微信群组
+    {
+      agentId: "health",
+      match: {
+        channel: "wecom",
+        peer: { kind: "group", id: "wrXXXXXXXX" },
       },
     },
   ],
@@ -102,14 +119,25 @@ openclaw agents add health
 
 ### 方案 B：个人健康私信
 
+将特定联系人的私信路由到健康 agent：
+
 ```json5
 {
   bindings: [
+    // QQ 私信示例
     {
       agentId: "health",
       match: {
-        channel: "whatsapp",
-        peer: { kind: "dm", id: "+8613800138000" },
+        channel: "qq",
+        peer: { kind: "dm", id: "987654321" },
+      },
+    },
+    // 或飞书私信
+    {
+      agentId: "health",
+      match: {
+        channel: "feishu",
+        peer: { kind: "dm", id: "ou_xxx" },
       },
     },
   ],
@@ -119,6 +147,8 @@ openclaw agents add health
 **优点**：完全私密、一对一交互
 
 ### 方案 C：多渠道隔离
+
+使用不同渠道分离日常和健康（例如：QQ 用于日常，飞书用于健康管理）：
 
 ```json5
 {
@@ -137,8 +167,8 @@ openclaw agents add health
     ],
   },
   bindings: [
-    { agentId: "main", match: { channel: "whatsapp" } },
-    { agentId: "health", match: { channel: "telegram" } },
+    { agentId: "main", match: { channel: "qq" } },
+    { agentId: "health", match: { channel: "feishu" } },
   ],
 }
 ```
@@ -187,7 +217,7 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 
 ## 使用示例
 
-在健康群组中：
+在健康群组中（QQ、飞书、企微、钉钉等）：
 
 ```
 用户: @健康 帮我添加一个家庭成员，叫张三，是我爸爸，65岁
@@ -209,4 +239,4 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 - ✅ 灵活配置权限和工具
 - ✅ 支持多人共享（家庭群组）
 
-推荐使用**方案 A（家庭健康群组）**，既能保证隔离，又方便家人共同使用。
+推荐使用**方案 A（家庭健康群组）**，既能保证隔离，又方便家人共同使用。支持 QQ、飞书、企业微信、钉钉等常用渠道。
