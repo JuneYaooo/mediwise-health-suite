@@ -39,20 +39,6 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 助手：根据最近的记录，您的血压...
 ```
 
-#### 症状咨询
-```
-用户："我最近老是头晕"
-助手：我来帮您分析一下。请问头晕是什么时候开始的？
-```
-
-#### 急救指导
-```
-用户："有人晕倒了怎么办"
-助手：🚨 意识丧失急救步骤：
-1️⃣ 立即拨打 120
-2️⃣ 检查呼吸和脉搏...
-```
-
 #### 饮食记录
 ```
 用户："帮我记录今天早餐：牛奶一杯、面包两片、鸡蛋一个"
@@ -80,18 +66,6 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 助手：我来帮您识别化验单内容...
 ```
 
-#### 药物安全查询
-```
-用户："氨氯地平和阿司匹林能一起吃吗？"
-助手：让我查询一下这两种药物的相互作用...
-```
-
-#### 健康科普
-```
-用户："高血压是怎么回事？"
-助手：让我为您找一些权威的科普内容...
-```
-
 #### 可穿戴设备同步
 ```
 用户："帮我同步小米手环的数据"
@@ -105,8 +79,6 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 | 添加成员 | "添加家庭成员" |
 | 记录指标 | "记录血压 130/85" |
 | 查看摘要 | "最近健康情况" |
-| 症状咨询 | "我头晕" |
-| 急救指导 | "烫伤怎么办" |
 | 饮食记录 | "记录早餐" |
 | 体重管理 | "设定减重目标" |
 | 就医准备 | "整理就医摘要" |
@@ -167,20 +139,6 @@ User: "Show me my recent health status"
 Assistant: Based on recent records, your blood pressure...
 ```
 
-#### Symptom Consultation
-```
-User: "I've been feeling dizzy lately"
-Assistant: Let me help you analyze this. When did the dizziness start?
-```
-
-#### First Aid Guidance
-```
-User: "Someone fainted, what should I do?"
-Assistant: 🚨 Loss of consciousness first aid steps:
-1️⃣ Call 911 immediately
-2️⃣ Check breathing and pulse...
-```
-
 #### Diet Tracking
 ```
 User: "Record today's breakfast: a glass of milk, two slices of bread, one egg"
@@ -208,18 +166,6 @@ User: "Help me recognize this lab report"
 Assistant: Let me help you recognize the lab report content...
 ```
 
-#### Drug Safety Query
-```
-User: "Can I take Amlodipine and Aspirin together?"
-Assistant: Let me check the interaction between these two medications...
-```
-
-#### Health Education
-```
-User: "What is hypertension?"
-Assistant: Let me find some authoritative educational content for you...
-```
-
 #### Wearable Device Sync
 ```
 User: "Sync my Xiaomi Band data"
@@ -233,8 +179,6 @@ Assistant: Okay, let me sync your band data...
 | Add Member | "Add family member" |
 | Record Metrics | "Record blood pressure 130/85" |
 | View Summary | "Recent health status" |
-| Symptom Consultation | "I feel dizzy" |
-| First Aid | "What to do for burns" |
 | Diet Tracking | "Record breakfast" |
 | Weight Management | "Set weight loss goal" |
 | Doctor Visit Prep | "Organize medical summary" |

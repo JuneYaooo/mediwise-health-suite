@@ -102,7 +102,7 @@ python3 {baseDir}/scripts/doctor_visit_report.py text --member-id <id> --descrip
 
 1. **不要直接展示 JSON**：查询结果必须转成自然中文。
 2. **不要用自身视觉能力读医疗图片**：图片/PDF 只能走外部视觉模型。
-3. **药物安全问题必须先搜**：统一复用 `medical-search`，不要凭记忆回答。
+3. **药物安全问题必须先搜**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答。
 4. **发简报默认发图片版**：优先 `briefing_report.py screenshot`，不是纯文本。
 5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
 6. **共享实例要做租户隔离**：有 `owner_id` 时始终带上。

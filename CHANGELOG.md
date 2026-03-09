@@ -9,18 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial release of MediWise Health Suite
-- 11 integrated health management skills:
+- 5 health management skills:
   - `mediwise-health-tracker`: Core health records management
-  - `health-monitor`: Smart health monitoring and alerts
-  - `medical-search`: Medical search and drug safety
-  - `symptom-triage`: Symptom triage
-  - `first-aid`: First aid guidance
-  - `diagnosis-comparison`: Multi-source diagnosis comparison
-  - `health-education`: Health education
   - `diet-tracker`: Diet tracking
   - `weight-manager`: Weight management
-  - `wearable-sync`: Wearable device sync
-  - `self-improving-agent`: Self-improvement
+  - `health-monitor`: Smart health monitoring and alerts (待完善)
+  - `wearable-sync`: Wearable device sync (待完善)
 - Shared SQLite database for all health data
 - Doctor visit summary generation (text/image/PDF)
 - Image recognition for medical reports

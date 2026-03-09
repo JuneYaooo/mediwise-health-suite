@@ -19,7 +19,7 @@
 - 药物 + 食物
 - 中成药安全
 
-统一复用 `medical-search` 的来源筛选、引用格式和免责声明。
+通过 DDInter、openFDA 或网页搜索查询，统一使用来源筛选、引用格式和免责声明。
 
 ## 查询方式
 
@@ -47,7 +47,7 @@ python3 {baseDir}/scripts/openfda_query.py search --name "metformin"
 ### 网页搜索
 
 - 中成药、安全说明、药酒同服、药食同服等优先走网页搜索
-- 来源优先级沿用 `medical-search`
+- 来源优先级：权威医学数据库 > 官方说明书 > 可靠医学网站
 - 正文关键结论必须带 `[1][2]`
 
 ## 结果呈现

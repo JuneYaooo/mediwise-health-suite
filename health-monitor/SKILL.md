@@ -20,7 +20,7 @@ description: >-
 | info | 信息记录 | 仅记录，不主动推送 |
 | warning | 预警 | 创建 reminder 推送 |
 | urgent | 紧急 | 推送 + 标记高优先级 |
-| emergency | 危急 | 推送 + 联动 first-aid skill 急救指引 |
+| emergency | 危急 | 推送 + 建议立即就医或拨打急救电话 |
 
 ## 默认阈值
 
