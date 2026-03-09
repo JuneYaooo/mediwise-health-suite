@@ -57,7 +57,29 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 助手：好的，我先为您生成一份就医前摘要...
 ```
 
-### 3. 高级功能
+### 3. 家庭群组使用
+
+在 QQ 群或飞书群中，一家人可以共同使用健康助手，数据自动按发送者隔离：
+
+```
+张三: @健康 帮我添加家庭成员"妈妈"，68岁
+助手: 已为您添加家庭成员"妈妈"
+
+李四: @健康 帮我记录血压 125/80
+助手: 已为您记录血压...
+
+张三: @健康 帮我看看全家的健康情况
+助手: [只显示张三的数据，看不到李四的记录]
+```
+
+每个用户还可以为家人代管健康档案：
+
+```
+张三: @健康 帮妈妈记录今天血糖 6.8
+助手: 已为"妈妈"记录空腹血糖 6.8 mmol/L
+```
+
+### 4. 高级功能
 
 #### 图片识别
 ```
@@ -72,7 +94,7 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 助手：好的，我来同步您的手环数据...
 ```
 
-### 4. 常用命令
+### 5. 常用命令
 
 | 功能 | 示例对话 |
 |------|---------|
@@ -83,7 +105,7 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 | 体重管理 | "设定减重目标" |
 | 就医准备 | "整理就医摘要" |
 
-### 5. 配置（可选）
+### 6. 配置（可选）
 
 编辑 `~/.openclaw/config.json`：
 
@@ -157,7 +179,29 @@ User: "I'm preparing to see a doctor, help me organize my recent condition"
 Assistant: Okay, let me generate a doctor visit summary for you...
 ```
 
-### 3. Advanced Features
+### 3. Family Group Usage
+
+In a QQ group or Feishu group, family members can share the same health assistant. Data is automatically isolated by sender identity:
+
+```
+Alice: @Health Add a family member "Mom", 68 years old
+Assistant: Added family member "Mom" for you.
+
+Bob: @Health Record my blood pressure 125/80
+Assistant: Recorded blood pressure for you...
+
+Alice: @Health Show me my family's health overview
+Assistant: [Only shows Alice's data, cannot see Bob's records]
+```
+
+Each user can also manage health records for their family members:
+
+```
+Alice: @Health Record Mom's blood sugar today: 6.8
+Assistant: Recorded fasting blood sugar 6.8 mmol/L for "Mom"
+```
+
+### 4. Advanced Features
 
 #### Image Recognition
 ```
@@ -172,7 +216,7 @@ User: "Sync my Xiaomi Band data"
 Assistant: Okay, let me sync your band data...
 ```
 
-### 4. Common Commands
+### 5. Common Commands
 
 | Feature | Example Dialogue |
 |---------|-----------------|
@@ -183,7 +227,7 @@ Assistant: Okay, let me sync your band data...
 | Weight Management | "Set weight loss goal" |
 | Doctor Visit Prep | "Organize medical summary" |
 
-### 5. Configuration (Optional)
+### 6. Configuration (Optional)
 
 Edit `~/.openclaw/config.json`:
 

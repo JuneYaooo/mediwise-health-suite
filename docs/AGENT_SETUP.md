@@ -202,11 +202,39 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 
 ## 数据隔离
 
+系统提供两个层级的数据隔离：
+
+### Agent 级隔离
+
 每个 agent 有独立的：
 - **工作区**：`~/.openclaw/workspace-health`
 - **会话存储**：`~/.openclaw/agents/health/sessions`
 - **认证配置**：`~/.openclaw/agents/health/agent/auth-profiles.json`
 - **数据库**：`health.db` 存储在工作区
+
+### 用户级隔离（群聊场景）
+
+在家庭群组中，系统通过 `owner_id`（发送者的平台 ID）自动隔离不同用户的数据：
+
+```
+家庭健康群（QQ 群 123456789）
+├── 张三（QQ: 111）→ owner_id="qq_111"
+│   ├── 自己的健康档案
+│   ├── 爸爸的健康档案
+│   └── 妈妈的健康档案
+│
+├── 李四（QQ: 222）→ owner_id="qq_222"
+│   ├── 自己的健康档案
+│   └── 老婆的健康档案
+│
+└── 张三和李四的数据完全隔离，互不可见
+```
+
+**工作原理**：
+- 群聊中每条消息的发送者 ID 由平台自动提供
+- 路由层（`index.js`）自动将发送者 ID 作为 `owner_id` 传给脚本
+- 所有查询和写入操作都按 `owner_id` 过滤
+- 无需用户手动指定，全程自动
 
 ## 安全建议
 

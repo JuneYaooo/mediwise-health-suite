@@ -18,11 +18,11 @@ clawdhub install mediwise-health-suite
 
 ```bash
 # 克隆到 OpenClaw skills 目录
-git clone https://github.com/your-username/mediwise-health-suite.git \
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/.openclaw/skills/mediwise-health-suite
 
 # 或克隆到自定义位置
-git clone https://github.com/your-username/mediwise-health-suite.git \
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/my-skills/mediwise-health-suite
 ```
 
@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/mediwise-health-suite.git
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git
 cd mediwise-health-suite
 
 # 创建符号链接到 OpenClaw skills 目录
@@ -145,11 +145,11 @@ After installation, OpenClaw will automatically load all skills.
 
 ```bash
 # Clone to OpenClaw skills directory
-git clone https://github.com/your-username/mediwise-health-suite.git \
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/.openclaw/skills/mediwise-health-suite
 
 # Or clone to custom location
-git clone https://github.com/your-username/mediwise-health-suite.git \
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/my-skills/mediwise-health-suite
 ```
 
@@ -176,7 +176,7 @@ If OpenClaw responds and asks for member information, installation is successful
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/mediwise-health-suite.git
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git
 cd mediwise-health-suite
 
 # Create symbolic link to OpenClaw skills directory
