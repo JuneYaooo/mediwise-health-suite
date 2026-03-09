@@ -1,4 +1,0 @@
-{
-  "fallback": true,
-  "message": "未能从文本中识别到常见健康指标，建议使用 smart_intake.py extract 进行智能提取"
-}

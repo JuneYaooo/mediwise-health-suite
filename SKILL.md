@@ -3,11 +3,11 @@ name: mediwise-health-suite
 description: >-
   家庭健康管理套件。已实现：健康档案管理（成员、病程、用药、指标、就医摘要）、
   饮食追踪（营养分析、热量计算）、体重管理（BMI/BMR/TDEE、趋势分析）。
-  待完善：健康监测、可穿戴设备同步。所有数据本地存储，保护隐私。
+  待完善：健康监测、可穿戴设备同步。默认本地存储，可选后端 API 和向量搜索（需主动配置）。
   Family health management suite. Implemented: health records (members, visits, medications,
   metrics, doctor visit summaries), diet tracking (nutrition analysis, calorie calculation),
   weight management (BMI/BMR/TDEE, trend analysis). To be improved: health monitoring, wearable sync.
-  All data stored locally for privacy.
+  Local storage by default, optional backend API and vector search (requires manual configuration).
 version: 1.0.0
 author: MediWise Team
 license: MIT
@@ -125,9 +125,13 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 
 ## 数据隐私
 
-- 所有数据存储在本地 SQLite 数据库
-- 不上传任何个人健康信息到云端
-- 支持多租户隔离（共享实例场景）
+- **默认本地存储**：所有数据存储在本地 SQLite 数据库，不上传云端
+- **可选后端模式**：支持可选的后端 API 模式（需用户主动配置，默认关闭）
+- **可选向量搜索**：支持智能查询功能（本地模型优先，可选 API，默认关闭）
+- **MCP 服务器**：提供只读数据访问接口（用于与其他工具集成）
+- **多租户隔离**：支持共享实例场景的数据隔离
+
+**重要**：所有云端功能均为可选，需用户主动配置启用。默认配置下，所有数据仅存储在本地。
 
 ## 技术架构
 
@@ -135,6 +139,7 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 - **脚本语言**: Python 3.8+
 - **Skill 框架**: OpenClaw Agent Skills
 - **模块化设计**: 5 个 skills（3 个已实现，2 个待完善）
+- **可选功能**: 后端 API、向量搜索、MCP 服务器（默认关闭）
 
 ## 许可证
 
