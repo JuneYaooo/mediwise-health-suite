@@ -1,14 +1,7 @@
 ---
 name: mediwise-health-suite
-description: >-
-  家庭健康管理套件。已实现：健康档案管理（成员、病程、用药、指标、就医摘要）、
-  饮食追踪（营养分析、热量计算）、体重管理（BMI/BMR/TDEE、趋势分析）。
-  待完善：健康监测、可穿戴设备同步。默认本地存储，可选后端 API 和向量搜索（需主动配置）。
-  Family health management suite. Implemented: health records (members, visits, medications,
-  metrics, doctor visit summaries), diet tracking (nutrition analysis, calorie calculation),
-  weight management (BMI/BMR/TDEE, trend analysis). To be improved: health monitoring, wearable sync.
-  Local storage by default, optional backend API and vector search (requires manual configuration).
-version: 1.0.0
+description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
+version: 1.0.4
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
@@ -17,51 +10,15 @@ keywords:
   - health
   - medical
   - family
-  - tracking
   - diet
   - weight
   - records
   - chinese
-  - 健康管理
-  - 医疗
-  - 家庭健康
-  - 饮食
-  - 体重
   - openclaw
-# Optional environment variables (all features work without any of these)
-env:
-  optional:
-    - name: USDA_API_KEY
-      description: >-
-        USDA FoodData Central API key for international food lookup fallback in
-        diet-tracker. Register free at https://api.data.gov/signup/
-        If unset, USDA lookup is silently skipped; CFCD6 and cn-brands data
-        are used instead (covers most Chinese foods).
-    - name: MEDIWISE_DATA_DIR
-      description: >-
-        Override the default data directory where SQLite databases are stored.
-        Defaults to the OS user-data directory (~/.local/share/mediwise on Linux).
-    - name: MEDIWISE_MEDICAL_DB_PATH
-      description: Override path for the medical database file (medical.db).
-    - name: MEDIWISE_LIFESTYLE_DB_PATH
-      description: Override path for the lifestyle database file (lifestyle.db).
-# Network: offline by default. Optional features below contact external hosts ONLY
-# when explicitly configured by the user via setup.py or env vars.
-network:
-  default: offline
-  optional_outbound:
-    - host: api.nal.usda.gov
-      trigger: USDA_API_KEY env var is set
-      purpose: USDA FoodData Central — international food nutrition lookup (diet-tracker)
-      data_sent: food name search query string (no personal health data)
-    - host: api.siliconflow.cn
-      trigger: vector search enabled via setup.py set-embedding
-      purpose: Text embedding API for semantic health record search
-      data_sent: anonymised text snippets for embedding (no PII by default)
-    - host: user-configured
-      trigger: backend API enabled via setup.py set-backend
-      purpose: Optional self-hosted REST API backend (replaces local SQLite)
-      data_sent: full health record data — only configure with a trusted endpoint
+requires:
+  bins:
+    - python3
+    - sqlite3
 ---
 
 # MediWise Health Suite - 家庭健康管理套件
@@ -165,6 +122,27 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 - **多租户隔离**：支持共享实例场景的数据隔离
 
 **重要**：所有云端功能均为可选，需用户主动配置启用。默认配置下，所有数据仅存储在本地。
+
+## 可选环境变量
+
+所有功能在不设置任何环境变量的情况下均可正常使用。
+
+| 变量名 | 用途 | 默认行为 |
+|--------|------|----------|
+| `USDA_API_KEY` | USDA FoodData Central API Key，用于饮食追踪的国际食材兜底查询。免费注册：https://api.data.gov/signup/ | 未设置时跳过 USDA 查询，使用 CFCD6/cn-brands 离线数据库 |
+| `MEDIWISE_DATA_DIR` | 覆盖 SQLite 数据库存储目录 | 默认 OS 用户数据目录（Linux: `~/.local/share/mediwise`） |
+| `MEDIWISE_MEDICAL_DB_PATH` | 覆盖医疗数据库（medical.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
+| `MEDIWISE_LIFESTYLE_DB_PATH` | 覆盖生活方式数据库（lifestyle.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
+
+## 可选外部网络访问
+
+默认完全离线。以下外部主机**仅在用户主动配置后**才会被访问：
+
+| 主机 | 触发条件 | 发送内容 |
+|------|----------|----------|
+| `api.nal.usda.gov` | 设置 `USDA_API_KEY` 环境变量 | 食物名称搜索词（不含个人健康数据） |
+| `api.siliconflow.cn` | 执行 `setup.py set-embedding` 启用向量搜索 | 匿名文本片段用于 embedding（默认不含 PII） |
+| 用户自行配置的地址 | 执行 `setup.py set-backend` 启用后端 API | 完整健康记录数据，仅限信任的自托管端点 |
 
 ## 技术架构
 

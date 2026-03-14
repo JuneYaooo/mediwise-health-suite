@@ -1,12 +1,6 @@
 ---
 name: wearable-sync
-description: >-
-  可穿戴设备数据同步。支持从华为手表、小米手环（Gadgetbridge）、Zepp 等设备导入健康数据。
-  可插拔 Provider 架构，当前支持 Gadgetbridge 本地 SQLite 导入。
-  Wearable device data sync. Supports importing health data from Huawei watches,
-  Xiaomi bands (Gadgetbridge), Zepp devices, etc. Pluggable provider architecture,
-  currently supports Gadgetbridge local SQLite import.
-  关键词：手环、手表、可穿戴、设备绑定、数据同步、华为手表、小米手环、Gadgetbridge、睡眠数据、步数、设备管理。
+description: "Wearable device data sync: import health data from Huawei watches, Xiaomi bands (Gadgetbridge), Zepp devices. Pluggable provider architecture; currently supports Gadgetbridge local SQLite import."
 ---
 
 # Wearable Sync - 可穿戴设备数据同步

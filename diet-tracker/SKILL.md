@@ -1,10 +1,6 @@
 ---
 name: diet-tracker
-description: >-
-  日常饮食记录与营养分析。用于记录每餐、维护食物条目、查看每日或每周营养摘要、
-  分析热量趋势，并与 `mediwise-health-tracker`、`weight-manager` 联动形成饮食与体重闭环。
-  Use when recording meals, managing food items, reviewing nutrition summaries,
-  or analyzing calorie trends for a family member.
+description: "Diet and nutrition tracking: log meals, manage food items, view daily/weekly nutrition summaries, analyze calorie trends. Integrates with mediwise-health-tracker and weight-manager."
 ---
 
 # diet-tracker

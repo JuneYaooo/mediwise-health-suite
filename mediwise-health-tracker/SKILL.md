@@ -1,30 +1,24 @@
 ---
 name: mediwise-health-tracker
-description: >-
-  家庭健康与病程记录管理工具。当用户想要添加或管理家庭成员信息、记录就诊经历（门诊/住院/急诊）、
-  记录症状/诊断/用药/检验/影像检查结果、记录日常健康指标（血压/血糖/心率/体温等）、
-  查询病程历史或用药记录、生成健康时间线或摘要、查看全家健康概况时，使用此技能。
-  也适用于用户发送体检报告图片或化验单需要识别录入的场景。
-  也适用于用户想要设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、每日健康简报、
-  就医前摘要图的场景。
-  也适用于用户准备去医院、想规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）的场景。
-  也适用于用户随口提到健康问题（如"最近膝盖有点疼"）需要记录并定期跟进的场景。
-  Family health and medical record management tool. Use when the user wants to add/manage
-  family members, record medical visits, track symptoms, diagnoses, medications, lab results,
-  imaging results, daily health metrics, query medical history, generate health timelines or
-  summaries, view family health overview, or extract data from medical report images and lab sheets.
-  Also use when the user wants to set medication reminders, health metric measurement reminders,
-  follow-up checkup reminders, or get proactive health advice, daily health briefings, and a
-  doctor-visit summary image before seeing a clinician.
-  Also use for visit lifecycle management (plan → prep → outcome → follow-up) and health memory
-  tracking (capture casual health mentions and proactively follow up).
+description: Family health and medical record management. Tracks members, visits, medications, lab results, daily metrics, reminders, briefings, and pre-visit summaries.
 ---
 
 # MediWise Health Tracker
 
 家庭健康与病程记录管理技能。所有操作通过 `{baseDir}/scripts/` 下的 Python 脚本完成，默认输出 JSON，再转成自然语言回复给用户。
 
-当用户问“你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、简报外，还可以根据最近的描述和历史记录先整理一段“就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
+当用户问”你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、简报外，还可以根据最近的描述和历史记录先整理一段”就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
+
+## 适用场景
+
+- 添加或管理家庭成员信息
+- 记录就诊经历（门诊/住院/急诊）、症状/诊断/用药/检验/影像检查结果
+- 记录日常健康指标（血压/血糖/心率/体温等）
+- 查询病程历史或用药记录、生成健康时间线或摘要、查看全家健康概况
+- 发送体检报告图片或化验单需要识别录入
+- 设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、每日健康简报、就医前摘要图
+- 规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）
+- 随口提到健康问题（如”最近膝盖有点疼”）需要记录并定期跟进
 
 ## 核心工作流
 

@@ -1,11 +1,6 @@
 ---
 name: weight-manager
-description: >-
-  体重管理、减脂增重目标、运动记录与身体指标分析。用于设定体重目标、追踪进度、
-  计算 BMI/BMR/TDEE、分析热量收支，并结合 `diet-tracker` 与 `mediwise-health-tracker`
-  形成饮食、运动、体重和围度的管理闭环。
-  Use when setting weight goals, tracking progress, logging exercise, or analyzing
-  calorie balance and body composition.
+description: "Weight management: set goals, track progress, log exercise, calculate BMI/BMR/TDEE, analyze calorie balance and body composition. Integrates with diet-tracker and mediwise-health-tracker."
 ---
 
 # weight-manager
