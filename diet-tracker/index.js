@@ -76,6 +76,14 @@ const ROUTES = {
     if (inputs.params?.days) args.push('--days', String(inputs.params.days));
     return { script: 'nutrition.py', args };
   },
+  'food-lookup': (inputs) => {
+    const args = ['search', '--query', inputs.params?.query ?? ''];
+    if (inputs.params?.limit) args.push('--limit', String(inputs.params.limit));
+    if (inputs.params?.source) args.push('--source', inputs.params.source);
+    if (inputs.params?.no_brands) args.push('--no-brands');
+    return { script: 'food_lookup.py', args };
+  },
+  'food-stats': () => ({ script: 'food_lookup.py', args: ['stats'] }),
 };
 
 /**
@@ -105,6 +113,12 @@ export async function execute(inputs, context) {
 
   try {
     const { script, args } = routeFn(inputs);
+
+    const ownerId = inputs.owner_id;
+    if (ownerId) {
+      args.push('--owner-id', ownerId);
+    }
+
     log(`[diet-tracker] script=${script} args=${args.join(' ')}`);
     const result = await runScript(script, args);
     return { status: 'ok', result };

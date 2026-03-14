@@ -173,6 +173,12 @@ export async function execute(inputs, context) {
 
   try {
     const { script, args } = routeFn(inputs);
+
+    const ownerId = inputs.owner_id;
+    if (ownerId) {
+      args.push('--owner-id', ownerId);
+    }
+
     log(`[weight-manager] script=${script} args=${args.join(' ')}`);
     const result = await runScript(script, args);
     return { status: 'ok', result };

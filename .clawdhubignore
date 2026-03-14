@@ -24,3 +24,25 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Mediwise Health Suite - Local data (NEVER package)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+data/
+**/data/
+attachments/
+**/attachments/
+exports/
+**/exports/
+!exports/.gitkeep
+backups/
+**/backups/
+logs/
+**/logs/

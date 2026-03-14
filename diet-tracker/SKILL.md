@@ -65,6 +65,18 @@ description: >-
 | calorie-trend | calorie-trend | --member-id | --days (默认 7) | 热量趋势分析（N 天每日总热量） |
 | nutrition-balance | nutrition-balance | --member-id | --days (默认 7) | 三大营养素比例分析 |
 
+### food_lookup.py — 食物营养查询
+
+| 动作 | 子命令 | 必要参数 | 可选参数 | 说明 |
+|------|--------|----------|----------|------|
+| food-lookup | search | params.query | params.limit (默认5), params.source (auto/cfcd/brands/usda) | 三层数据源搜索食物营养（CFCD6 → 中国品牌外食 → USDA） |
+| food-stats | stats | — | — | 查看食物数据库概况（各数据源条目数） |
+
+数据来源（按优先级）：
+1. **CFCD6**（离线）：《中国食物成分表标准版第6版》1657 条，覆盖粮谷、肉蛋奶、蔬果、水产等
+2. **cn-brands**（离线）：339 条，奶茶、外卖、便利店、火锅等外食场景
+3. **USDA FoodData Central**（在线）：国际食材兜底，需配置 `USDA_API_KEY` 环境变量
+
 ## 使用流程
 
 1. 确认成员身份（通过 mediwise-health-tracker 的 list-members）
@@ -75,13 +87,15 @@ description: >-
 
 ## items JSON 格式
 
-`--items` 参数接受 JSON 数组：
+`--items` 参数接受 JSON 数组。营养字段可省略，系统会自动从食物数据库查询填充：
 ```json
 [
-  {"food_name": "米饭", "amount": 200, "unit": "g", "calories": 232, "protein": 4.6, "fat": 0.6, "carbs": 51.5, "fiber": 0.3},
-  {"food_name": "炒青菜", "amount": 150, "unit": "g", "calories": 45, "protein": 2.1, "fat": 2.5, "carbs": 3.2, "fiber": 1.8}
+  {"food_name": "鸡胸脯肉", "amount": 150, "unit": "g"},
+  {"food_name": "米饭", "amount": 200, "unit": "g", "calories": 232, "protein": 4.6, "fat": 0.6, "carbs": 51.5}
 ]
 ```
+
+自动填充规则：CFCD6/USDA 数据按 `amount`（克）换算；中国品牌/外食数据按每份直接使用。
 
 ## 注意事项
 

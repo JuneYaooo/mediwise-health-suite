@@ -8,7 +8,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-from health_db import ensure_db, get_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, is_api_mode, transaction, verify_member_ownership, verify_record_ownership
+from health_db import ensure_db, get_medical_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, is_api_mode, transaction, verify_member_ownership, verify_record_ownership
 from validators import validate_metric_value
 import api_client
 
@@ -32,6 +32,10 @@ def add_metric(args):
             data["measured_at"] = args.measured_at
         if args.note:
             data["note"] = args.note
+        if getattr(args, 'context', None):
+            data["context"] = args.context
+        if getattr(args, 'related_visit_id', None):
+            data["related_visit_id"] = args.related_visit_id
         try:
             result = api_client.add_metric(data)
             output_json({"status": "ok", "message": "健康指标已记录", "metric": result})
@@ -39,7 +43,7 @@ def add_metric(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         if not verify_member_ownership(conn, args.member_id, getattr(args, 'owner_id', None)):
             output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})
             return
@@ -62,10 +66,17 @@ def add_metric(args):
         metric_id = generate_id()
         measured_at = args.measured_at or now_iso()
         source = getattr(args, 'source', None) or 'manual'
+        context = getattr(args, 'context', None) or 'routine'
+        related_visit_id = getattr(args, 'related_visit_id', None)
+        if related_visit_id:
+            v = conn.execute("SELECT id FROM visits WHERE id=? AND is_deleted=0", (related_visit_id,)).fetchone()
+            if not v:
+                output_json({"status": "error", "message": f"未找到关联就诊记录: {related_visit_id}"})
+                return
         conn.execute(
-            """INSERT INTO health_metrics (id, member_id, metric_type, value, measured_at, note, source, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (metric_id, args.member_id, args.type, value, measured_at, args.note, source, now_iso())
+            """INSERT INTO health_metrics (id, member_id, metric_type, value, measured_at, note, source, context, related_visit_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (metric_id, args.member_id, args.type, value, measured_at, args.note, source, context, related_visit_id, now_iso())
         )
         conn.commit()
         metric = row_to_dict(conn.execute("SELECT * FROM health_metrics WHERE id=?", (metric_id,)).fetchone())
@@ -95,7 +106,7 @@ def list_metrics(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         if not verify_member_ownership(conn, args.member_id, getattr(args, 'owner_id', None)):
             output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})
@@ -142,7 +153,7 @@ def delete_metric(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         row = conn.execute("SELECT * FROM health_metrics WHERE id=? AND is_deleted=0", (args.id,)).fetchone()
         if not row:
             output_json({"status": "error", "message": f"未找到指标记录: {args.id}"})
@@ -167,6 +178,8 @@ def main():
     p_add.add_argument("--measured-at", default=None, help="测量时间 (YYYY-MM-DD HH:MM)")
     p_add.add_argument("--note", default=None)
     p_add.add_argument("--source", default="manual", help="数据来源: manual|huawei|zepp|gadgetbridge|openwearables")
+    p_add.add_argument("--context", default="routine", choices=["routine", "visit", "self_test"], help="测量场景: routine(日常)|visit(就诊中)|self_test(自测)")
+    p_add.add_argument("--related-visit-id", default=None, help="关联就诊记录ID（就诊中测量时使用）")
 
     p_list = sub.add_parser("list")
     p_list.add_argument("--member-id", required=True)

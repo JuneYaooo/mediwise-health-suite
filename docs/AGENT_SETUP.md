@@ -210,7 +210,7 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 - **工作区**：`~/.openclaw/workspace-health`
 - **会话存储**：`~/.openclaw/agents/health/sessions`
 - **认证配置**：`~/.openclaw/agents/health/agent/auth-profiles.json`
-- **数据库**：`health.db` 存储在工作区
+- **数据库**：`health.db` 存储在工作区（新版拆分为 `medical.db` / `lifestyle.db`）
 
 ### 用户级隔离（群聊场景）
 
@@ -241,7 +241,7 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 1. **启用沙箱**：`sandbox.mode: "all"` 隔离健康数据
 2. **限制工具**：只允许必要的工具
 3. **设置提及模式**：避免在群组中误触发
-4. **定期备份**：备份 `~/.openclaw/workspace-health/health.db`
+4. **定期备份**：备份 `~/.openclaw/workspace-health/medical.db` 与 `~/.openclaw/workspace-health/lifestyle.db`
 
 ## 使用示例
 

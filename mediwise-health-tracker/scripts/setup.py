@@ -16,6 +16,7 @@ import argparse
 import json
 import sys
 import os
+import sqlite3
 
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
@@ -23,10 +24,24 @@ from config import (
     ensure_data_dir, DEFAULT_CONFIG, CONFIG_PATH,
     check_pdf_tools,
 )
+from health_db import (
+    init_db,
+    get_medical_db_path,
+    get_lifestyle_db_path,
+    MEDICAL_TABLES,
+    LIFESTYLE_TABLES,
+)
 
 
 def output_json(data):
     print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+def _mask_key(s: str) -> str:
+    """Mask a secret string, showing at most the first 4 chars."""
+    if not s or len(s) <= 4:
+        return "***"
+    return s[:4] + "***"
 
 
 def cmd_check(args):
@@ -97,7 +112,7 @@ def cmd_set_vision(args):
     save_config(cfg)
     # Mask API key in output
     display = {**cfg}
-    display["vision"] = {**cfg["vision"], "api_key": cfg["vision"]["api_key"][:8] + "***"}
+    display["vision"] = {**cfg["vision"], "api_key": _mask_key(cfg["vision"]["api_key"])}
     output_json({
         "status": "ok",
         "message": f"多模态视觉模型已配置: {args.provider}/{args.model}",
@@ -130,11 +145,11 @@ def cmd_show(args):
     # Mask API keys
     display = {**cfg}
     if cfg.get("vision", {}).get("api_key"):
-        display["vision"] = {**cfg["vision"], "api_key": cfg["vision"]["api_key"][:8] + "***"}
+        display["vision"] = {**cfg["vision"], "api_key": _mask_key(cfg["vision"]["api_key"])}
     if cfg.get("embedding", {}).get("api_key"):
-        display["embedding"] = {**cfg["embedding"], "api_key": cfg["embedding"]["api_key"][:8] + "***"}
+        display["embedding"] = {**cfg["embedding"], "api_key": _mask_key(cfg["embedding"]["api_key"])}
     if cfg.get("backend", {}).get("token"):
-        display["backend"] = {**cfg.get("backend", {}), "token": cfg["backend"]["token"][:8] + "***"}
+        display["backend"] = {**cfg.get("backend", {}), "token": _mask_key(cfg["backend"]["token"])}
     output_json({"status": "ok", "config_path": CONFIG_PATH, "config": display})
 
 
@@ -151,7 +166,7 @@ def cmd_set_embedding(args):
     save_config(cfg)
     display = {**cfg}
     if cfg["embedding"].get("api_key"):
-        display["embedding"] = {**cfg["embedding"], "api_key": cfg["embedding"]["api_key"][:8] + "***"}
+        display["embedding"] = {**cfg["embedding"], "api_key": _mask_key(cfg["embedding"]["api_key"])}
     output_json({
         "status": "ok",
         "message": f"Embedding 已配置: provider={args.provider}",
@@ -207,7 +222,7 @@ def cmd_set_backend(args):
         "token": args.token
     }
     save_config(cfg)
-    display_token = args.token[:8] + "***" if len(args.token) > 8 else "***"
+    display_token = _mask_key(args.token)
     output_json({
         "status": "ok",
         "message": f"后端 API 模式已启用: {args.url}",
@@ -429,6 +444,258 @@ def cmd_set_privacy(args):
     })
 
 
+def _table_exists(conn, table_name):
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,)
+    ).fetchone()
+    return bool(row)
+
+
+# Union of all known tables — used to guard against unexpected names in SQL
+_ALL_KNOWN_TABLES: frozenset[str] = MEDICAL_TABLES | LIFESTYLE_TABLES
+
+
+def _validate_table_name(table_name: str) -> str:
+    """Raise ValueError if table_name is not a recognised internal table.
+
+    This is a defence-in-depth guard: callers already pass names from the
+    MEDICAL_TABLES / LIFESTYLE_TABLES constants, so this should never fire
+    in normal operation.  It prevents an accidentally wrong value from being
+    silently interpolated into a SQL string.
+    """
+    if table_name not in _ALL_KNOWN_TABLES:
+        raise ValueError(f"Unexpected table name: {table_name!r}")
+    return table_name
+
+
+def _table_count(conn, table_name):
+    if not _table_exists(conn, table_name):
+        return 0
+    _validate_table_name(table_name)
+    row = conn.execute(f"SELECT COUNT(*) AS c FROM {table_name}").fetchone()
+    return int(row["c"] if row else 0)
+
+
+def _table_columns(conn, table_name):
+    _validate_table_name(table_name)
+    return [r["name"] for r in conn.execute(f"PRAGMA table_info({table_name})").fetchall()]
+
+
+def _copy_table_data(source_conn, target_conn, table_name):
+    if not _table_exists(source_conn, table_name) or not _table_exists(target_conn, table_name):
+        return {
+            "table": table_name,
+            "source_exists": _table_exists(source_conn, table_name),
+            "target_exists": _table_exists(target_conn, table_name),
+            "copied": 0,
+            "before": _table_count(target_conn, table_name),
+            "after": _table_count(target_conn, table_name),
+            "skipped": "table_missing",
+        }
+
+    _validate_table_name(table_name)
+    source_cols = _table_columns(source_conn, table_name)
+    target_cols = _table_columns(target_conn, table_name)
+    common_cols = [c for c in source_cols if c in target_cols]
+
+    before = _table_count(target_conn, table_name)
+    if not common_cols:
+        return {
+            "table": table_name,
+            "source_exists": True,
+            "target_exists": True,
+            "copied": 0,
+            "before": before,
+            "after": before,
+            "skipped": "no_common_columns",
+        }
+
+    # Column names come from PRAGMA table_info of our own schema — safe to interpolate.
+    col_sql = ", ".join(common_cols)
+    placeholders = ", ".join(["?"] * len(common_cols))
+    rows = source_conn.execute(f"SELECT {col_sql} FROM {table_name}").fetchall()
+
+    copied = 0
+    for row in rows:
+        values = [row[col] for col in common_cols]
+        cur = target_conn.execute(
+            f"INSERT OR IGNORE INTO {table_name} ({col_sql}) VALUES ({placeholders})",
+            values,
+        )
+        copied += cur.rowcount
+
+    after = _table_count(target_conn, table_name)
+    return {
+        "table": table_name,
+        "source_exists": True,
+        "target_exists": True,
+        "copied": copied,
+        "before": before,
+        "after": after,
+    }
+
+
+def cmd_migrate_split_db(args):
+    """Migrate legacy single DB data into split medical/lifestyle DBs."""
+    cfg = load_config()
+    legacy_db_path = os.path.abspath(cfg.get("db_path", DEFAULT_CONFIG["db_path"]))
+    medical_db_path = os.path.abspath(get_medical_db_path())
+    lifestyle_db_path = os.path.abspath(get_lifestyle_db_path())
+
+    init_db("medical")
+    init_db("lifestyle")
+
+    if not os.path.exists(legacy_db_path):
+        output_json({
+            "status": "ok",
+            "message": "未检测到旧版单库文件，无需迁移",
+            "legacy_db_path": legacy_db_path,
+            "medical_db_path": medical_db_path,
+            "lifestyle_db_path": lifestyle_db_path,
+            "migrated": False,
+        })
+        return
+
+    source_conn = sqlite3.connect(legacy_db_path)
+    source_conn.row_factory = sqlite3.Row
+    medical_conn = sqlite3.connect(medical_db_path)
+    medical_conn.row_factory = sqlite3.Row
+    lifestyle_conn = sqlite3.connect(lifestyle_db_path)
+    lifestyle_conn.row_factory = sqlite3.Row
+
+    medical_details = []
+    lifestyle_details = []
+    try:
+        for table in sorted(MEDICAL_TABLES):
+            if legacy_db_path == medical_db_path:
+                medical_details.append({
+                    "table": table,
+                    "source_exists": _table_exists(source_conn, table),
+                    "target_exists": True,
+                    "copied": 0,
+                    "before": _table_count(medical_conn, table),
+                    "after": _table_count(medical_conn, table),
+                    "skipped": "same_source_target",
+                })
+            else:
+                medical_details.append(_copy_table_data(source_conn, medical_conn, table))
+
+        for table in sorted(LIFESTYLE_TABLES):
+            if legacy_db_path == lifestyle_db_path:
+                lifestyle_details.append({
+                    "table": table,
+                    "source_exists": _table_exists(source_conn, table),
+                    "target_exists": True,
+                    "copied": 0,
+                    "before": _table_count(lifestyle_conn, table),
+                    "after": _table_count(lifestyle_conn, table),
+                    "skipped": "same_source_target",
+                })
+            else:
+                lifestyle_details.append(_copy_table_data(source_conn, lifestyle_conn, table))
+
+        medical_conn.commit()
+        lifestyle_conn.commit()
+    finally:
+        source_conn.close()
+        medical_conn.close()
+        lifestyle_conn.close()
+
+    output_json({
+        "status": "ok",
+        "message": "拆库迁移完成",
+        "legacy_db_path": legacy_db_path,
+        "medical_db_path": medical_db_path,
+        "lifestyle_db_path": lifestyle_db_path,
+        "medical": {
+            "table_count": len(medical_details),
+            "copied_rows": sum(d.get("copied", 0) for d in medical_details),
+            "details": medical_details,
+        },
+        "lifestyle": {
+            "table_count": len(lifestyle_details),
+            "copied_rows": sum(d.get("copied", 0) for d in lifestyle_details),
+            "details": lifestyle_details,
+        },
+    })
+
+
+def cmd_migration_status(args):
+    """Show split DB migration status by per-table row counts."""
+    cfg = load_config()
+    legacy_db_path = os.path.abspath(cfg.get("db_path", DEFAULT_CONFIG["db_path"]))
+    medical_db_path = os.path.abspath(get_medical_db_path())
+    lifestyle_db_path = os.path.abspath(get_lifestyle_db_path())
+
+    status = {
+        "status": "ok",
+        "legacy_db_path": legacy_db_path,
+        "legacy_exists": os.path.exists(legacy_db_path),
+        "medical_db_path": medical_db_path,
+        "medical_exists": os.path.exists(medical_db_path),
+        "lifestyle_db_path": lifestyle_db_path,
+        "lifestyle_exists": os.path.exists(lifestyle_db_path),
+        "medical": {},
+        "lifestyle": {},
+    }
+
+    legacy_conn = None
+    medical_conn = None
+    lifestyle_conn = None
+    try:
+        if status["legacy_exists"]:
+            legacy_conn = sqlite3.connect(legacy_db_path)
+            legacy_conn.row_factory = sqlite3.Row
+        if status["medical_exists"]:
+            medical_conn = sqlite3.connect(medical_db_path)
+            medical_conn.row_factory = sqlite3.Row
+        if status["lifestyle_exists"]:
+            lifestyle_conn = sqlite3.connect(lifestyle_db_path)
+            lifestyle_conn.row_factory = sqlite3.Row
+
+        for table in sorted(MEDICAL_TABLES):
+            legacy_count = _table_count(legacy_conn, table) if legacy_conn else None
+            split_count = _table_count(medical_conn, table) if medical_conn else None
+            status["medical"][table] = {
+                "legacy": legacy_count,
+                "split": split_count,
+                "match": None if legacy_count is None or split_count is None else legacy_count == split_count,
+            }
+
+        for table in sorted(LIFESTYLE_TABLES):
+            legacy_count = _table_count(legacy_conn, table) if legacy_conn else None
+            split_count = _table_count(lifestyle_conn, table) if lifestyle_conn else None
+            status["lifestyle"][table] = {
+                "legacy": legacy_count,
+                "split": split_count,
+                "match": None if legacy_count is None or split_count is None else legacy_count == split_count,
+            }
+
+        medical_matched = [v["match"] for v in status["medical"].values() if v["match"] is not None]
+        lifestyle_matched = [v["match"] for v in status["lifestyle"].values() if v["match"] is not None]
+
+        status["summary"] = {
+            "medical_tables": len(status["medical"]),
+            "lifestyle_tables": len(status["lifestyle"]),
+            "medical_match_ratio": (
+                f"{sum(1 for x in medical_matched if x)}/{len(medical_matched)}" if medical_matched else "N/A"
+            ),
+            "lifestyle_match_ratio": (
+                f"{sum(1 for x in lifestyle_matched if x)}/{len(lifestyle_matched)}" if lifestyle_matched else "N/A"
+            ),
+        }
+    finally:
+        if legacy_conn:
+            legacy_conn.close()
+        if medical_conn:
+            medical_conn.close()
+        if lifestyle_conn:
+            lifestyle_conn.close()
+
+    output_json(status)
+
+
 def main():
     parser = argparse.ArgumentParser(description="MediWise Health Tracker 配置管理")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -473,6 +740,9 @@ def main():
     p.add_argument("--level", required=True, choices=["full", "anonymized", "statistical"],
                    help="隐私级别: full（完整）/ anonymized（匿名化）/ statistical（仅统计）")
 
+    sub.add_parser("migrate-split-db", help="将旧版单库数据迁移到 medical/lifestyle 双库")
+    sub.add_parser("migration-status", help="查看拆库迁移状态和表行数对比")
+
     args = parser.parse_args()
     commands = {
         "check": cmd_check, "init": cmd_init, "set-db-path": cmd_set_db_path,
@@ -483,6 +753,8 @@ def main():
         "check-pdf": cmd_check_pdf, "set-pdf-engine": cmd_set_pdf_engine,
         "set-backend": cmd_set_backend, "disable-backend": cmd_disable_backend,
         "set-privacy": cmd_set_privacy,
+        "migrate-split-db": cmd_migrate_split_db,
+        "migration-status": cmd_migration_status,
     }
     commands[args.command](args)
 

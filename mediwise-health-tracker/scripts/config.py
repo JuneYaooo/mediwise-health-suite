@@ -81,6 +81,8 @@ CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 DEFAULT_CONFIG = {
     "db_path": os.path.join(DATA_DIR, "health.db"),
+    "medical_db_path": os.path.join(DATA_DIR, "medical.db"),
+    "lifestyle_db_path": os.path.join(DATA_DIR, "lifestyle.db"),
     "timezone": "Asia/Shanghai",
     "vision": {
         "enabled": False,
@@ -206,13 +208,36 @@ def config_exists():
     return os.path.exists(CONFIG_PATH)
 
 
+def _resolve_db_path(cfg: dict, db_key: str) -> str:
+    """Resolve a DB path with backward-compatible fallback to db_path."""
+    return cfg.get(db_key) or cfg.get("db_path", DEFAULT_CONFIG["db_path"])
+
+
 def get_db_path():
-    """Get database path from config or environment."""
+    """Get legacy default database path from config or environment."""
     env_path = os.environ.get("MEDIWISE_DB_PATH")
     if env_path:
         return env_path
     cfg = load_config()
-    return cfg.get("db_path", DEFAULT_CONFIG["db_path"])
+    return _resolve_db_path(cfg, "medical_db_path")
+
+
+def get_medical_db_path():
+    """Get medical domain database path from config or environment."""
+    env_path = os.environ.get("MEDIWISE_MEDICAL_DB_PATH") or os.environ.get("MEDIWISE_DB_PATH")
+    if env_path:
+        return env_path
+    cfg = load_config()
+    return _resolve_db_path(cfg, "medical_db_path")
+
+
+def get_lifestyle_db_path():
+    """Get lifestyle domain database path from config or environment."""
+    env_path = os.environ.get("MEDIWISE_LIFESTYLE_DB_PATH")
+    if env_path:
+        return env_path
+    cfg = load_config()
+    return _resolve_db_path(cfg, "lifestyle_db_path")
 
 
 def get_vision_config():
@@ -264,6 +289,8 @@ def check_config_status():
     ensure_data_dir()
     cfg = load_config()
     db_path = get_db_path()
+    medical_db_path = get_medical_db_path()
+    lifestyle_db_path = get_lifestyle_db_path()
     vision = cfg.get("vision", DEFAULT_CONFIG["vision"])
 
     issues = []
@@ -273,6 +300,12 @@ def check_config_status():
 
     if not os.path.exists(db_path):
         issues.append("数据库文件不存在，将在首次使用时自动创建")
+
+    if not os.path.exists(medical_db_path):
+        issues.append("医疗数据库文件不存在，将在首次使用时自动创建")
+
+    if not os.path.exists(lifestyle_db_path):
+        issues.append("生活方式数据库文件不存在，将在首次使用时自动创建")
 
     vision_configured = (
         vision.get("enabled", False)
@@ -315,7 +348,11 @@ def check_config_status():
         "config_path": CONFIG_PATH,
         "data_dir": DATA_DIR,
         "db_path": db_path,
+        "medical_db_path": medical_db_path,
+        "lifestyle_db_path": lifestyle_db_path,
         "db_exists": os.path.exists(db_path),
+        "medical_db_exists": os.path.exists(medical_db_path),
+        "lifestyle_db_exists": os.path.exists(lifestyle_db_path),
         "vision_configured": vision_configured,
         "vision": vision,
         "embedding_provider": embedding_provider,

@@ -117,6 +117,9 @@ class GadgetbridgeProvider(BaseProvider):
             if table not in existing_tables:
                 continue
 
+            # table is always a member of the _SAMPLE_TABLES constant — safe to interpolate.
+            assert table in _SAMPLE_TABLES, f"Unexpected table name: {table!r}"
+
             # Check available columns
             cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
 

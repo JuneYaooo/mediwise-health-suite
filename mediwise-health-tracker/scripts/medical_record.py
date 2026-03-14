@@ -8,9 +8,16 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-from health_db import ensure_db, get_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, is_api_mode, transaction
+from health_db import ensure_db, get_medical_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, is_api_mode, transaction, verify_member_ownership, verify_record_ownership
 from validators import validate_date, validate_date_optional
 import api_client
+
+# Whitelist of column names allowed in UPDATE statements for the visits table.
+_VISIT_UPDATE_FIELDS = frozenset([
+    "visit_type", "visit_date", "end_date", "hospital", "department",
+    "chief_complaint", "diagnosis", "summary", "visit_status",
+    "follow_up_date", "follow_up_notes",
+])
 
 
 # --- Visit ---
@@ -29,11 +36,14 @@ def add_visit(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         # verify member exists
         m = conn.execute("SELECT id,name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+            return
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该成员"})
             return
 
         try:
@@ -75,8 +85,11 @@ def list_visits(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权访问该成员"})
+            return
         sql = "SELECT * FROM visits WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
         if args.start_date:
@@ -88,6 +101,9 @@ def list_visits(args):
         if args.visit_type:
             sql += " AND visit_type=?"
             params.append(args.visit_type)
+        if args.owner_id:
+            sql += " AND member_id IN (SELECT id FROM members WHERE owner_id=? AND is_deleted=0)"
+            params.append(args.owner_id)
         sql += " ORDER BY visit_date DESC"
 
         rows = conn.execute(sql, params).fetchall()
@@ -100,7 +116,8 @@ def update_visit(args):
     if is_api_mode():
         data = {}
         for f in ["visit_type", "visit_date", "end_date", "hospital", "department",
-                   "chief_complaint", "diagnosis", "summary"]:
+                   "chief_complaint", "diagnosis", "summary", "visit_status",
+                   "follow_up_date", "follow_up_notes"]:
             val = getattr(args, f, None)
             if val is not None:
                 data[f] = val
@@ -114,10 +131,13 @@ def update_visit(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         row = conn.execute("SELECT * FROM visits WHERE id=? AND is_deleted=0", (args.id,)).fetchone()
         if not row:
             output_json({"status": "error", "message": f"未找到就诊记录: {args.id}"})
+            return
+        if not verify_record_ownership(conn, "visits", args.id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该记录"})
             return
 
         try:
@@ -125,13 +145,19 @@ def update_visit(args):
                 args.visit_date = validate_date(args.visit_date, "就诊日期")
             if getattr(args, 'end_date', None) is not None:
                 args.end_date = validate_date_optional(args.end_date, "结束日期")
+            if getattr(args, 'follow_up_date', None) is not None:
+                args.follow_up_date = validate_date_optional(args.follow_up_date, "复诊日期")
         except ValueError as e:
             output_json({"status": "error", "message": str(e)})
             return
 
+        visit_status = getattr(args, 'visit_status', None)
+        if visit_status is not None and visit_status not in ("planned", "completed"):
+            output_json({"status": "error", "message": f"visit_status 无效: {visit_status}，支持: planned, completed"})
+            return
+
         fields, values = [], []
-        for f in ["visit_type", "visit_date", "end_date", "hospital", "department",
-                   "chief_complaint", "diagnosis", "summary"]:
+        for f in _VISIT_UPDATE_FIELDS:
             val = getattr(args, f, None)
             if val is not None:
                 fields.append(f"{f}=?")
@@ -143,6 +169,7 @@ def update_visit(args):
         fields.append("updated_at=?")
         values.append(now_iso())
         values.append(args.id)
+        # Column names are from _VISIT_UPDATE_FIELDS (hardcoded whitelist); values via ?.
         conn.execute(f"UPDATE visits SET {', '.join(fields)} WHERE id=?", values)
         conn.commit()
         visit = row_to_dict(conn.execute("SELECT * FROM visits WHERE id=?", (args.id,)).fetchone())
@@ -158,10 +185,13 @@ def delete_visit(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         row = conn.execute("SELECT * FROM visits WHERE id=? AND is_deleted=0", (args.id,)).fetchone()
         if not row:
             output_json({"status": "error", "message": f"未找到就诊记录: {args.id}"})
+            return
+        if not verify_record_ownership(conn, "visits", args.id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该记录"})
             return
         conn.execute("UPDATE visits SET is_deleted=1, updated_at=? WHERE id=?", (now_iso(), args.id))
         conn.commit()
@@ -184,10 +214,13 @@ def add_symptom(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+            return
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该成员"})
             return
 
         try:
@@ -223,13 +256,19 @@ def list_symptoms(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权访问该成员"})
+            return
         sql = "SELECT * FROM symptoms WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
         if args.visit_id:
             sql += " AND visit_id=?"
             params.append(args.visit_id)
+        if args.owner_id:
+            sql += " AND member_id IN (SELECT id FROM members WHERE owner_id=? AND is_deleted=0)"
+            params.append(args.owner_id)
         sql += " ORDER BY onset_date DESC, created_at DESC"
         rows = conn.execute(sql, params).fetchall()
         output_json({"status": "ok", "count": len(rows), "symptoms": rows_to_list(rows)})
@@ -253,10 +292,13 @@ def add_medication(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+            return
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该成员"})
             return
 
         try:
@@ -290,10 +332,13 @@ def stop_medication(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         row = conn.execute("SELECT * FROM medications WHERE id=? AND is_deleted=0", (args.medication_id,)).fetchone()
         if not row:
             output_json({"status": "error", "message": f"未找到用药记录: {args.medication_id}"})
+            return
+        if not verify_record_ownership(conn, "medications", args.medication_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该记录"})
             return
         conn.execute(
             "UPDATE medications SET is_active=0, end_date=?, stop_reason=?, updated_at=? WHERE id=?",
@@ -317,12 +362,18 @@ def list_medications(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权访问该成员"})
+            return
         sql = "SELECT * FROM medications WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
         if args.active_only:
             sql += " AND is_active=1"
+        if args.owner_id:
+            sql += " AND member_id IN (SELECT id FROM members WHERE owner_id=? AND is_deleted=0)"
+            params.append(args.owner_id)
         sql += " ORDER BY start_date DESC"
         rows = conn.execute(sql, params).fetchall()
         output_json({"status": "ok", "count": len(rows), "medications": rows_to_list(rows)})
@@ -344,10 +395,13 @@ def add_lab_result(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+            return
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该成员"})
             return
 
         # validate items JSON
@@ -391,8 +445,11 @@ def list_lab_results(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权访问该成员"})
+            return
         sql = "SELECT * FROM lab_results WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
         if args.start_date:
@@ -401,6 +458,9 @@ def list_lab_results(args):
         if args.end_date:
             sql += " AND test_date<=?"
             params.append(args.end_date)
+        if args.owner_id:
+            sql += " AND member_id IN (SELECT id FROM members WHERE owner_id=? AND is_deleted=0)"
+            params.append(args.owner_id)
         sql += " ORDER BY test_date DESC"
         rows = conn.execute(sql, params).fetchall()
         results = rows_to_list(rows)
@@ -427,10 +487,13 @@ def add_imaging(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+            return
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权操作该成员"})
             return
 
         try:
@@ -467,8 +530,11 @@ def list_imaging(args):
             output_json({"status": "error", "message": str(e)})
         return
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
+        if not verify_member_ownership(conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": "无权访问该成员"})
+            return
         sql = "SELECT * FROM imaging_results WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
         if args.start_date:
@@ -477,6 +543,9 @@ def list_imaging(args):
         if args.end_date:
             sql += " AND exam_date<=?"
             params.append(args.end_date)
+        if args.owner_id:
+            sql += " AND member_id IN (SELECT id FROM members WHERE owner_id=? AND is_deleted=0)"
+            params.append(args.owner_id)
         sql += " ORDER BY exam_date DESC"
         rows = conn.execute(sql, params).fetchall()
         output_json({"status": "ok", "count": len(rows), "imaging_results": rows_to_list(rows)})
@@ -491,6 +560,7 @@ def main():
     # --- visit commands ---
     p = sub.add_parser("add-visit")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-type", required=True, help="门诊/住院/急诊/体检/其他")
     p.add_argument("--visit-date", required=True)
     p.add_argument("--end-date", default=None)
@@ -502,12 +572,14 @@ def main():
 
     p = sub.add_parser("list-visits")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
     p.add_argument("--visit-type", default=None)
 
     p = sub.add_parser("update-visit")
     p.add_argument("--id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-type", default=None)
     p.add_argument("--visit-date", default=None)
     p.add_argument("--end-date", default=None)
@@ -516,13 +588,18 @@ def main():
     p.add_argument("--chief-complaint", default=None)
     p.add_argument("--diagnosis", default=None)
     p.add_argument("--summary", default=None)
+    p.add_argument("--visit-status", default=None, choices=["planned", "completed"], help="就诊状态")
+    p.add_argument("--follow-up-date", default=None, help="复诊日期 (YYYY-MM-DD)")
+    p.add_argument("--follow-up-notes", default=None, help="复诊备注")
 
     p = sub.add_parser("delete-visit")
     p.add_argument("--id", required=True)
+    p.add_argument("--owner-id", default=None)
 
     # --- symptom commands ---
     p = sub.add_parser("add-symptom")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-id", default=None)
     p.add_argument("--symptom", required=True)
     p.add_argument("--severity", default=None, help="轻度/中度/重度")
@@ -532,11 +609,13 @@ def main():
 
     p = sub.add_parser("list-symptoms")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-id", default=None)
 
     # --- medication commands ---
     p = sub.add_parser("add-medication")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-id", default=None)
     p.add_argument("--name", required=True)
     p.add_argument("--dosage", default=None)
@@ -547,16 +626,19 @@ def main():
 
     p = sub.add_parser("stop-medication")
     p.add_argument("--medication-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--end-date", default=None)
     p.add_argument("--reason", default=None)
 
     p = sub.add_parser("list-medications")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--active-only", action="store_true")
 
     # --- lab result commands ---
     p = sub.add_parser("add-lab-result")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-id", default=None)
     p.add_argument("--test-name", required=True)
     p.add_argument("--test-date", required=True)
@@ -564,12 +646,14 @@ def main():
 
     p = sub.add_parser("list-lab-results")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
 
     # --- imaging commands ---
     p = sub.add_parser("add-imaging")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--visit-id", default=None)
     p.add_argument("--exam-name", required=True)
     p.add_argument("--exam-date", required=True)
@@ -578,6 +662,7 @@ def main():
 
     p = sub.add_parser("list-imaging")
     p.add_argument("--member-id", required=True)
+    p.add_argument("--owner-id", default=None)
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
 

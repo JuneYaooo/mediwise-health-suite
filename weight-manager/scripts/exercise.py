@@ -12,7 +12,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared')
 from path_setup import setup_mediwise_path
 setup_mediwise_path()
 
-from health_db import ensure_db, get_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, transaction
+from health_db import (
+    ensure_db,
+    get_medical_connection,
+    get_lifestyle_connection,
+    generate_id,
+    now_iso,
+    row_to_dict,
+    rows_to_list,
+    output_json,
+    transaction,
+    verify_member_ownership,
+)
 from validators import validate_date_optional
 
 VALID_EXERCISE_TYPES = [
@@ -51,40 +62,43 @@ def add_exercise(args):
         })
         return
 
-    with transaction() as conn:
-        m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+    medical_conn = get_medical_connection()
+    try:
+        m = medical_conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
+        if not m or not verify_member_ownership(medical_conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
             return
+    finally:
+        medical_conn.close()
+    try:
+        exercise_date = validate_date_optional(args.exercise_date, "运动日期") or datetime.now().strftime("%Y-%m-%d")
+    except ValueError as e:
+        output_json({"status": "error", "message": str(e)})
+        return
 
+    duration = None
+    if args.duration is not None:
         try:
-            exercise_date = validate_date_optional(args.exercise_date, "运动日期") or datetime.now().strftime("%Y-%m-%d")
-        except ValueError as e:
-            output_json({"status": "error", "message": str(e)})
+            duration = int(args.duration)
+            if duration <= 0 or duration > 1440:
+                output_json({"status": "error", "message": "运动时长应在 1-1440 分钟范围内"})
+                return
+        except (ValueError, TypeError):
+            output_json({"status": "error", "message": "运动时长必须为整数（分钟）"})
             return
 
-        duration = None
-        if args.duration is not None:
-            try:
-                duration = int(args.duration)
-                if duration <= 0 or duration > 1440:
-                    output_json({"status": "error", "message": "运动时长应在 1-1440 分钟范围内"})
-                    return
-            except (ValueError, TypeError):
-                output_json({"status": "error", "message": "运动时长必须为整数（分钟）"})
+    calories_burned = 0
+    if args.calories_burned is not None:
+        try:
+            calories_burned = float(args.calories_burned)
+            if calories_burned < 0 or calories_burned > 10000:
+                output_json({"status": "error", "message": "消耗热量应在 0-10000 kcal 范围内"})
                 return
+        except (ValueError, TypeError):
+            output_json({"status": "error", "message": "消耗热量必须为数值"})
+            return
 
-        calories_burned = 0
-        if args.calories_burned is not None:
-            try:
-                calories_burned = float(args.calories_burned)
-                if calories_burned < 0 or calories_burned > 10000:
-                    output_json({"status": "error", "message": "消耗热量应在 0-10000 kcal 范围内"})
-                    return
-            except (ValueError, TypeError):
-                output_json({"status": "error", "message": "消耗热量必须为数值"})
-                return
-
+    with transaction(domain="lifestyle") as conn:
         record_id = generate_id()
         now = now_iso()
         conn.execute(
@@ -99,30 +113,35 @@ def add_exercise(args):
         conn.commit()
 
         record = row_to_dict(conn.execute("SELECT * FROM exercise_records WHERE id=?", (record_id,)).fetchone())
-        type_name = EXERCISE_TYPE_NAMES.get(args.exercise_type, args.exercise_type)
-        msg_parts = [f"已记录{m['name']}的运动: {type_name}"]
-        if duration:
-            msg_parts.append(f"{duration}分钟")
-        if calories_burned > 0:
-            msg_parts.append(f"消耗{calories_burned}kcal")
 
-        output_json({
-            "status": "ok",
-            "message": "，".join(msg_parts),
-            "record": record,
-        })
+    type_name = EXERCISE_TYPE_NAMES.get(args.exercise_type, args.exercise_type)
+    msg_parts = [f"已记录{m['name']}的运动: {type_name}"]
+    if duration:
+        msg_parts.append(f"{duration}分钟")
+    if calories_burned > 0:
+        msg_parts.append(f"消耗{calories_burned}kcal")
+
+    output_json({
+        "status": "ok",
+        "message": "，".join(msg_parts),
+        "record": record,
+    })
 
 
 def list_exercises(args):
     """查看运动记录。"""
     ensure_db()
-    conn = get_connection()
-    try:
-        m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
-            return
 
+    medical_conn = get_medical_connection()
+    try:
+        m = medical_conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
+        if not m or not verify_member_ownership(medical_conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
+            return
+    finally:
+        medical_conn.close()
+    conn = get_lifestyle_connection()
+    try:
         sql = "SELECT * FROM exercise_records WHERE member_id=? AND is_deleted=0"
         params = [args.member_id]
 
@@ -154,10 +173,11 @@ def list_exercises(args):
         conn.close()
 
 
+
 def delete_exercise(args):
     """删除运动记录（软删除）。"""
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="lifestyle") as conn:
         row = conn.execute(
             "SELECT * FROM exercise_records WHERE id=? AND is_deleted=0",
             (args.id,)
@@ -166,6 +186,13 @@ def delete_exercise(args):
             output_json({"status": "error", "message": f"未找到运动记录: {args.id}"})
             return
 
+        medical_conn = get_medical_connection()
+        try:
+            if not verify_member_ownership(medical_conn, row["member_id"], args.owner_id):
+                output_json({"status": "error", "message": "无权访问该运动记录"})
+                return
+        finally:
+            medical_conn.close()
         conn.execute("UPDATE exercise_records SET is_deleted=1 WHERE id=?", (args.id,))
         conn.commit()
         output_json({"status": "ok", "message": "运动记录已删除"})
@@ -174,13 +201,17 @@ def delete_exercise(args):
 def daily_summary(args):
     """某日运动摘要。"""
     ensure_db()
-    conn = get_connection()
-    try:
-        m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
-            return
 
+    medical_conn = get_medical_connection()
+    try:
+        m = medical_conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
+        if not m or not verify_member_ownership(medical_conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
+            return
+    finally:
+        medical_conn.close()
+    conn = get_lifestyle_connection()
+    try:
         date = args.date or datetime.now().strftime("%Y-%m-%d")
         rows = conn.execute(
             """SELECT * FROM exercise_records
@@ -217,6 +248,7 @@ def daily_summary(args):
         conn.close()
 
 
+
 def main():
     parser = argparse.ArgumentParser(description="运动记录管理")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -232,6 +264,7 @@ def main():
     p_add.add_argument("--exercise-time", default=None, help="运动时间 HH:MM")
     p_add.add_argument("--intensity", default=None, help="强度: low/medium/high")
     p_add.add_argument("--note", default=None)
+    p_add.add_argument("--owner-id", default=None)
 
     # list
     p_list = sub.add_parser("list")
@@ -240,15 +273,18 @@ def main():
     p_list.add_argument("--start-date", default=None)
     p_list.add_argument("--end-date", default=None)
     p_list.add_argument("--limit", default=None, type=int)
+    p_list.add_argument("--owner-id", default=None)
 
     # delete
     p_del = sub.add_parser("delete")
     p_del.add_argument("--id", required=True)
+    p_del.add_argument("--owner-id", default=None)
 
     # daily-summary
     p_ds = sub.add_parser("daily-summary")
     p_ds.add_argument("--member-id", required=True)
     p_ds.add_argument("--date", default=None, help="日期 YYYY-MM-DD（默认今天）")
+    p_ds.add_argument("--owner-id", default=None)
 
     args = parser.parse_args()
     commands = {

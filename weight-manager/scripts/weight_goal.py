@@ -12,7 +12,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared')
 from path_setup import setup_mediwise_path
 setup_mediwise_path()
 
-from health_db import ensure_db, get_connection, generate_id, now_iso, row_to_dict, output_json, transaction
+from health_db import (
+    ensure_db,
+    get_medical_connection,
+    get_lifestyle_connection,
+    generate_id,
+    now_iso,
+    row_to_dict,
+    output_json,
+    transaction,
+    verify_member_ownership,
+)
 from validators import validate_date_optional
 from metric_utils import calculate_age, calculate_bmr, calculate_tdee
 
@@ -27,39 +37,56 @@ ACTIVITY_LEVELS = {
     "very_active": 1.9,
 }
 
+# Whitelist of column names allowed in UPDATE statements for the weight_goals table.
+_WEIGHT_GOAL_UPDATE_FIELDS = frozenset([
+    "target_weight", "target_date", "daily_calorie_target", "note",
+])
+
 
 def set_goal(args):
     """设定体重目标。"""
     ensure_db()
-    with transaction() as conn:
-        m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
-            return
 
-        if args.goal_type not in VALID_GOAL_TYPES:
-            output_json({"status": "error", "message": f"不支持的目标类型: {args.goal_type}，支持: {', '.join(VALID_GOAL_TYPES)}"})
+    medical_conn = get_medical_connection()
+    try:
+        m = medical_conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
+        if not m or not verify_member_ownership(medical_conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
             return
+    finally:
+        medical_conn.close()
 
-        try:
-            start_weight = float(args.start_weight)
-            target_weight = float(args.target_weight)
-        except (ValueError, TypeError):
-            output_json({"status": "error", "message": "起始体重和目标体重必须为数值"})
-            return
+    if args.goal_type not in VALID_GOAL_TYPES:
+        output_json({"status": "error", "message": f"不支持的目标类型: {args.goal_type}，支持: {', '.join(VALID_GOAL_TYPES)}"})
+        return
 
-        if not (0.5 <= start_weight <= 500) or not (0.5 <= target_weight <= 500):
-            output_json({"status": "error", "message": "体重值应在 0.5-500 kg 范围内"})
-            return
+    try:
+        start_weight = float(args.start_weight)
+        target_weight = float(args.target_weight)
+    except (ValueError, TypeError):
+        output_json({"status": "error", "message": "起始体重和目标体重必须为数值"})
+        return
 
-        # Validate goal consistency
-        if args.goal_type == "lose" and target_weight >= start_weight:
-            output_json({"status": "error", "message": "减重目标的目标体重应低于起始体重"})
-            return
-        if args.goal_type == "gain" and target_weight <= start_weight:
-            output_json({"status": "error", "message": "增重目标的目标体重应高于起始体重"})
-            return
+    if not (0.5 <= start_weight <= 500) or not (0.5 <= target_weight <= 500):
+        output_json({"status": "error", "message": "体重值应在 0.5-500 kg 范围内"})
+        return
 
+    # Validate goal consistency
+    if args.goal_type == "lose" and target_weight >= start_weight:
+        output_json({"status": "error", "message": "减重目标的目标体重应低于起始体重"})
+        return
+    if args.goal_type == "gain" and target_weight <= start_weight:
+        output_json({"status": "error", "message": "增重目标的目标体重应高于起始体重"})
+        return
+
+    try:
+        start_date = validate_date_optional(args.start_date, "开始日期") or datetime.now().strftime("%Y-%m-%d")
+        target_date = validate_date_optional(args.target_date, "目标日期")
+    except ValueError as e:
+        output_json({"status": "error", "message": str(e)})
+        return
+
+    with transaction(domain="lifestyle") as conn:
         # Check for existing active goal
         existing = conn.execute(
             "SELECT id FROM weight_goals WHERE member_id=? AND status='active' AND is_deleted=0",
@@ -72,37 +99,32 @@ def set_goal(args):
             })
             return
 
+    daily_calorie_target = None
+    auto_calorie_target = None
+    if args.daily_calorie_target is not None:
         try:
-            start_date = validate_date_optional(args.start_date, "开始日期") or datetime.now().strftime("%Y-%m-%d")
-            target_date = validate_date_optional(args.target_date, "目标日期")
-        except ValueError as e:
-            output_json({"status": "error", "message": str(e)})
-            return
-
-        daily_calorie_target = None
-        auto_calorie_target = None
-        if args.daily_calorie_target is not None:
-            try:
-                daily_calorie_target = int(args.daily_calorie_target)
-                if daily_calorie_target < 800 or daily_calorie_target > 10000:
-                    output_json({"status": "error", "message": "每日热量目标应在 800-10000 kcal 范围内"})
-                    return
-            except (ValueError, TypeError):
-                output_json({"status": "error", "message": "每日热量目标必须为整数"})
+            daily_calorie_target = int(args.daily_calorie_target)
+            if daily_calorie_target < 800 or daily_calorie_target > 10000:
+                output_json({"status": "error", "message": "每日热量目标应在 800-10000 kcal 范围内"})
                 return
-        else:
-            # Auto-calculate from BMR/TDEE if member has enough data
-            member = conn.execute(
+        except (ValueError, TypeError):
+            output_json({"status": "error", "message": "每日热量目标必须为整数"})
+            return
+    else:
+        # Auto-calculate from BMR/TDEE if member has enough data
+        medical_conn = get_medical_connection()
+        try:
+            member = medical_conn.execute(
                 "SELECT gender, birth_date FROM members WHERE id=? AND is_deleted=0",
                 (args.member_id,)
             ).fetchone()
             if member and member["gender"] in ("male", "female") and member["birth_date"]:
-                weight_data = conn.execute(
+                weight_data = medical_conn.execute(
                     """SELECT value FROM health_metrics WHERE member_id=? AND metric_type='weight' AND is_deleted=0
                        ORDER BY measured_at DESC LIMIT 1""",
                     (args.member_id,)
                 ).fetchone()
-                height_data = conn.execute(
+                height_data = medical_conn.execute(
                     """SELECT value FROM health_metrics WHERE member_id=? AND metric_type='height' AND is_deleted=0
                        ORDER BY measured_at DESC LIMIT 1""",
                     (args.member_id,)
@@ -130,7 +152,10 @@ def set_goal(args):
                         daily_calorie_target = auto_calorie_target
                     except (ValueError, TypeError):
                         pass
+        finally:
+            medical_conn.close()
 
+    with transaction(domain="lifestyle") as conn:
         goal_id = generate_id()
         now = now_iso()
         conn.execute(
@@ -144,29 +169,34 @@ def set_goal(args):
         conn.commit()
 
         goal = row_to_dict(conn.execute("SELECT * FROM weight_goals WHERE id=?", (goal_id,)).fetchone())
-        type_name = GOAL_TYPE_NAMES.get(args.goal_type, args.goal_type)
-        diff = abs(target_weight - start_weight)
-        result = {
-            "status": "ok",
-            "message": f"已为{m['name']}设定{type_name}目标: {start_weight}kg → {target_weight}kg（{diff:.1f}kg）",
-            "goal": goal
-        }
-        if auto_calorie_target is not None:
-            result["auto_calorie_target"] = auto_calorie_target
-            result["message"] += f"，已自动设定每日热量目标 {auto_calorie_target} kcal"
-        output_json(result)
+
+    type_name = GOAL_TYPE_NAMES.get(args.goal_type, args.goal_type)
+    diff = abs(target_weight - start_weight)
+    result = {
+        "status": "ok",
+        "message": f"已为{m['name']}设定{type_name}目标: {start_weight}kg → {target_weight}kg（{diff:.1f}kg）",
+        "goal": goal
+    }
+    if auto_calorie_target is not None:
+        result["auto_calorie_target"] = auto_calorie_target
+        result["message"] += f"，已自动设定每日热量目标 {auto_calorie_target} kcal"
+    output_json(result)
 
 
 def view_goal(args):
     """查看当前活跃目标。"""
     ensure_db()
-    conn = get_connection()
-    try:
-        m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
-            return
 
+    medical_conn = get_medical_connection()
+    try:
+        m = medical_conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
+        if not m or not verify_member_ownership(medical_conn, args.member_id, args.owner_id):
+            output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
+            return
+    finally:
+        medical_conn.close()
+    conn = get_lifestyle_connection()
+    try:
         goal = conn.execute(
             "SELECT * FROM weight_goals WHERE member_id=? AND status='active' AND is_deleted=0",
             (args.member_id,)
@@ -204,10 +234,11 @@ def view_goal(args):
         conn.close()
 
 
+
 def update_goal(args):
     """修改目标参数。"""
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="lifestyle") as conn:
         goal = conn.execute(
             "SELECT * FROM weight_goals WHERE id=? AND is_deleted=0", (args.goal_id,)
         ).fetchone()
@@ -217,6 +248,14 @@ def update_goal(args):
         if goal["status"] != "active":
             output_json({"status": "error", "message": f"目标状态为 {goal['status']}，仅活跃目标可修改"})
             return
+
+        medical_conn = get_medical_connection()
+        try:
+            if not verify_member_ownership(medical_conn, goal["member_id"], args.owner_id):
+                output_json({"status": "error", "message": "无权访问该目标"})
+                return
+        finally:
+            medical_conn.close()
 
         updates = []
         params = []
@@ -262,10 +301,16 @@ def update_goal(args):
             output_json({"status": "error", "message": "未指定要更新的字段"})
             return
 
+        # Validate all column tokens against the whitelist before interpolating.
+        col_names = [u.split("=")[0] for u in updates]
+        assert all(c in _WEIGHT_GOAL_UPDATE_FIELDS for c in col_names), \
+            f"Unexpected column in update: {col_names}"
+
         updates.append("updated_at=?")
         params.append(now_iso())
         params.append(args.goal_id)
 
+        # Column names are from _WEIGHT_GOAL_UPDATE_FIELDS (hardcoded whitelist); values via ?.
         conn.execute(f"UPDATE weight_goals SET {', '.join(updates)} WHERE id=?", params)
         conn.commit()
 
@@ -276,7 +321,7 @@ def update_goal(args):
 def complete_goal(args):
     """标记目标完成。"""
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="lifestyle") as conn:
         goal = conn.execute(
             "SELECT * FROM weight_goals WHERE id=? AND is_deleted=0", (args.goal_id,)
         ).fetchone()
@@ -286,6 +331,14 @@ def complete_goal(args):
         if goal["status"] != "active":
             output_json({"status": "error", "message": f"目标状态为 {goal['status']}，仅活跃目标可标记完成"})
             return
+
+        medical_conn = get_medical_connection()
+        try:
+            if not verify_member_ownership(medical_conn, goal["member_id"], args.owner_id):
+                output_json({"status": "error", "message": "无权访问该目标"})
+                return
+        finally:
+            medical_conn.close()
 
         now = now_iso()
         conn.execute(
@@ -299,7 +352,7 @@ def complete_goal(args):
 def abandon_goal(args):
     """放弃目标。"""
     ensure_db()
-    with transaction() as conn:
+    with transaction(domain="lifestyle") as conn:
         goal = conn.execute(
             "SELECT * FROM weight_goals WHERE id=? AND is_deleted=0", (args.goal_id,)
         ).fetchone()
@@ -309,6 +362,14 @@ def abandon_goal(args):
         if goal["status"] != "active":
             output_json({"status": "error", "message": f"目标状态为 {goal['status']}，仅活跃目标可放弃"})
             return
+
+        medical_conn = get_medical_connection()
+        try:
+            if not verify_member_ownership(medical_conn, goal["member_id"], args.owner_id):
+                output_json({"status": "error", "message": "无权访问该目标"})
+                return
+        finally:
+            medical_conn.close()
 
         now = now_iso()
         conn.execute(
@@ -335,10 +396,12 @@ def main():
     p_set.add_argument("--activity-level", default="sedentary",
                         help="活动水平: sedentary/light/moderate/active/very_active（用于自动推算热量目标）")
     p_set.add_argument("--note", default=None)
+    p_set.add_argument("--owner-id", default=None)
 
     # view
     p_view = sub.add_parser("view")
     p_view.add_argument("--member-id", required=True)
+    p_view.add_argument("--owner-id", default=None)
 
     # update
     p_upd = sub.add_parser("update")
@@ -347,14 +410,17 @@ def main():
     p_upd.add_argument("--target-date", default=None)
     p_upd.add_argument("--daily-calorie-target", default=None)
     p_upd.add_argument("--note", default=None)
+    p_upd.add_argument("--owner-id", default=None)
 
     # complete
     p_comp = sub.add_parser("complete")
     p_comp.add_argument("--goal-id", required=True)
+    p_comp.add_argument("--owner-id", default=None)
 
     # abandon
     p_abn = sub.add_parser("abandon")
     p_abn.add_argument("--goal-id", required=True)
+    p_abn.add_argument("--owner-id", default=None)
 
     args = parser.parse_args()
     commands = {

@@ -12,11 +12,18 @@ from __future__ import annotations
 import sys
 import json
 import copy
+import logging
 from datetime import datetime, timedelta
 
 import health_db
 import reminder as reminder_mod
 from metric_utils import parse_metric_value, calculate_age as _calculate_age_shared
+
+_logger = logging.getLogger(__name__)
+
+# Ratio thresholds for elevating a "warning" to an "alert"
+_ANOMALY_ALERT_RATIO_HIGH = 1.15  # >15% above the high bound → alert severity
+_ANOMALY_ALERT_RATIO_LOW = 0.85   # >15% below the low bound  → alert severity
 
 
 # --- Metric normal ranges ---
@@ -162,7 +169,7 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                     abnormal_count += 1
                     alerts.append({
                         "type": "metric_anomaly",
-                        "severity": "alert" if val > bounds["high"] * 1.15 else "warning",
+                        "severity": "alert" if val > bounds["high"] * _ANOMALY_ALERT_RATIO_HIGH else "warning",
                         "member_id": member_id,
                         "title": f"{metric_type} 偏高",
                         "detail": f"{key}: {val} {bounds['unit']}（正常范围 {bounds['low']}-{bounds['high']}）",
@@ -173,7 +180,7 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                     abnormal_count += 1
                     alerts.append({
                         "type": "metric_anomaly",
-                        "severity": "alert" if val < bounds["low"] * 0.85 else "warning",
+                        "severity": "alert" if val < bounds["low"] * _ANOMALY_ALERT_RATIO_LOW else "warning",
                         "member_id": member_id,
                         "title": f"{metric_type} 偏低",
                         "detail": f"{key}: {val} {bounds['unit']}（正常范围 {bounds['low']}-{bounds['high']}）",
@@ -213,7 +220,7 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
 def check_metric_gaps(member_id: str) -> list[dict]:
     """Check if any metric types haven't been measured recently enough."""
     conn = health_db.get_connection()
-    now = datetime.now()
+    now_date = datetime.now().date()
     gaps = []
     try:
         for metric_type, interval_days in METRIC_MEASURE_INTERVALS.items():
@@ -240,8 +247,8 @@ def check_metric_gaps(member_id: str) -> list[dict]:
                         "suggestion": f"建议每 {interval_days} 天测量一次",
                     })
             else:
-                last_date = datetime.strptime(row["measured_at"][:10], "%Y-%m-%d")
-                days_since = (now - last_date).days
+                last_date = datetime.strptime(row["measured_at"][:10], "%Y-%m-%d").date()
+                days_since = (now_date - last_date).days
                 if days_since > interval_days:
                     gaps.append({
                         "type": "metric_gap",
@@ -259,7 +266,7 @@ def check_metric_gaps(member_id: str) -> list[dict]:
 def check_overdue_checkups(member_id: str) -> list[dict]:
     """Check if follow-up visits are overdue based on diagnosis history."""
     conn = health_db.get_connection()
-    now = datetime.now()
+    now_date = datetime.now().date()
     alerts = []
     try:
         visits = health_db.rows_to_list(conn.execute(
@@ -282,10 +289,10 @@ def check_overdue_checkups(member_id: str) -> list[dict]:
 
         for keyword, (last_date_str, interval, full_diag) in diagnosis_dates.items():
             try:
-                last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
+                last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
             except ValueError:
                 continue
-            days_since = (now - last_date).days
+            days_since = (now_date - last_date).days
             if days_since > interval:
                 alerts.append({
                     "type": "overdue_checkup",
@@ -371,7 +378,11 @@ def check_cycle_alerts(member_id: str) -> list[dict]:
         cycle_type = row["cycle_type"]
         try:
             status = cycle_tracker.get_status(member_id, cycle_type)
-        except Exception:
+        except Exception as e:
+            _logger.warning(
+                "cycle_tracker.get_status failed for member %s, cycle_type %s: %s",
+                member_id, cycle_type, e,
+            )
             continue
 
         if cycle_type == "menstrual":
@@ -517,13 +528,32 @@ def get_daily_briefing(member_id: str = None, owner_id: str = None) -> dict:
         total_alerts += tips_result.get("alert_count", 0)
         total_warnings += tips_result.get("warning_count", 0)
 
-        if tips_result.get("tips") or member_due:
+        # Integrate health memory: pending follow-up notes
+        memory_tips = []
+        try:
+            import health_memory as _hm
+            pending_notes = _hm.get_pending_notes(mid)
+            for note in pending_notes:
+                days = note.get("days_since_mentioned", 0)
+                preview = note["content"][:40]
+                memory_tips.append({
+                    "severity": "info",
+                    "type": "health_memory",
+                    "note_id": note["id"],
+                    "message": f"📝 {days}天前提到：{preview}，别忘了告诉我是否有改善",
+                    "member_name": m["name"],
+                })
+        except Exception as e:
+            _logger.warning("health_memory integration failed for member %s: %s", mid, e)
+
+        all_tips = tips_result.get("tips", []) + memory_tips
+        if all_tips or member_due:
             member_briefings.append({
                 "member_id": mid,
                 "member_name": m["name"],
                 "relation": m["relation"],
                 "due_reminders": member_due,
-                "health_tips": tips_result.get("tips", []),
+                "health_tips": all_tips,
             })
 
     return {

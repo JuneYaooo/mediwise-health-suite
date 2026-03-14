@@ -79,10 +79,11 @@ pip install -r requirements.txt
 
 ### 数据库初始化
 
-首次使用时，系统会自动创建数据库：
+首次使用时，系统会自动创建数据库（默认拆分为医疗与生活方式两库）：
 
 ```
-~/.openclaw/skills/mediwise-health-suite/data/health.db
+~/.openclaw/skills/mediwise-health-suite/data/medical.db
+~/.openclaw/skills/mediwise-health-suite/data/lifestyle.db
 ```
 
 如果需要手动初始化：
@@ -90,6 +91,14 @@ pip install -r requirements.txt
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 init_db.py
+```
+
+如果从旧版本升级（单库 `health.db`），可执行迁移命令：
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py migrate-split-db
+python3 setup.py migration-status
 ```
 
 ### 故障排查
@@ -206,10 +215,11 @@ Add to OpenClaw configuration file:
 
 ### Database Initialization
 
-On first use, the system will automatically create the database:
+On first use, the system will automatically create databases (split into medical and lifestyle by default):
 
 ```
-~/.openclaw/skills/mediwise-health-suite/data/health.db
+~/.openclaw/skills/mediwise-health-suite/data/medical.db
+~/.openclaw/skills/mediwise-health-suite/data/lifestyle.db
 ```
 
 To manually initialize:
@@ -217,6 +227,14 @@ To manually initialize:
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 init_db.py
+```
+
+If upgrading from the legacy single database (`health.db`), run the migration:
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py migrate-split-db
+python3 setup.py migration-status
 ```
 
 ### Troubleshooting

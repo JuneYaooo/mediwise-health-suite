@@ -21,7 +21,7 @@
 - 日常指标：血压、血糖、心率、血氧、体温、体重等
 - 查询能力：健康摘要、时间线、在用药、全家概览
 
-对应入口：
+医疗健康数据默认存储在 `medical.db`，生活方式数据（饮食、体重、运动、可穿戴）存储在 `lifestyle.db`，两库通过 `member_id` 关联。
 - `mediwise-health-tracker/SKILL.md`
 - `mediwise-health-tracker/scripts/member.py`
 - `mediwise-health-tracker/scripts/medical_record.py`
@@ -93,6 +93,8 @@
 - **可穿戴同步**：手环手表数据同步入库
 
 这部分让系统不仅知道”生病了什么情况”，也知道”平时生活方式是什么状态”。
+
+生活方式数据默认存储在 `lifestyle.db`，不会与医疗主线表混在同一个库中。
 
 对应入口：
 - `diet-tracker/SKILL.md`

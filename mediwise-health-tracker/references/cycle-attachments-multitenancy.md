@@ -31,7 +31,7 @@ python3 {baseDir}/scripts/reminder.py auto-cycle --member-id <id> --cycle-type m
 ### 添加与查看
 
 ```bash
-python3 {baseDir}/scripts/attachment.py add --member-id <id> --file /path/to/report.jpg --category lab_report --description "2025年3月化验单"
+python3 {baseDir}/scripts/attachment.py add --member-id <id> --source-path /path/to/report.jpg --category lab_report --description "2025年3月化验单"
 python3 {baseDir}/scripts/attachment.py list --member-id <id>
 python3 {baseDir}/scripts/attachment.py get --id <attachment_id>
 ```
@@ -65,7 +65,7 @@ python3 {baseDir}/scripts/attachment.py get-url --id <attachment_id> --secret <s
 
 1. 用户在群聊中发消息 → 平台提供发送者 ID
 2. `index.js` 路由层自动将发送者 ID 作为 `owner_id` 参数传给脚本
-3. 脚本中的所有查询和写入都带上 `owner_id` 过滤
+3. 脚本中的所有查询和写入都带上 `owner_id` 过滤（数据存储在 `medical.db` / `lifestyle.db`）
 
 **结果**：同一群聊中，不同用户的数据完全隔离，互相不可见。
 

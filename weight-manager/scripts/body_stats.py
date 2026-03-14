@@ -12,7 +12,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared')
 from path_setup import setup_mediwise_path
 setup_mediwise_path()
 
-from health_db import ensure_db, get_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, transaction
+from health_db import (
+    ensure_db,
+    get_medical_connection,
+    get_lifestyle_connection,
+    generate_id,
+    now_iso,
+    row_to_dict,
+    rows_to_list,
+    output_json,
+    transaction,
+)
 from metric_utils import calculate_age, calculate_bmr, calculate_tdee
 
 ACTIVITY_LEVELS = {
@@ -94,7 +104,7 @@ def _classify_bmi(bmi):
 def bmi(args):
     """计算 BMI。"""
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         m = _get_member_info(conn, args.member_id)
         if not m:
@@ -135,7 +145,7 @@ def bmi(args):
 def bmr_tdee(args):
     """计算 BMR 和 TDEE（Mifflin-St Jeor 公式）。"""
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         m = _get_member_info(conn, args.member_id)
         if not m:
@@ -200,7 +210,7 @@ def bmr_tdee(args):
 def suggest_calories(args):
     """根据 TDEE + 目标类型自动推算每日热量目标。"""
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         m = _get_member_info(conn, args.member_id)
         if not m:
@@ -244,11 +254,14 @@ def suggest_calories(args):
         tdee_value = round(calculate_tdee(bmr_value, activity_level), 1)
 
         # Check active goal
-        goal = conn.execute(
-            "SELECT * FROM weight_goals WHERE member_id=? AND status='active' AND is_deleted=0",
-            (args.member_id,)
-        ).fetchone()
-
+        lifestyle_conn = get_lifestyle_connection()
+        try:
+            goal = lifestyle_conn.execute(
+                "SELECT * FROM weight_goals WHERE member_id=? AND status='active' AND is_deleted=0",
+                (args.member_id,)
+            ).fetchone()
+        finally:
+            lifestyle_conn.close()
         goal_type = args.goal_type
         if not goal_type and goal:
             goal_type = goal["goal_type"]
@@ -296,7 +309,7 @@ def add_measurement(args):
         })
         return
 
-    with transaction() as conn:
+    with transaction(domain="medical") as conn:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -332,7 +345,7 @@ def add_measurement(args):
 def list_measurements(args):
     """查看围度记录历史。"""
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
@@ -373,7 +386,7 @@ def list_measurements(args):
 def body_summary(args):
     """综合身体报告（BMI + 围度变化 + 体脂率趋势）。"""
     ensure_db()
-    conn = get_connection()
+    conn = get_medical_connection()
     try:
         m = _get_member_info(conn, args.member_id)
         if not m:

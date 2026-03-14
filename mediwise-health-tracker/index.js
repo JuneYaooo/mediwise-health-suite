@@ -101,7 +101,7 @@ const ROUTES = {
     args: ['list', '--member-id', inputs.member_id],
   }),
   'update-reminder': (inputs) => {
-    const args = ['update', '--reminder-id', inputs.params?.reminder_id ?? inputs.member_id];
+    const args = ['update', '--reminder-id', inputs.params?.reminder_id ?? ''];
     const p = inputs.params ?? {};
     if (p.title) args.push('--title', p.title);
     if (p.schedule_value) args.push('--schedule-value', p.schedule_value);
@@ -111,7 +111,7 @@ const ROUTES = {
   },
   'delete-reminder': (inputs) => ({
     script: 'reminder.py',
-    args: ['delete', '--reminder-id', inputs.params?.reminder_id ?? inputs.member_id],
+    args: ['delete', '--reminder-id', inputs.params?.reminder_id ?? ''],
   }),
   'health-advice': (inputs) => {
     const args = ['briefing'];
@@ -125,7 +125,7 @@ const ROUTES = {
     args: ['tips', '--member-id', inputs.member_id],
   }),
   'generate-report': (inputs) => {
-    const args = ['generate'];
+    const args = ['screenshot'];
     if (inputs.member_id) {
       args.push('--member-id', inputs.member_id);
     }
@@ -269,6 +269,121 @@ const ROUTES = {
     if (inputs.params?.port) args.push('--port', String(inputs.params.port));
     return { script: 'attachment.py', args };
   },
+
+  // Direct write routes for medical records and metrics
+  'add-visit': (inputs) => {
+    const args = ['add-visit', '--member-id', inputs.member_id,
+                  '--visit-type', inputs.params?.visit_type ?? '门诊',
+                  '--visit-date', inputs.params?.visit_date ?? ''];
+    const p = inputs.params ?? {};
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.hospital) args.push('--hospital', p.hospital);
+    if (p.department) args.push('--department', p.department);
+    if (p.chief_complaint) args.push('--chief-complaint', p.chief_complaint);
+    if (p.diagnosis) args.push('--diagnosis', p.diagnosis);
+    if (p.summary) args.push('--summary', p.summary);
+    return { script: 'medical_record.py', args };
+  },
+  'add-symptom': (inputs) => {
+    const args = ['add-symptom', '--member-id', inputs.member_id,
+                  '--symptom', inputs.params?.symptom ?? ''];
+    const p = inputs.params ?? {};
+    if (p.visit_id) args.push('--visit-id', p.visit_id);
+    if (p.severity) args.push('--severity', p.severity);
+    if (p.onset_date) args.push('--onset-date', p.onset_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.description) args.push('--description', p.description);
+    return { script: 'medical_record.py', args };
+  },
+  'add-medication': (inputs) => {
+    const args = ['add-medication', '--member-id', inputs.member_id,
+                  '--name', inputs.params?.name ?? ''];
+    const p = inputs.params ?? {};
+    if (p.visit_id) args.push('--visit-id', p.visit_id);
+    if (p.dosage) args.push('--dosage', p.dosage);
+    if (p.frequency) args.push('--frequency', p.frequency);
+    if (p.start_date) args.push('--start-date', p.start_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.purpose) args.push('--purpose', p.purpose);
+    return { script: 'medical_record.py', args };
+  },
+  'add-metric': (inputs) => {
+    const args = ['add', '--member-id', inputs.member_id,
+                  '--type', inputs.params?.type ?? '',
+                  '--value', String(inputs.params?.value ?? '')];
+    const p = inputs.params ?? {};
+    if (p.measured_at) args.push('--measured-at', p.measured_at);
+    if (p.note) args.push('--note', p.note);
+    if (p.source) args.push('--source', p.source);
+    if (p.context) args.push('--context', p.context);
+    if (p.related_visit_id) args.push('--related-visit-id', p.related_visit_id);
+    return { script: 'health_metric.py', args };
+  },
+
+  // Visit lifecycle management
+  'plan-visit': (inputs) => {
+    const args = ['plan', '--member-id', inputs.member_id, '--visit-date', inputs.params?.visit_date ?? ''];
+    if (inputs.params?.hospital) args.push('--hospital', inputs.params.hospital);
+    if (inputs.params?.department) args.push('--department', inputs.params.department);
+    if (inputs.params?.chief_complaint) args.push('--chief-complaint', inputs.params.chief_complaint);
+    if (inputs.params?.visit_type) args.push('--visit-type', inputs.params.visit_type);
+    return { script: 'visit_lifecycle.py', args };
+  },
+  'visit-prep': (inputs) => {
+    const args = ['prep', '--member-id', inputs.member_id];
+    if (inputs.params?.visit_id) args.push('--visit-id', inputs.params.visit_id);
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    return { script: 'visit_lifecycle.py', args };
+  },
+  'record-visit-outcome': (inputs) => {
+    const args = ['outcome', '--visit-id', inputs.params?.visit_id ?? '',
+                  '--diagnosis', inputs.params?.diagnosis ?? ''];
+    if (inputs.params?.summary) args.push('--summary', inputs.params.summary);
+    if (inputs.params?.follow_up_date) args.push('--follow-up-date', inputs.params.follow_up_date);
+    if (inputs.params?.follow_up_notes) args.push('--follow-up-notes', inputs.params.follow_up_notes);
+    if (inputs.params?.medications) args.push('--medications', JSON.stringify(inputs.params.medications));
+    if (inputs.params?.lab_orders) args.push('--lab-orders', JSON.stringify(inputs.params.lab_orders));
+    return { script: 'visit_lifecycle.py', args };
+  },
+  'pending-visits': (inputs) => ({
+    script: 'visit_lifecycle.py',
+    args: ['pending', '--member-id', inputs.member_id],
+  }),
+
+  // Health memory tracking
+  'log-health-note': (inputs) => {
+    const args = ['log', '--member-id', inputs.member_id, '--content', inputs.params?.content ?? ''];
+    if (inputs.params?.category) args.push('--category', inputs.params.category);
+    if (inputs.params?.follow_up_days) args.push('--follow-up-days', String(inputs.params.follow_up_days));
+    return { script: 'health_memory.py', args };
+  },
+  'check-health-notes': (inputs) => {
+    const args = ['list', '--member-id', inputs.member_id];
+    if (inputs.params?.include_resolved) args.push('--include-resolved');
+    return { script: 'health_memory.py', args };
+  },
+  'resolve-health-note': (inputs) => {
+    const args = ['resolve', '--note-id', inputs.params?.note_id ?? ''];
+    if (inputs.params?.resolution_note) args.push('--resolution-note', inputs.params.resolution_note);
+    return { script: 'health_memory.py', args };
+  },
+
+  // Medication intake check-in
+  'log-medication-taken': (inputs) => {
+    const args = ['log-taken', '--member-id', inputs.member_id,
+                  '--medication-name', inputs.params?.medication_name ?? ''];
+    if (inputs.params?.taken_at) args.push('--taken-at', inputs.params.taken_at);
+    if (inputs.params?.dose_taken) args.push('--dose-taken', inputs.params.dose_taken);
+    if (inputs.params?.note) args.push('--note', inputs.params.note);
+    return { script: 'medication_log.py', args };
+  },
+  'list-medication-logs': (inputs) => {
+    const args = ['list', '--member-id', inputs.member_id];
+    if (inputs.params?.medication_name) args.push('--medication-name', inputs.params.medication_name);
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    if (inputs.params?.limit) args.push('--limit', String(inputs.params.limit));
+    return { script: 'medication_log.py', args };
+  },
 };
 
 /**
@@ -308,6 +423,7 @@ export async function execute(inputs, context) {
     const ownerId = inputs.owner_id;
     const OWNER_ID_SCRIPTS = [
       'member.py',
+      'medical_record.py',
       'query.py',
       'health_metric.py',
       'export.py',
@@ -319,6 +435,11 @@ export async function execute(inputs, context) {
       'cycle_tracker.py',
       'quick_entry.py',
       'smart_intake.py',
+      'drug_interaction.py',
+      'openfda_query.py',
+      'visit_lifecycle.py',
+      'health_memory.py',
+      'medication_log.py',
     ];
     if (ownerId && OWNER_ID_SCRIPTS.includes(script)) {
       args.push('--owner-id', ownerId);

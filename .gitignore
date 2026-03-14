@@ -205,3 +205,30 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Mediwise Health Suite - Local data (NEVER commit)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+data/
+**/data/
+attachments/
+**/attachments/
+exports/
+**/exports/
+!exports/.gitkeep
+backups/
+**/backups/
+logs/
+**/logs/
+# Mediwise - test data with PII
+**/test_data/*.db
+**/test_data/*.sqlite
+**/test_data/*.json
+!**/test_data/.gitkeep

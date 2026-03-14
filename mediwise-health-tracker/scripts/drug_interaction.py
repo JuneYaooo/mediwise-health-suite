@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import ssl
 import sys
@@ -19,18 +20,24 @@ sys.path.insert(0, os.path.dirname(__file__))
 from health_db import ensure_db, get_connection, rows_to_list, output_json, is_api_mode
 import api_client
 
+_logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # DDInter API helpers
 # ---------------------------------------------------------------------------
 
-# DDInter SSL certificate is expired; create an unverified context.
-_SSL_CTX = ssl._create_unverified_context()
+_SSL_CTX = ssl.create_default_context()
 _TIMEOUT = 10  # seconds
 
 
 def _ddinter_get(path: str) -> dict | list | None:
-    """GET request to DDInter.  Returns parsed JSON or None on failure."""
+    """GET request to DDInter.  Returns parsed JSON or None on failure.
+
+    Returns None both when data is not found (HTTP 404) and on network/parse
+    errors.  Non-404 HTTP errors and connectivity issues are logged at WARNING
+    level so operators can detect when the external API is unreachable.
+    """
     url = "https://ddinter.scbdd.com" + path
     req = urllib.request.Request(url, method="GET")
     try:
@@ -39,8 +46,18 @@ def _ddinter_get(path: str) -> dict | list | None:
             if not body:
                 return None
             return json.loads(body)
-    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError,
-            TimeoutError, OSError):
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            _logger.warning("DDInter API HTTP error for %s: %s %s", path, e.code, e.reason)
+        return None
+    except urllib.error.URLError as e:
+        _logger.warning("DDInter API unreachable (%s): %s", path, e.reason)
+        return None
+    except (TimeoutError, OSError) as e:
+        _logger.warning("DDInter API timeout/connection error (%s): %s", path, e)
+        return None
+    except json.JSONDecodeError as e:
+        _logger.warning("DDInter API invalid JSON response (%s): %s", path, e)
         return None
 
 
@@ -340,6 +357,71 @@ def _get_interactions(ddinter_id: str) -> list[dict]:
     if not isinstance(interactions, list):
         return []
     return interactions
+
+
+def check_pairwise_interactions(meds: list[dict]) -> list[dict]:
+    """Check all pairwise drug interactions among a list of active medications.
+
+    Args:
+        meds: list of dicts with at least a ``name`` key (medication name).
+
+    Returns:
+        list of interaction warning dicts (Major/Moderate only):
+        [{drug_a, drug_b, level, description}, ...]
+    """
+    if len(meds) < 2:
+        return []
+
+    # Resolve all medication names to DDInter search results (cached)
+    resolved: dict[str, list[dict]] = {}
+    for med in meds:
+        name = med["name"]
+        if name not in resolved:
+            _en, _cn, results = _resolve_drug(name)
+            resolved[name] = results
+
+    warnings: list[dict] = []
+    checked_pairs: set[tuple] = set()
+
+    for i, med_a in enumerate(meds):
+        name_a = med_a["name"]
+        results_a = resolved.get(name_a, [])
+        if not results_a:
+            continue
+        drug_id_a = results_a[0]["id"]
+
+        try:
+            interactions_a = _get_interactions(drug_id_a)
+        except Exception as e:
+            _logger.warning("Failed to get interactions for DDInter ID %s: %s", drug_id_a, e)
+            continue
+        interaction_map = {item["id"]: item for item in interactions_a if item.get("id")}
+
+        for med_b in meds[i + 1:]:
+            name_b = med_b["name"]
+            pair = tuple(sorted([name_a, name_b]))
+            if pair in checked_pairs:
+                continue
+            checked_pairs.add(pair)
+
+            results_b = resolved.get(name_b, [])
+            if not results_b:
+                continue
+            drug_id_b = results_b[0]["id"]
+
+            matched = interaction_map.get(drug_id_b)
+            if matched:
+                level_raw = matched.get("level", [])
+                level = level_raw[0] if isinstance(level_raw, list) and level_raw else str(level_raw)
+                if level in ("Major", "Moderate"):
+                    warnings.append({
+                        "drug_a": name_a,
+                        "drug_b": name_b,
+                        "level": level,
+                        "description": matched.get("actions", []),
+                    })
+
+    return warnings
 
 
 # ---------------------------------------------------------------------------

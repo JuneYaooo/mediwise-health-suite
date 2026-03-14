@@ -9,18 +9,96 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from config import get_db_path as _cfg_get_db_path, config_exists, check_config_status, save_config, DEFAULT_CONFIG, ensure_data_dir, is_backend_mode
+from config import (
+    get_db_path as _cfg_get_db_path,
+    get_medical_db_path as _cfg_get_medical_db_path,
+    get_lifestyle_db_path as _cfg_get_lifestyle_db_path,
+    config_exists,
+    check_config_status,
+    save_config,
+    DEFAULT_CONFIG,
+    ensure_data_dir,
+    is_backend_mode,
+)
 
 
 def is_api_mode():
     """Check if backend API mode is enabled."""
     return is_backend_mode()
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 14
+
+MEDICAL_TABLES = {
+    "schema_version",
+    "members",
+    "visits",
+    "symptoms",
+    "medications",
+    "lab_results",
+    "imaging_results",
+    "health_metrics",
+    "member_summaries",
+    "observations",
+    "compression_log",
+    "reminders",
+    "reminder_logs",
+    "embeddings",
+    "cycle_records",
+    "cycle_predictions",
+    "monitor_thresholds",
+    "monitor_alerts",
+    "audit_events",
+    "attachments",
+    "attachment_links",
+    "health_notes",
+    "medication_logs",
+}
+
+LIFESTYLE_TABLES = {
+    "diet_records",
+    "diet_items",
+    "weight_goals",
+    "exercise_records",
+    "wearable_devices",
+    "wearable_sync_log",
+}
+
+TABLE_DOMAIN = {
+    **{table: "medical" for table in MEDICAL_TABLES},
+    **{table: "lifestyle" for table in LIFESTYLE_TABLES},
+}
+
+
+def get_table_domain(table_name: str | None) -> str:
+    """Return table domain. Unknown tables default to medical."""
+    if not table_name:
+        return "medical"
+    return TABLE_DOMAIN.get(table_name, "medical")
 
 
 def get_db_path():
+    """Legacy accessor kept for backward compatibility (medical DB)."""
     return _cfg_get_db_path()
+
+
+def get_medical_db_path():
+    return _cfg_get_medical_db_path()
+
+
+def get_lifestyle_db_path():
+    return _cfg_get_lifestyle_db_path()
+
+
+def _open_connection(db_path):
+    db_dir = os.path.dirname(db_path)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
 
 
 def _auto_init_config():
@@ -66,6 +144,9 @@ CREATE TABLE IF NOT EXISTS visits (
     chief_complaint TEXT,
     diagnosis TEXT,
     summary TEXT,
+    visit_status TEXT DEFAULT 'completed',
+    follow_up_date TEXT,
+    follow_up_notes TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     is_deleted INTEGER DEFAULT 0,
@@ -141,6 +222,8 @@ CREATE TABLE IF NOT EXISTS health_metrics (
     measured_at TEXT NOT NULL,
     note TEXT,
     source TEXT DEFAULT 'manual',
+    context TEXT DEFAULT 'routine',
+    related_visit_id TEXT,
     created_at TEXT NOT NULL,
     is_deleted INTEGER DEFAULT 0,
     FOREIGN KEY (member_id) REFERENCES members(id)
@@ -483,28 +566,192 @@ CREATE TABLE IF NOT EXISTS attachment_links (
 CREATE INDEX IF NOT EXISTS idx_attachment_links_attachment ON attachment_links(attachment_id, is_deleted);
 CREATE INDEX IF NOT EXISTS idx_attachment_links_record ON attachment_links(record_type, record_id, is_deleted);
 
+-- Health notes table for memory and proactive tracking
+
+CREATE TABLE IF NOT EXISTS health_notes (
+    id TEXT PRIMARY KEY,
+    member_id TEXT,
+    owner_id TEXT,
+    content TEXT NOT NULL,
+    category TEXT,
+    mentioned_at TEXT NOT NULL,
+    follow_up_date TEXT,
+    is_resolved INTEGER DEFAULT 0,
+    resolved_at TEXT,
+    resolution_note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+CREATE INDEX IF NOT EXISTS idx_health_notes_member ON health_notes(member_id, is_resolved);
+CREATE INDEX IF NOT EXISTS idx_health_notes_follow_up ON health_notes(follow_up_date, is_resolved);
+
+-- Medication intake logs (voluntary check-in)
+
+CREATE TABLE IF NOT EXISTS medication_logs (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    medication_id TEXT,
+    medication_name TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    dose_taken TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id),
+    FOREIGN KEY (medication_id) REFERENCES medications(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_medication_logs_member ON medication_logs(member_id, medication_name, taken_at);
+
+"""
+
+LIFESTYLE_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS diet_records (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    meal_type TEXT NOT NULL,
+    meal_date TEXT NOT NULL,
+    meal_time TEXT,
+    total_calories REAL DEFAULT 0,
+    total_protein REAL DEFAULT 0,
+    total_fat REAL DEFAULT 0,
+    total_carbs REAL DEFAULT 0,
+    total_fiber REAL DEFAULT 0,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS diet_items (
+    id TEXT PRIMARY KEY,
+    record_id TEXT NOT NULL,
+    food_name TEXT NOT NULL,
+    amount REAL,
+    unit TEXT,
+    calories REAL DEFAULT 0,
+    protein REAL DEFAULT 0,
+    fat REAL DEFAULT 0,
+    carbs REAL DEFAULT 0,
+    fiber REAL DEFAULT 0,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (record_id) REFERENCES diet_records(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_diet_records_member ON diet_records(member_id, meal_date);
+CREATE INDEX IF NOT EXISTS idx_diet_items_record ON diet_items(record_id);
+
+CREATE TABLE IF NOT EXISTS weight_goals (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    goal_type TEXT NOT NULL,
+    start_weight REAL NOT NULL,
+    target_weight REAL NOT NULL,
+    start_date TEXT,
+    target_date TEXT,
+    daily_calorie_target INTEGER,
+    status TEXT DEFAULT 'active',
+    note TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_weight_goals_member ON weight_goals(member_id, status);
+
+CREATE TABLE IF NOT EXISTS exercise_records (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    exercise_type TEXT NOT NULL,
+    exercise_name TEXT,
+    duration INTEGER,
+    calories_burned REAL DEFAULT 0,
+    exercise_date TEXT NOT NULL,
+    exercise_time TEXT,
+    intensity TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_exercise_records_member ON exercise_records(member_id, exercise_date);
+
+CREATE TABLE IF NOT EXISTS wearable_devices (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    device_name TEXT,
+    device_id TEXT,
+    config TEXT NOT NULL,
+    supported_metrics TEXT,
+    last_sync_at TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_wearable_devices_member ON wearable_devices(member_id, is_active);
+
+CREATE TABLE IF NOT EXISTS wearable_sync_log (
+    id TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    sync_start TEXT NOT NULL,
+    sync_end TEXT,
+    status TEXT NOT NULL,
+    metrics_synced INTEGER DEFAULT 0,
+    metrics_skipped INTEGER DEFAULT 0,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (device_id) REFERENCES wearable_devices(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_log_device ON wearable_sync_log(device_id, created_at);
 """
 
 
+def _schema_sql_for_domain(domain: str) -> str:
+    return LIFESTYLE_SCHEMA_SQL if domain == "lifestyle" else SCHEMA_SQL
+
+
 def get_connection():
-    """Get a database connection, creating the database if needed."""
-    db_path = get_db_path()
-    db_dir = os.path.dirname(db_path)
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    """Get legacy default connection (medical DB) for compatibility."""
+    return get_medical_connection()
 
 
-def init_db():
-    """Initialize the database schema."""
-    conn = get_connection()
+def get_medical_connection():
+    """Get a connection to the medical database."""
+    return _open_connection(get_medical_db_path())
+
+
+def get_lifestyle_connection():
+    """Get a connection to the lifestyle database."""
+    return _open_connection(get_lifestyle_db_path())
+
+
+def get_connection_for_domain(domain: str):
+    """Get a connection for a specific data domain."""
+    if domain == "lifestyle":
+        return get_lifestyle_connection()
+    return get_medical_connection()
+
+
+def get_connection_for_table(table_name: str):
+    """Get a connection by table name routing."""
+    return get_connection_for_domain(get_table_domain(table_name))
+
+
+def init_db(domain: str = "medical"):
+    """Initialize schema for a specific database domain."""
+    conn = get_connection_for_domain(domain)
     try:
-        conn.executescript(SCHEMA_SQL)
+        conn.executescript(_schema_sql_for_domain(domain))
         cursor = conn.execute("SELECT version FROM schema_version LIMIT 1")
         row = cursor.fetchone()
         if not row:
@@ -524,13 +771,25 @@ def ensure_db():
     """
     status = _auto_init_config()
     db_path = get_db_path()
-    if not os.path.exists(db_path):
-        init_db()
+    medical_db_path = get_medical_db_path()
+    lifestyle_db_path = get_lifestyle_db_path()
+
+    created_any = False
+    if not os.path.exists(medical_db_path):
+        init_db("medical")
+        status["medical_db_exists"] = True
         status["db_exists"] = True
-        status["first_run"] = True
-    else:
-        conn = get_connection()
-        try:
+        created_any = True
+
+    if not os.path.exists(lifestyle_db_path):
+        init_db("lifestyle")
+        status["lifestyle_db_exists"] = True
+        created_any = True
+
+    status["first_run"] = created_any
+
+    conn = get_medical_connection()
+    try:
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='members'")
             if not cursor.fetchone():
                 conn.executescript(SCHEMA_SQL)
@@ -932,9 +1191,77 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_member_time ON audit_events(member_i
                 if v12_migrated or (current_version and current_version[0] < SCHEMA_VERSION):
                     conn.execute("UPDATE schema_version SET version=?", (SCHEMA_VERSION,))
                     conn.commit()
-        finally:
-            conn.close()
-        status["first_run"] = False
+                # Migrate: visit lifecycle columns + health_notes table (v12 -> v13)
+                visit_cols = [row[1] for row in conn.execute("PRAGMA table_info(visits)").fetchall()]
+                v13_migrated = False
+                if "visit_status" not in visit_cols:
+                    conn.execute("ALTER TABLE visits ADD COLUMN visit_status TEXT DEFAULT 'completed'")
+                    v13_migrated = True
+                if "follow_up_date" not in visit_cols:
+                    conn.execute("ALTER TABLE visits ADD COLUMN follow_up_date TEXT")
+                    v13_migrated = True
+                if "follow_up_notes" not in visit_cols:
+                    conn.execute("ALTER TABLE visits ADD COLUMN follow_up_notes TEXT")
+                    v13_migrated = True
+                metric_cols = [row[1] for row in conn.execute("PRAGMA table_info(health_metrics)").fetchall()]
+                if "context" not in metric_cols:
+                    conn.execute("ALTER TABLE health_metrics ADD COLUMN context TEXT DEFAULT 'routine'")
+                    v13_migrated = True
+                if "related_visit_id" not in metric_cols:
+                    conn.execute("ALTER TABLE health_metrics ADD COLUMN related_visit_id TEXT")
+                    v13_migrated = True
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='health_notes'"
+                )
+                if not cursor.fetchone():
+                    conn.executescript("""
+CREATE TABLE IF NOT EXISTS health_notes (
+    id TEXT PRIMARY KEY,
+    member_id TEXT,
+    owner_id TEXT,
+    content TEXT NOT NULL,
+    category TEXT,
+    mentioned_at TEXT NOT NULL,
+    follow_up_date TEXT,
+    is_resolved INTEGER DEFAULT 0,
+    resolved_at TEXT,
+    resolution_note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+CREATE INDEX IF NOT EXISTS idx_health_notes_member ON health_notes(member_id, is_resolved);
+CREATE INDEX IF NOT EXISTS idx_health_notes_follow_up ON health_notes(follow_up_date, is_resolved);
+""")
+                    v13_migrated = True
+                if v13_migrated:
+                    conn.execute("UPDATE schema_version SET version=?", (13,))
+                    conn.commit()
+                # Migrate: add medication_logs table (v13 -> v14)
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='medication_logs'"
+                )
+                if not cursor.fetchone():
+                    conn.executescript("""
+CREATE TABLE IF NOT EXISTS medication_logs (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    medication_id TEXT,
+    medication_name TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    dose_taken TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id),
+    FOREIGN KEY (medication_id) REFERENCES medications(id)
+);
+CREATE INDEX IF NOT EXISTS idx_medication_logs_member ON medication_logs(member_id, medication_name, taken_at);
+""")
+                    conn.execute("UPDATE schema_version SET version=?", (14,))
+                    conn.commit()
+    finally:
+        conn.close()
     _set_last_status(status)
     return status
 
@@ -948,16 +1275,28 @@ def generate_id():
 import contextlib
 
 @contextlib.contextmanager
-def transaction():
+def transaction(domain: str = "medical", table_name: str | None = None):
     """Context manager for database write operations with auto-rollback on error.
 
     Usage:
         with transaction() as conn:
             conn.execute(...)
             conn.commit()
+
+        with transaction(domain="lifestyle") as conn:
+            conn.execute(...)
+            conn.commit()
+
+        with transaction(table_name="diet_records") as conn:
+            conn.execute(...)
+            conn.commit()
+
     On exception, conn.rollback() is called before re-raising.
     """
-    conn = get_connection()
+    if table_name:
+        conn = get_connection_for_table(table_name)
+    else:
+        conn = get_connection_for_domain(domain)
     try:
         yield conn
     except Exception:
@@ -972,6 +1311,27 @@ def now_iso():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _fetch_member_owner_id(conn, member_id):
+    row = conn.execute(
+        "SELECT owner_id FROM members WHERE id=? AND is_deleted=0", (member_id,)
+    ).fetchone()
+    if not row:
+        return None
+    return row["owner_id"]
+
+
+def _resolve_member_owner_id(conn, member_id):
+    try:
+        return _fetch_member_owner_id(conn, member_id)
+    except sqlite3.OperationalError:
+        pass
+    medical_conn = get_medical_connection()
+    try:
+        return _fetch_member_owner_id(medical_conn, member_id)
+    finally:
+        medical_conn.close()
+
+
 def verify_member_ownership(conn, member_id, owner_id):
     """Verify member belongs to owner.
 
@@ -980,12 +1340,10 @@ def verify_member_ownership(conn, member_id, owner_id):
     """
     if not owner_id:
         return True
-    row = conn.execute(
-        "SELECT owner_id FROM members WHERE id=? AND is_deleted=0", (member_id,)
-    ).fetchone()
-    if not row:
+    actual_owner_id = _resolve_member_owner_id(conn, member_id)
+    if not actual_owner_id:
         return False
-    return row["owner_id"] == owner_id
+    return actual_owner_id == owner_id
 
 
 def get_record_member_id(conn, table, record_id):
@@ -1010,12 +1368,7 @@ def verify_record_ownership(conn, table, record_id, owner_id):
 
 
 def get_member_owner_id(conn, member_id):
-    row = conn.execute(
-        "SELECT owner_id FROM members WHERE id=? AND is_deleted=0", (member_id,)
-    ).fetchone()
-    if not row:
-        return None
-    return row["owner_id"]
+    return _resolve_member_owner_id(conn, member_id)
 
 
 def append_audit_event(conn, event_type, member_id=None, owner_id=None,

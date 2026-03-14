@@ -7,6 +7,8 @@ description: >-
   也适用于用户发送体检报告图片或化验单需要识别录入的场景。
   也适用于用户想要设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、每日健康简报、
   就医前摘要图的场景。
+  也适用于用户准备去医院、想规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）的场景。
+  也适用于用户随口提到健康问题（如"最近膝盖有点疼"）需要记录并定期跟进的场景。
   Family health and medical record management tool. Use when the user wants to add/manage
   family members, record medical visits, track symptoms, diagnoses, medications, lab results,
   imaging results, daily health metrics, query medical history, generate health timelines or
@@ -14,6 +16,8 @@ description: >-
   Also use when the user wants to set medication reminders, health metric measurement reminders,
   follow-up checkup reminders, or get proactive health advice, daily health briefings, and a
   doctor-visit summary image before seeing a clinician.
+  Also use for visit lifecycle management (plan → prep → outcome → follow-up) and health memory
+  tracking (capture casual health mentions and proactively follow up).
 ---
 
 # MediWise Health Tracker
@@ -38,7 +42,7 @@ python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人"
 - 简短指标文本：优先 `quick_entry.py`
 - 复杂文本、就诊、用药、检验：用 `smart_intake.py` 或对应业务脚本
 - 图片 / PDF / 多附件：走视觉录入流程
-- 录入后发现异常指标、新诊断或用药变化：补记 `memory.py add-observation`
+- 录入后发现异常指标、新诊断或用药变化：用 `log-health-note` 动作记录并跟进
 
 ### 3. 查询后做自然语言整理
 
@@ -55,12 +59,16 @@ python3 {baseDir}/scripts/query.py family-overview
 
 ### 常用录入
 
-```bash
-python3 {baseDir}/scripts/medical_record.py add-visit --member-id <id> --visit-type "门诊" --visit-date "2025-01-15" --hospital "人民医院" --diagnosis "高血压"
-python3 {baseDir}/scripts/medical_record.py add-symptom --member-id <id> --symptom "头痛" --severity "中度"
-python3 {baseDir}/scripts/medical_record.py add-medication --member-id <id> --name "氨氯地平" --dosage "5mg" --frequency "每日一次"
-python3 {baseDir}/scripts/health_metric.py add --member-id <id> --type blood_pressure --value '{"systolic":130,"diastolic":85}'
-```
+结构化数据可直接调用对应动作写入：
+
+| 动作 | 说明 | 关键参数 |
+|------|------|----------|
+| `add-visit` | 添加就诊记录 | member_id, visit_type, visit_date；可选 hospital/department/diagnosis |
+| `add-symptom` | 添加症状记录 | member_id, symptom；可选 severity/visit_id/onset_date |
+| `add-medication` | 添加用药记录 | member_id, name；可选 dosage/frequency/visit_id/purpose |
+| `add-metric` | 添加健康指标 | member_id, type, value；可选 measured_at/source/context |
+
+自然语言或图片输入走 `smart-extract` → `smart-confirm` 流程；短文本指标走 `quick-entry-save`。
 
 ### 快速录入指标
 
@@ -69,10 +77,13 @@ python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --
 python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id>
 ```
 
-### 自动观察记忆
+### 录入后发现异常，记录并跟进
+
+录入数据后若发现异常指标、新诊断或用药变化，用 `log-health-note` 动作记录并自动创建跟进提醒：
 
 ```bash
-python3 {baseDir}/scripts/memory.py add-observation --member-id <id> --type metric --title "血压偏高" --facts '["收缩压160mmHg，超出正常范围上限140mmHg"]'
+# action: log-health-note
+python3 {baseDir}/scripts/health_memory.py log --member-id <id> --content "血压160/100，高于正常上限" --category observation --follow-up-days 3
 ```
 
 ### 生成就医前摘要
@@ -80,7 +91,7 @@ python3 {baseDir}/scripts/memory.py add-observation --member-id <id> --type metr
 当用户最近准备去看医生，可以先让用户用自然语言描述本次不适，默认先生成一段简短摘要：
 
 ```bash
-python3 {baseDir}/scripts/doctor_visit_report.py text --member-id <id> --description "最近两周反复头晕，起床和翻身时更明显，偶尔恶心，担心是不是血压或者耳石问题"
+python3 {baseDir}/scripts/doctor_visit_report.py text --member-id <id> --description “最近两周反复头晕，起床和翻身时更明显，偶尔恶心，担心是不是血压或者耳石问题”
 ```
 
 生成完后，顺手问一句：
@@ -97,6 +108,43 @@ python3 {baseDir}/scripts/doctor_visit_report.py text --member-id <id> --descrip
 - 近期关键指标、异常提醒、最近就诊变化
 - 相关既往病史与近期检查
 - 当前在用药、过敏史、可识别的中高风险药物相互作用
+
+### 就诊全程管理（plan → prep → outcome → follow-up）
+
+对于有明确就诊计划的场景，可以走完整就诊生命周期：
+
+```bash
+# 1. 创建就诊预约（status=planned），获取准备提醒
+python3 {baseDir}/scripts/visit_lifecycle.py plan --member-id <id> --visit-date 2026-03-15 --hospital 协和医院 --department 心内科 --chief-complaint “反复胸闷”
+
+# 2. 就诊前智能汇总：症状按身体系统分组 + 近期异常指标 + 在用药 + 药物相互作用警告
+python3 {baseDir}/scripts/visit_lifecycle.py prep --member-id <id> [--days 30]
+
+# 3. 就诊后引导录入：诊断、处方、复诊安排（自动创建复诊提醒）
+python3 {baseDir}/scripts/visit_lifecycle.py outcome --visit-id <vid> --diagnosis “高血压” \
+  --follow-up-date 2026-06-15 \
+  --medications '[{“name”:”氨氯地平”,”dosage”:”5mg”,”frequency”:”每日一次”}]'
+
+# 4. 查看待处理就诊（planned / 未填结果 / 复诊提醒）
+python3 {baseDir}/scripts/visit_lifecycle.py pending --member-id <id>
+```
+
+### 健康记忆追踪
+
+当用户随口提到健康问题时，及时记录并自动跟进：
+
+```bash
+# 记录随口提到的健康问题，自动创建 N 天后的跟进提醒
+python3 {baseDir}/scripts/health_memory.py log --member-id <id> --content “最近睡眠很差，经常半夜醒” --category symptom --follow-up-days 5
+
+# 查看未解决的健康备注和到期跟进
+python3 {baseDir}/scripts/health_memory.py list --member-id <id>
+
+# 标记已解决
+python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-note “医生建议减少咖啡因摄入，已执行”
+```
+
+待跟进的健康备注会自动出现在每日简报（`health_advisor.py briefing`）中，确保不遗漏。
 
 ## 不可跳过的规则
 
@@ -118,7 +166,9 @@ python3 {baseDir}/scripts/doctor_visit_report.py text --member-id <id> --descrip
 - 查询和总结病程：帮你把最近变化、既往史、在用药整理清楚
 - 做提醒和健康简报：比如用药提醒、复查提醒、每日简报
 - 识别报告图片或化验单：把图片/PDF里的信息提取出来录入
-- 在你准备去看医生前，先生成一段“就医前摘要”：自动整理最近的关键情况、相关病史、过敏史、在用药和需要注意的事项；如果你需要，我再继续整理成图片或 PDF
+- 在你准备去看医生前，先生成一段”就医前摘要”：自动整理最近的关键情况、相关病史、过敏史、在用药和需要注意的事项；如果你需要，我再继续整理成图片或 PDF
+- 就诊全程管理：提前规划预约 → 就诊前智能汇总症状/指标/用药 → 就诊后记录诊断和处方 → 自动追踪复诊提醒
+- 健康记忆：随时告诉我你注意到的健康问题（如”最近膝盖有点疼”），我会记下来并在几天后主动提醒你跟进
 
 如果你愿意，现在就可以直接告诉我：
 “帮我整理最近的情况”

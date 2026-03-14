@@ -130,7 +130,7 @@ description: >-
 ## 使用流程
 
 1. 确认成员身份
-2. 记录身高体重（health_metric add --type weight / --type height）
+2. 记录身高体重（通过 `mediwise-health-tracker` 的 `add-metric` 动作，type 填 weight / height）
 3. 使用 `calculate-bmi` 计算 BMI
 4. 使用 `calculate-bmr-tdee` 计算基础代谢和每日总消耗
 5. 使用 `set-goal` 设定体重管理目标（自动推算热量目标）

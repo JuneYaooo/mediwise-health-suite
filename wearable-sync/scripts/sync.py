@@ -64,10 +64,14 @@ def _check_duplicate(conn, member_id, metric_type, measured_at, source):
     return row is not None
 
 
-def sync_device(device_id):
-    """Sync a single device. Returns sync result dict."""
+def sync_device(device_id, owner_id=None):
+    """Sync a single device. Returns sync result dict.
+
+    If owner_id is provided, the device's owning member is verified against it
+    before any sync work begins.
+    """
     health_db.ensure_db()
-    conn = health_db.get_connection()
+    conn = health_db.get_lifestyle_connection()
 
     try:
         device = _load_device(conn, device_id)
@@ -75,6 +79,15 @@ def sync_device(device_id):
             return {"status": "error", "message": f"未找到活跃设备: {device_id}"}
     finally:
         conn.close()
+
+    # Verify that the caller has access to the member this device belongs to
+    if owner_id is not None:
+        med_conn = health_db.get_medical_connection()
+        try:
+            if not health_db.verify_member_ownership(med_conn, device["member_id"], owner_id):
+                return {"status": "error", "message": f"无权访问设备: {device_id}"}
+        finally:
+            med_conn.close()
 
     provider_name = device["provider"]
     provider = _get_provider(provider_name)
@@ -97,7 +110,7 @@ def sync_device(device_id):
     sync_id = health_db.generate_id()
     sync_start = health_db.now_iso()
 
-    with health_db.transaction() as conn:
+    with health_db.transaction(domain="lifestyle") as conn:
         conn.execute(
             """INSERT INTO wearable_sync_log (id, device_id, sync_start, status, created_at)
                VALUES (?, ?, ?, 'running', ?)""",
@@ -125,13 +138,12 @@ def sync_device(device_id):
     synced = 0
     skipped = 0
 
-    with health_db.transaction() as conn:
+    with health_db.transaction(domain="medical") as conn:
         for metric in normalized:
             if _check_duplicate(conn, member_id, metric["metric_type"],
                                 metric["measured_at"], metric["source"]):
                 skipped += 1
                 continue
-
             metric_id = health_db.generate_id()
             conn.execute(
                 """INSERT INTO health_metrics
@@ -142,8 +154,10 @@ def sync_device(device_id):
                  health_db.now_iso())
             )
             synced += 1
+        conn.commit()
 
-        # Update last_sync_at on device
+    # Update device last_sync_at in lifestyle domain (separate transaction)
+    with health_db.transaction(domain="lifestyle") as conn:
         conn.execute(
             "UPDATE wearable_devices SET last_sync_at=?, updated_at=? WHERE id=?",
             (health_db.now_iso(), health_db.now_iso(), device_id)
@@ -169,7 +183,7 @@ def sync_device(device_id):
 
 def _update_sync_log(sync_id, status, synced, skipped, error_msg):
     """Update sync log entry with final status."""
-    with health_db.transaction() as conn:
+    with health_db.transaction(domain="lifestyle") as conn:
         conn.execute(
             """UPDATE wearable_sync_log
                SET sync_end=?, status=?, metrics_synced=?, metrics_skipped=?, error_message=?
@@ -203,14 +217,25 @@ def _auto_check_after_sync(member_id):
 def cmd_run(args):
     """Run sync for a device or all devices of a member."""
     health_db.ensure_db()
+    owner_id = getattr(args, "owner_id", None)
 
     if args.device_id:
-        result = sync_device(args.device_id)
+        result = sync_device(args.device_id, owner_id=owner_id)
         health_db.output_json(result)
         return
 
     if args.member_id:
-        conn = health_db.get_connection()
+        # Verify the caller has access to this member before listing their devices
+        if owner_id is not None:
+            med_conn = health_db.get_medical_connection()
+            try:
+                if not health_db.verify_member_ownership(med_conn, args.member_id, owner_id):
+                    health_db.output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})
+                    return
+            finally:
+                med_conn.close()
+
+        conn = health_db.get_lifestyle_connection()
         try:
             rows = conn.execute(
                 "SELECT id FROM wearable_devices WHERE member_id=? AND is_active=1 AND is_deleted=0",
@@ -225,7 +250,7 @@ def cmd_run(args):
 
         results = []
         for row in rows:
-            results.append(sync_device(row["id"]))
+            results.append(sync_device(row["id"], owner_id=owner_id))
         total_synced = sum(r.get("synced", 0) for r in results)
         total_skipped = sum(r.get("skipped", 0) for r in results)
         health_db.output_json({
@@ -241,7 +266,7 @@ def cmd_run(args):
 def cmd_run_all(args):
     """Run sync for all active devices."""
     health_db.ensure_db()
-    conn = health_db.get_connection()
+    conn = health_db.get_lifestyle_connection()
     try:
         rows = conn.execute(
             "SELECT id, member_id, provider, device_name FROM wearable_devices WHERE is_active=1 AND is_deleted=0"
@@ -272,7 +297,7 @@ def cmd_run_all(args):
 def cmd_status(args):
     """Show sync status for a device."""
     health_db.ensure_db()
-    conn = health_db.get_connection()
+    conn = health_db.get_lifestyle_connection()
     try:
         device = conn.execute(
             "SELECT * FROM wearable_devices WHERE id=? AND is_deleted=0",
@@ -300,7 +325,7 @@ def cmd_status(args):
 def cmd_history(args):
     """Show sync history for a device."""
     health_db.ensure_db()
-    conn = health_db.get_connection()
+    conn = health_db.get_lifestyle_connection()
     try:
         limit = int(args.limit) if args.limit else 10
         rows = conn.execute(
@@ -324,6 +349,7 @@ def main():
     p_run = sub.add_parser("run", help="同步设备数据")
     p_run.add_argument("--device-id", default=None)
     p_run.add_argument("--member-id", default=None)
+    p_run.add_argument("--owner-id", default=None, help="调用方的 owner_id，用于归属校验")
 
     sub.add_parser("run-all", help="同步所有活跃设备")
 
