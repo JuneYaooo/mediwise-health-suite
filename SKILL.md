@@ -28,6 +28,40 @@ keywords:
   - 饮食
   - 体重
   - openclaw
+# Optional environment variables (all features work without any of these)
+env:
+  optional:
+    - name: USDA_API_KEY
+      description: >-
+        USDA FoodData Central API key for international food lookup fallback in
+        diet-tracker. Register free at https://api.data.gov/signup/
+        If unset, USDA lookup is silently skipped; CFCD6 and cn-brands data
+        are used instead (covers most Chinese foods).
+    - name: MEDIWISE_DATA_DIR
+      description: >-
+        Override the default data directory where SQLite databases are stored.
+        Defaults to the OS user-data directory (~/.local/share/mediwise on Linux).
+    - name: MEDIWISE_MEDICAL_DB_PATH
+      description: Override path for the medical database file (medical.db).
+    - name: MEDIWISE_LIFESTYLE_DB_PATH
+      description: Override path for the lifestyle database file (lifestyle.db).
+# Network: offline by default. Optional features below contact external hosts ONLY
+# when explicitly configured by the user via setup.py or env vars.
+network:
+  default: offline
+  optional_outbound:
+    - host: api.nal.usda.gov
+      trigger: USDA_API_KEY env var is set
+      purpose: USDA FoodData Central — international food nutrition lookup (diet-tracker)
+      data_sent: food name search query string (no personal health data)
+    - host: api.siliconflow.cn
+      trigger: vector search enabled via setup.py set-embedding
+      purpose: Text embedding API for semantic health record search
+      data_sent: anonymised text snippets for embedding (no PII by default)
+    - host: user-configured
+      trigger: backend API enabled via setup.py set-backend
+      purpose: Optional self-hosted REST API backend (replaces local SQLite)
+      data_sent: full health record data — only configure with a trusted endpoint
 ---
 
 # MediWise Health Suite - 家庭健康管理套件

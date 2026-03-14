@@ -42,28 +42,34 @@ openclaw agents add health
         },
         model: "anthropic/claude-sonnet-4-5",
         sandbox: {
-          mode: "all",
+          mode: "all",   // 隔离健康工作区，不与其他 agent 共享文件系统
           scope: "agent",
         },
         tools: {
-          allow: ["exec", "read", "write", "sessions_list", "sessions_history"],
-          deny: ["browser", "canvas"],
+          // 最小权限配置（推荐起点，见下方"权限说明"）
+          allow: ["exec", "read", "write"],
+          deny: ["browser", "sessions_list", "sessions_history"],
         },
       },
     ],
   },
-  bindings: [
-    {
-      agentId: "health",
-      match: {
-        channel: "qq",
-        peer: { kind: "group", id: "123456789" },
-      },
-    },
-    { agentId: "main", match: { channel: "qq" } },
-  ],
+  // ... bindings 见下方方案 A/B/C
 }
 ```
+
+### 权限说明
+
+下表说明每个工具的用途和风险等级，请按需开启：
+
+| 工具 | 是否必需 | 用途 | 风险说明 |
+|------|----------|------|----------|
+| `exec` | **必需** | 运行健康管理 Python 脚本 | Agent 可执行脚本命令；sandbox 模式可限制影响范围 |
+| `read` | **必需** | 读取导出报告、化验单图片 | 限于 workspace 目录内 |
+| `write` | 推荐 | 保存就医摘要、导出报告 | 限于 workspace 目录内 |
+| `sessions_list` | 可选 | health_memory 功能：检索历史会话 | 可访问该 agent 的历史会话列表 |
+| `sessions_history` | 可选 | health_memory 功能：读取历史会话内容 | 可读取该 agent 历史对话全文 |
+
+**推荐做法**：从最小权限（`exec` + `read` + `write`）开始，只在需要 health_memory 功能时才添加 `sessions_list` 和 `sessions_history`。
 
 ## 推荐配置方案
 
@@ -239,9 +245,14 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 ## 安全建议
 
 1. **启用沙箱**：`sandbox.mode: "all"` 隔离健康数据
-2. **限制工具**：只允许必要的工具
+2. **最小权限**：从 `exec + read + write` 开始，按需添加其他权限（见上方"权限说明"表格）
 3. **设置提及模式**：避免在群组中误触发
 4. **定期备份**：备份 `~/.openclaw/workspace-health/medical.db` 与 `~/.openclaw/workspace-health/lifestyle.db`
+5. **可选功能谨慎开启**：
+   - **USDA 食物库**：设置 `USDA_API_KEY` 后才会请求 `api.nal.usda.gov`，否则默认离线
+   - **向量搜索**：需手动执行 `setup.py set-embedding` 启用，默认关闭
+   - **后端 API**：需手动执行 `setup.py set-backend` 启用，默认关闭
+   - **MCP 服务器**：若启用，务必将绑定地址设为 `127.0.0.1`（仅本机），不得绑定 `0.0.0.0` 或对外网络接口
 
 ## 使用示例
 
