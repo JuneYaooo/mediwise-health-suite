@@ -162,7 +162,6 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 - **默认本地存储**：所有数据存储在本地 SQLite 数据库，不上传云端
 - **可选后端模式**：支持可选的后端 API 模式（需用户主动配置，默认关闭）
 - **可选向量搜索**：支持智能查询功能（本地模型优先，可选 API，默认关闭）
-- **MCP 服务器**：提供只读数据访问接口（用于与其他工具集成）
 - **多租户隔离**：支持共享实例场景的数据隔离
 
 **重要**：所有云端功能均为可选，需用户主动配置启用。默认配置下，所有数据仅存储在本地。
@@ -173,7 +172,7 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 - **脚本语言**: Python 3.8+
 - **Skill 框架**: OpenClaw Agent Skills
 - **模块化设计**: 5 个 skills（3 个已实现，2 个待完善）
-- **可选功能**: 后端 API、向量搜索、MCP 服务器（默认关闭）
+- **可选功能**: 后端 API、向量搜索（默认关闭）
 
 ## 许可证
 

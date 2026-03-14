@@ -252,7 +252,6 @@ openclaw chat --agent health "帮我添加一个家庭成员"
    - **USDA 食物库**：设置 `USDA_API_KEY` 后才会请求 `api.nal.usda.gov`，否则默认离线
    - **向量搜索**：需手动执行 `setup.py set-embedding` 启用，默认关闭
    - **后端 API**：需手动执行 `setup.py set-backend` 启用，默认关闭
-   - **MCP 服务器**：若启用，务必将绑定地址设为 `127.0.0.1`（仅本机），不得绑定 `0.0.0.0` 或对外网络接口
 
 ## 使用示例
 
