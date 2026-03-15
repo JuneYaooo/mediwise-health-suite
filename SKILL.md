@@ -64,15 +64,29 @@ requires:
 
 ### 安装
 
+> **重要**：OpenClaw 沙箱要求 skills 必须位于插件/agent 工作区目录内。
+> `clawhub install` 会安装到**当前目录**的 `skills/` 子目录，
+> 因此务必先 `cd` 进入正确的工作区目录再执行安装命令。
+
 **通过 ClawdHub（推荐）：**
 ```bash
+# 先进入 OpenClaw agent 工作区目录（路径以实际配置为准）
+cd ~/.openclaw/workspace-health   # 或你的插件根目录
+
+# 再安装，skill 会被放到 ./skills/mediwise-health-suite/
 clawdhub install JuneYaooo/mediwise-health-suite
 ```
 
-**手动安装：**
+**手动安装（路径最明确）：**
 ```bash
+# 直接克隆到正确路径，不受工作目录影响
 git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
-  ~/.openclaw/skills/mediwise-health-suite
+  ~/.openclaw/workspace-health/skills/mediwise-health-suite
+```
+
+**路径检测工具（装完后验证）：**
+```bash
+bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
 ```
 
 ### 基本使用

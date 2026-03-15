@@ -2,15 +2,32 @@
 
 ## 中文
 
+> **路径注意事项（重要）**
+>
+> OpenClaw 的沙箱安全机制要求：skill 文件必须位于 agent 工作区（插件根目录）**内部**，
+> 否则会触发 "escapes plugin root" 保护，SKILL.md 内容无法注入给 agent，脚本也无法被调用。
+>
+> - `clawhub install` 会把 skill 装到**执行命令时所在目录**的 `skills/` 子目录。
+> - 因此，请务必先 `cd` 进入 agent 工作区目录，再运行安装命令。
+> - 或者直接用 `git clone` 指定完整目标路径（见方式 2），最不容易出错。
+
 ### 方式 1：通过 ClawdHub 安装（推荐）
 
-这是最简单的安装方式：
+**必须先进入 agent 工作区目录再安装：**
 
 ```bash
-clawdhub install mediwise-health-suite
+# 先进入你的 OpenClaw agent 工作区（路径以实际配置为准）
+cd ~/.openclaw/workspace-health
+
+# 安装命令会将 skill 放到 ./skills/mediwise-health-suite/
+clawdhub install JuneYaooo/mediwise-health-suite
 ```
 
-安装完成后，OpenClaw 会自动加载所有 skills。
+安装完成后，运行路径检测脚本确认位置正确：
+
+```bash
+bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
+```
 
 ### 方式 2：手动安装
 
@@ -185,15 +202,32 @@ chmod 755 ~/.openclaw/skills/mediwise-health-suite/data
 
 ## English
 
+> **Important: Install Path**
+>
+> OpenClaw's sandbox requires skill files to be located **inside** the agent workspace
+> (plugin root directory). Installing outside triggers an "escapes plugin root" error,
+> which silently prevents SKILL.md from being injected and scripts from being called.
+>
+> - `clawhub install` places the skill in the `skills/` subdirectory of your **current working directory**.
+> - Always `cd` into your agent workspace first, or use `git clone` with the full target path (Method 2).
+
 ### Method 1: Install via ClawdHub (Recommended)
 
-This is the easiest way:
+**You must `cd` into the agent workspace before installing:**
 
 ```bash
-clawdhub install mediwise-health-suite
+# Navigate to your OpenClaw agent workspace first
+cd ~/.openclaw/workspace-health
+
+# This installs to ./skills/mediwise-health-suite/
+clawdhub install JuneYaooo/mediwise-health-suite
 ```
 
-After installation, OpenClaw will automatically load all skills.
+After installation, verify the path is correct:
+
+```bash
+bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
+```
 
 ### Method 2: Manual Installation
 

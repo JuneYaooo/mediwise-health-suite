@@ -183,17 +183,31 @@ openclaw agents add health
 
 ## 安装 MediWise Skills
 
+**推荐：直接 git clone 到正确路径（最稳妥）**
+
 ```bash
-cd ~/.openclaw/workspace-health
-mkdir -p skills
-cd skills
-git clone https://github.com/JuneYaooo/mediwise-health-suite.git
+mkdir -p ~/.openclaw/workspace-health/skills
+git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
+  ~/.openclaw/workspace-health/skills/mediwise-health-suite
 ```
 
-或使用 ClawdHub：
+**或使用 ClawdHub（务必先 cd 进工作区目录）：**
 
 ```bash
-clawdhub install mediwise-health-suite --agent health
+# 先进入 agent 工作区，再安装
+cd ~/.openclaw/workspace-health
+clawdhub install JuneYaooo/mediwise-health-suite
+```
+
+> **为什么要先 cd？**
+> `clawhub install` 会把文件装到当前目录的 `skills/` 下。如果在项目根目录运行，
+> skill 会被放到插件根目录之外，触发 OpenClaw 的 "escapes plugin root" 沙箱保护，
+> 导致 SKILL.md 无法加载，脚本无法被 agent 调用。
+
+安装后验证路径：
+
+```bash
+bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
 ```
 
 ## 配置视觉模型（图片/PDF 识别必填）
