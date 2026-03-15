@@ -241,15 +241,50 @@ def get_lifestyle_db_path():
 
 
 def get_vision_config():
-    """Get vision model config."""
+    """Get vision model config.
+
+    Resolution order:
+    1. Environment variables (MEDIWISE_VISION_*)  — useful for Docker / .env deployment
+    2. config.json vision section
+    3. DEFAULT_CONFIG fallback
+    """
     cfg = load_config()
-    return cfg.get("vision", DEFAULT_CONFIG["vision"])
+    vision = dict(cfg.get("vision", DEFAULT_CONFIG["vision"]))
+
+    # Env-var overrides: any set var wins over config file
+    if os.environ.get("MEDIWISE_VISION_API_KEY"):
+        vision["api_key"] = os.environ["MEDIWISE_VISION_API_KEY"]
+        vision["enabled"] = True          # presence of key implies intent to enable
+    if os.environ.get("MEDIWISE_VISION_PROVIDER"):
+        vision["provider"] = os.environ["MEDIWISE_VISION_PROVIDER"]
+    if os.environ.get("MEDIWISE_VISION_MODEL"):
+        vision["model"] = os.environ["MEDIWISE_VISION_MODEL"]
+    if os.environ.get("MEDIWISE_VISION_BASE_URL"):
+        vision["base_url"] = os.environ["MEDIWISE_VISION_BASE_URL"]
+
+    return vision
 
 
 def get_llm_config():
-    """Get LLM config for text extraction. Falls back to vision config if not set."""
+    """Get LLM config for text extraction.
+
+    Resolution order:
+    1. MEDIWISE_LLM_* environment variables
+    2. config.json llm section (if fully configured)
+    3. Falls back to vision config (vision model also handles text)
+    """
     cfg = load_config()
-    llm = cfg.get("llm", {})
+    llm = dict(cfg.get("llm", DEFAULT_CONFIG["llm"]))
+
+    if os.environ.get("MEDIWISE_LLM_API_KEY"):
+        llm["api_key"] = os.environ["MEDIWISE_LLM_API_KEY"]
+    if os.environ.get("MEDIWISE_LLM_PROVIDER"):
+        llm["provider"] = os.environ["MEDIWISE_LLM_PROVIDER"]
+    if os.environ.get("MEDIWISE_LLM_MODEL"):
+        llm["model"] = os.environ["MEDIWISE_LLM_MODEL"]
+    if os.environ.get("MEDIWISE_LLM_BASE_URL"):
+        llm["base_url"] = os.environ["MEDIWISE_LLM_BASE_URL"]
+
     if llm.get("provider") and llm.get("model") and llm.get("api_key"):
         return llm
     return get_vision_config()

@@ -125,11 +125,55 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 
 ## 可选环境变量
 
-所有功能在不设置任何环境变量的情况下均可正常使用。
+所有功能在不设置任何环境变量的情况下均可正常使用。详细配置模板见根目录 `.env.example`。
+
+### 多模态视觉模型（强烈推荐配置）
+
+用于识别体检报告图片、化验单、病历 PDF。不配置则无法处理图片输入。
+
+| 变量名 | 说明 | 推荐值 |
+|--------|------|--------|
+| `MEDIWISE_VISION_API_KEY` | 视觉模型 API Key（设置即自动启用） | 见下方推荐方案 |
+| `MEDIWISE_VISION_PROVIDER` | 提供商名称 | `siliconflow` / `openai` / `ollama` |
+| `MEDIWISE_VISION_MODEL` | 模型名称 | 见下方推荐方案 |
+| `MEDIWISE_VISION_BASE_URL` | API 地址（OpenAI 兼容接口） | 见下方推荐方案 |
+
+**推荐方案：**
+
+| 方案 | 适用场景 | PROVIDER | MODEL | BASE_URL |
+|------|---------|----------|-------|----------|
+| 硅基流动 Qwen2.5-VL（**国内首选**） | 国内部署，价格低 | `siliconflow` | `Qwen/Qwen2.5-VL-72B-Instruct` | `https://api.siliconflow.cn/v1` |
+| Google Gemini 2.0 Flash | 海外，免费额度充足 | `openai` | `gemini-2.0-flash` | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| OpenAI GPT-4o | 通用，效果稳定 | `openai` | `gpt-4o` | `https://api.openai.com/v1` |
+| 阶跃星辰 Step-1V | 国内备选 | `openai` | `step-1v-32k` | `https://api.stepfun.com/v1` |
+| 本地 Ollama | 完全离线 | `ollama` | `qwen2-vl:7b` | `http://localhost:11434/v1` |
+
+也可以用 `setup.py` 命令配置（保存到 `config.json`，环境变量优先级更高）：
+```bash
+python3 scripts/setup.py set-vision \
+  --provider siliconflow \
+  --model Qwen/Qwen2.5-VL-72B-Instruct \
+  --api-key sk-xxx \
+  --base-url https://api.siliconflow.cn/v1
+```
+
+### 纯文本 LLM（可选）
+
+用于结构化提取、快速录入解析。**不设置时自动复用视觉模型**，无需单独配置。
+
+| 变量名 | 说明 |
+|--------|------|
+| `MEDIWISE_LLM_API_KEY` | 文本模型 API Key |
+| `MEDIWISE_LLM_PROVIDER` | 提供商 |
+| `MEDIWISE_LLM_MODEL` | 模型名称 |
+| `MEDIWISE_LLM_BASE_URL` | API 地址 |
+
+### 其他可选变量
 
 | 变量名 | 用途 | 默认行为 |
 |--------|------|----------|
-| `USDA_API_KEY` | USDA FoodData Central API Key，用于饮食追踪的国际食材兜底查询。免费注册：https://api.data.gov/signup/ | 未设置时跳过 USDA 查询，使用 CFCD6/cn-brands 离线数据库 |
+| `MEDIWISE_OWNER_ID` | 多租户隔离：限定当前进程只能访问该 owner 的数据（共享实例必填） | 未设置时为管理员模式，可访问全部数据 |
+| `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材兜底查询。免费注册：https://api.data.gov/signup/ | 未设置时跳过 USDA 查询，使用内置离线数据库 |
 | `MEDIWISE_DATA_DIR` | 覆盖 SQLite 数据库存储目录 | 默认 OS 用户数据目录（Linux: `~/.local/share/mediwise`） |
 | `MEDIWISE_MEDICAL_DB_PATH` | 覆盖医疗数据库（medical.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
 | `MEDIWISE_LIFESTYLE_DB_PATH` | 覆盖生活方式数据库（lifestyle.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
@@ -140,6 +184,9 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 
 | 主机 | 触发条件 | 发送内容 |
 |------|----------|----------|
+| `api.siliconflow.cn` | 设置 `MEDIWISE_VISION_*` 或 `setup.py set-vision` 启用视觉模型 | 图片 base64 + 提示词（不含个人身份信息） |
+| `generativelanguage.googleapis.com` | 配置 Gemini 作为视觉模型 | 图片 base64 + 提示词 |
+| `api.openai.com` | 配置 OpenAI GPT-4o 作为视觉模型 | 图片 base64 + 提示词 |
 | `api.nal.usda.gov` | 设置 `USDA_API_KEY` 环境变量 | 食物名称搜索词（不含个人健康数据） |
 | `api.siliconflow.cn` | 执行 `setup.py set-embedding` 启用向量搜索 | 匿名文本片段用于 embedding（默认不含 PII） |
 | 用户自行配置的地址 | 执行 `setup.py set-backend` 启用后端 API | 完整健康记录数据，仅限信任的自托管端点 |
