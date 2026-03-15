@@ -928,7 +928,7 @@ def main():
     parser.add_argument("--description", required=True)
     parser.add_argument("--days", type=int, default=180)
     parser.add_argument("--width", type=int, default=1080)
-    parser.add_argument("--owner-id", default=None)
+    parser.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     args = parser.parse_args(sys.argv[2:])
 
     if cmd == "data":

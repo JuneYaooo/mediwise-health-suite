@@ -10,6 +10,7 @@ Analyzes existing health data to generate actionable advice:
 from __future__ import annotations
 
 import sys
+import os
 import json
 import copy
 import logging
@@ -580,7 +581,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         health_db.output_json(generate_health_tips(args.member_id))
 
@@ -588,7 +589,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         health_db.output_json(get_daily_briefing(args.member_id, getattr(args, 'owner_id', None)))
 
@@ -596,7 +597,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         health_db.output_json({"anomalies": check_metric_anomalies(args.member_id)})
 
@@ -604,7 +605,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         health_db.output_json({"gaps": check_metric_gaps(args.member_id)})
 
@@ -612,7 +613,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         health_db.output_json({"overdue": check_overdue_checkups(args.member_id)})
 

@@ -78,6 +78,16 @@ _METRIC_RANGES = {
     "body_fat": (2, 60),             # %
 }
 
+VALID_CONTEXTS = {
+    "routine",          # 日常
+    "visit",            # 就诊中
+    "self_test",        # 自测
+    "fasting",          # 空腹（血糖用）
+    "postprandial_2h",  # 餐后2小时（血糖用）
+    "morning",          # 晨起（血压用）
+    "bedtime",          # 睡前
+}
+
 
 def validate_metric_value(metric_type, value):
     """Validate a health metric value against known ranges.

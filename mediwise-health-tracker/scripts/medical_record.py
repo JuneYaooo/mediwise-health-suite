@@ -560,7 +560,7 @@ def main():
     # --- visit commands ---
     p = sub.add_parser("add-visit")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-type", required=True, help="门诊/住院/急诊/体检/其他")
     p.add_argument("--visit-date", required=True)
     p.add_argument("--end-date", default=None)
@@ -572,14 +572,14 @@ def main():
 
     p = sub.add_parser("list-visits")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
     p.add_argument("--visit-type", default=None)
 
     p = sub.add_parser("update-visit")
     p.add_argument("--id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-type", default=None)
     p.add_argument("--visit-date", default=None)
     p.add_argument("--end-date", default=None)
@@ -594,12 +594,12 @@ def main():
 
     p = sub.add_parser("delete-visit")
     p.add_argument("--id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # --- symptom commands ---
     p = sub.add_parser("add-symptom")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-id", default=None)
     p.add_argument("--symptom", required=True)
     p.add_argument("--severity", default=None, help="轻度/中度/重度")
@@ -609,13 +609,13 @@ def main():
 
     p = sub.add_parser("list-symptoms")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-id", default=None)
 
     # --- medication commands ---
     p = sub.add_parser("add-medication")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-id", default=None)
     p.add_argument("--name", required=True)
     p.add_argument("--dosage", default=None)
@@ -626,19 +626,19 @@ def main():
 
     p = sub.add_parser("stop-medication")
     p.add_argument("--medication-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--end-date", default=None)
     p.add_argument("--reason", default=None)
 
     p = sub.add_parser("list-medications")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--active-only", action="store_true")
 
     # --- lab result commands ---
     p = sub.add_parser("add-lab-result")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-id", default=None)
     p.add_argument("--test-name", required=True)
     p.add_argument("--test-date", required=True)
@@ -646,14 +646,14 @@ def main():
 
     p = sub.add_parser("list-lab-results")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
 
     # --- imaging commands ---
     p = sub.add_parser("add-imaging")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--visit-id", default=None)
     p.add_argument("--exam-name", required=True)
     p.add_argument("--exam-date", required=True)
@@ -662,7 +662,7 @@ def main():
 
     p = sub.add_parser("list-imaging")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
 

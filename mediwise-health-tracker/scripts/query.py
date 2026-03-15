@@ -540,29 +540,29 @@ def main():
 
     p = sub.add_parser("timeline")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("active-medications")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("visits")
     p.add_argument("--member-id", required=True)
     p.add_argument("--start-date", default=None)
     p.add_argument("--end-date", default=None)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("summary")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("search")
     p.add_argument("--member-id", default=None)
     p.add_argument("--keyword", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("family-overview")
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

@@ -445,14 +445,14 @@ def main():
     p.add_argument("--department", default=None)
     p.add_argument("--chief-complaint", default=None)
     p.add_argument("--visit-type", default="门诊")
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # prep
     p = sub.add_parser("prep", help="就诊前智能汇总")
     p.add_argument("--member-id", required=True)
     p.add_argument("--visit-id", default=None)
     p.add_argument("--days", type=int, default=30)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # outcome
     p = sub.add_parser("outcome", help="记录就诊结果")
@@ -466,12 +466,12 @@ def main():
         help='处方药 JSON 数组，如 \'[{"name":"阿司匹林","dosage":"100mg","frequency":"每日一次"}]\'',
     )
     p.add_argument("--lab-orders", default=None)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # pending
     p = sub.add_parser("pending", help="待处理就诊列表")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

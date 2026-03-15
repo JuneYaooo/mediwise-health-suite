@@ -634,7 +634,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         result = generate_report(args.member_id, args.owner_id)
         health_db.output_json(result)
@@ -642,7 +642,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         p.add_argument("--width", type=int, default=960)
         args = p.parse_args(sys.argv[2:])
         # Generate HTML first

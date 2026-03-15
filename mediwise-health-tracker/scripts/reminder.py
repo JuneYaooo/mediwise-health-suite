@@ -10,6 +10,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 import sys
+import os
 import json
 import calendar
 from datetime import datetime, timedelta
@@ -414,7 +415,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         p.add_argument("--type", required=True, choices=["medication", "metric", "checkup", "custom", "cycle"])
         p.add_argument("--title", required=True)
         p.add_argument("--schedule-type", required=True, choices=["once", "daily", "weekly", "monthly", "cycle"])
@@ -435,7 +436,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         p.add_argument("--all", action="store_true", help="Include inactive reminders")
         args = p.parse_args(sys.argv[2:])
         result = list_reminders(args.member_id, active_only=not args.all, owner_id=args.owner_id)
@@ -451,7 +452,7 @@ def main():
         p.add_argument("--schedule-value")
         p.add_argument("--is-active", type=int, choices=[0, 1])
         p.add_argument("--priority", choices=["low", "normal", "high", "urgent"])
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         kwargs = {k.replace("-", "_"): v for k, v in vars(args).items()
                   if k != "reminder_id" and v is not None}
@@ -462,7 +463,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--reminder-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         result = delete_reminder(args.reminder_id, args.owner_id)
         health_db.output_json(result)
@@ -485,7 +486,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         args = p.parse_args(sys.argv[2:])
         conn = health_db.get_connection()
         try:
@@ -501,7 +502,7 @@ def main():
         import argparse
         p = argparse.ArgumentParser()
         p.add_argument("--member-id", required=True)
-        p.add_argument("--owner-id", default=None)
+        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
         p.add_argument("--cycle-type", default="menstrual", choices=["menstrual", "migraine", "allergy", "custom"])
         args = p.parse_args(sys.argv[2:])
         conn = health_db.get_connection()

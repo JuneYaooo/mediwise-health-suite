@@ -387,7 +387,7 @@ def main():
 
     p_rec = sub.add_parser("record", help="记录周期事件")
     p_rec.add_argument("--member-id", required=True)
-    p_rec.add_argument("--owner-id", default=None)
+    p_rec.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_rec.add_argument("--cycle-type", required=True, choices=VALID_CYCLE_TYPES)
     p_rec.add_argument("--event-type", required=True)
     p_rec.add_argument("--date", required=True, help="事件日期 YYYY-MM-DD")
@@ -395,18 +395,18 @@ def main():
 
     p_hist = sub.add_parser("history", help="查看周期历史")
     p_hist.add_argument("--member-id", required=True)
-    p_hist.add_argument("--owner-id", default=None)
+    p_hist.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_hist.add_argument("--cycle-type", required=True, choices=VALID_CYCLE_TYPES)
     p_hist.add_argument("--limit", type=int, default=12)
 
     p_pred = sub.add_parser("predict", help="预测下次周期")
     p_pred.add_argument("--member-id", required=True)
-    p_pred.add_argument("--owner-id", default=None)
+    p_pred.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_pred.add_argument("--cycle-type", required=True, choices=VALID_CYCLE_TYPES)
 
     p_stat = sub.add_parser("status", help="查看当前周期状态")
     p_stat.add_argument("--member-id", required=True)
-    p_stat.add_argument("--owner-id", default=None)
+    p_stat.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_stat.add_argument("--cycle-type", required=True, choices=VALID_CYCLE_TYPES)
 
     args = parser.parse_args()

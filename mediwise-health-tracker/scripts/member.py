@@ -211,16 +211,16 @@ def main():
     p_add.add_argument("--emergency-phone", default=None)
     p_add.add_argument("--custom-metric-ranges", default=None)
     p_add.add_argument("--timezone", default=None)
-    p_add.add_argument("--owner-id", default=None)
+    p_add.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # list
     p_list = sub.add_parser("list")
-    p_list.add_argument("--owner-id", default=None)
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # get
     p_get = sub.add_parser("get")
     p_get.add_argument("--id", required=True)
-    p_get.add_argument("--owner-id", default=None)
+    p_get.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # update
     p_upd = sub.add_parser("update")
@@ -237,12 +237,12 @@ def main():
     p_upd.add_argument("--emergency-phone", default=None)
     p_upd.add_argument("--custom-metric-ranges", default=None)
     p_upd.add_argument("--timezone", default=None)
-    p_upd.add_argument("--owner-id", default=None)
+    p_upd.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # delete
     p_del = sub.add_parser("delete")
     p_del.add_argument("--id", required=True)
-    p_del.add_argument("--owner-id", default=None)
+    p_del.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {"add": add_member, "list": list_members, "get": get_member,

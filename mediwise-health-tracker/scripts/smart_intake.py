@@ -1013,7 +1013,7 @@ def main():
     # extract command
     p_ext = sub.add_parser("extract", help="提取结构化数据")
     p_ext.add_argument("--member-id", required=True, help="成员 ID")
-    p_ext.add_argument("--owner-id", default=None, help="所有者 ID")
+    p_ext.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
     input_group = p_ext.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--text", help="自由文本输入")
     input_group.add_argument("--image", help="图片文件路径")
@@ -1022,7 +1022,7 @@ def main():
     # confirm command
     p_conf = sub.add_parser("confirm", help="确认录入提取的数据")
     p_conf.add_argument("--member-id", required=True, help="成员 ID")
-    p_conf.add_argument("--owner-id", default=None, help="所有者 ID")
+    p_conf.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
     p_conf.add_argument("--intake-data", required=True, help="extract 返回的 JSON 数据")
 
     args = parser.parse_args()

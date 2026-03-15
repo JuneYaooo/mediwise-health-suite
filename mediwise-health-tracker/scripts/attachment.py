@@ -577,7 +577,7 @@ def main():
     p_add.add_argument("--move", action="store_true", help="移动文件而非复制")
     p_add.add_argument("--link-record-type", default=None, choices=VALID_RECORD_TYPES)
     p_add.add_argument("--link-record-id", default=None)
-    p_add.add_argument("--owner-id", default=None)
+    p_add.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # list
     p_list = sub.add_parser("list", help="列出附件")
@@ -586,33 +586,33 @@ def main():
     p_list.add_argument("--record-type", default=None, choices=VALID_RECORD_TYPES)
     p_list.add_argument("--record-id", default=None)
     p_list.add_argument("--limit", type=int, default=50)
-    p_list.add_argument("--owner-id", default=None)
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # get
     p_get = sub.add_parser("get", help="查看附件详情")
     p_get.add_argument("--id", required=True)
     p_get.add_argument("--base64", action="store_true", help="返回文件 base64 编码内容")
-    p_get.add_argument("--owner-id", default=None)
+    p_get.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # delete
     p_del = sub.add_parser("delete", help="删除附件")
     p_del.add_argument("--id", required=True)
     p_del.add_argument("--purge", action="store_true", help="同时删除磁盘文件")
-    p_del.add_argument("--owner-id", default=None)
+    p_del.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # link
     p_link = sub.add_parser("link", help="关联附件到记录")
     p_link.add_argument("--attachment-id", required=True)
     p_link.add_argument("--record-type", required=True, choices=VALID_RECORD_TYPES)
     p_link.add_argument("--record-id", required=True)
-    p_link.add_argument("--owner-id", default=None)
+    p_link.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # unlink
     p_unlink = sub.add_parser("unlink", help="取消关联")
     p_unlink.add_argument("--attachment-id", required=True)
     p_unlink.add_argument("--record-type", required=True, choices=VALID_RECORD_TYPES)
     p_unlink.add_argument("--record-id", required=True)
-    p_unlink.add_argument("--owner-id", default=None)
+    p_unlink.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # serve
     p_serve = sub.add_parser("serve", help="启动签名 URL 文件服务")
@@ -627,7 +627,7 @@ def main():
     p_get_url.add_argument("--host", default="localhost")
     p_get_url.add_argument("--port", type=int, default=9120)
     p_get_url.add_argument("--secret", default=None, help="HMAC 签名密钥")
-    p_get_url.add_argument("--owner-id", default=None)
+    p_get_url.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     if not args.command:

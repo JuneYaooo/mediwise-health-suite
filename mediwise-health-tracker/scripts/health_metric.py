@@ -172,18 +172,18 @@ def main():
 
     p_add = sub.add_parser("add")
     p_add.add_argument("--member-id", required=True)
-    p_add.add_argument("--owner-id", default=None)
+    p_add.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_add.add_argument("--type", required=True, help=f"指标类型: {', '.join(VALID_TYPES)}")
     p_add.add_argument("--value", required=True, help="指标值，血压格式: {\"systolic\":130,\"diastolic\":85}")
     p_add.add_argument("--measured-at", default=None, help="测量时间 (YYYY-MM-DD HH:MM)")
     p_add.add_argument("--note", default=None)
     p_add.add_argument("--source", default="manual", help="数据来源: manual|huawei|zepp|gadgetbridge|openwearables")
-    p_add.add_argument("--context", default="routine", choices=["routine", "visit", "self_test"], help="测量场景: routine(日常)|visit(就诊中)|self_test(自测)")
+    p_add.add_argument("--context", default="routine", choices=sorted(["routine", "visit", "self_test", "fasting", "postprandial_2h", "morning", "bedtime"]), help="测量场景: routine|visit|self_test|fasting|postprandial_2h|morning|bedtime")
     p_add.add_argument("--related-visit-id", default=None, help="关联就诊记录ID（就诊中测量时使用）")
 
     p_list = sub.add_parser("list")
     p_list.add_argument("--member-id", required=True)
-    p_list.add_argument("--owner-id", default=None)
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p_list.add_argument("--type", default=None)
     p_list.add_argument("--start-date", default=None)
     p_list.add_argument("--end-date", default=None)
@@ -191,7 +191,7 @@ def main():
 
     p_del = sub.add_parser("delete")
     p_del.add_argument("--id", required=True)
-    p_del.add_argument("--owner-id", default=None)
+    p_del.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {"add": add_metric, "list": list_metrics, "delete": delete_metric}

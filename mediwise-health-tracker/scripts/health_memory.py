@@ -256,19 +256,19 @@ def main():
     p.add_argument("--content", required=True)
     p.add_argument("--category", default="other", choices=list(VALID_CATEGORIES))
     p.add_argument("--follow-up-days", type=int, default=5)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # list
     p = sub.add_parser("list", help="查看健康备注")
     p.add_argument("--member-id", required=True)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
     p.add_argument("--include-resolved", action="store_true", default=False)
 
     # resolve
     p = sub.add_parser("resolve", help="标记健康备注已解决")
     p.add_argument("--note-id", required=True)
     p.add_argument("--resolution-note", default=None)
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

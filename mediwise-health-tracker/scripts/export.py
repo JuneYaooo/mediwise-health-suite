@@ -426,13 +426,13 @@ def main():
 
     p = sub.add_parser("fhir", help="导出 FHIR R4 Bundle")
     p.add_argument("--member-id", required=True, help="成员 ID")
-    p.add_argument("--owner-id", default=None, help="所有者 ID")
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
     p.add_argument("--privacy-level", default=None, choices=["full", "anonymized", "statistical"])
     p.add_argument("--output", default=None, help="输出文件路径")
 
     p = sub.add_parser("statistics", help="导出聚合统计数据")
     p.add_argument("--member-id", default=None, help="成员 ID（不指定则全家聚合）")
-    p.add_argument("--owner-id", default=None, help="所有者 ID")
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
     p.add_argument("--output", default=None, help="输出文件路径")
 
     args = parser.parse_args()

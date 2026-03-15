@@ -26,7 +26,7 @@ def is_api_mode():
     """Check if backend API mode is enabled."""
     return is_backend_mode()
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 MEDICAL_TABLES = {
     "schema_version",
@@ -52,6 +52,7 @@ MEDICAL_TABLES = {
     "attachment_links",
     "health_notes",
     "medication_logs",
+    "chronic_disease_profiles",
 }
 
 LIFESTYLE_TABLES = {
@@ -603,6 +604,25 @@ CREATE TABLE IF NOT EXISTS medication_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_medication_logs_member ON medication_logs(member_id, medication_name, taken_at);
+
+-- Chronic disease profiles (diabetes, hypertension management)
+
+CREATE TABLE IF NOT EXISTS chronic_disease_profiles (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    disease_type TEXT NOT NULL,
+    targets TEXT NOT NULL,
+    diagnosed_date TEXT,
+    notes TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chronic_disease_member
+    ON chronic_disease_profiles(member_id, disease_type, is_active);
 
 """
 
@@ -1260,6 +1280,30 @@ CREATE INDEX IF NOT EXISTS idx_medication_logs_member ON medication_logs(member_
 """)
                     conn.execute("UPDATE schema_version SET version=?", (14,))
                     conn.commit()
+                # Migrate: add chronic_disease_profiles table (v14 -> v15)
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='chronic_disease_profiles'"
+                )
+                if not cursor.fetchone():
+                    conn.executescript("""
+CREATE TABLE IF NOT EXISTS chronic_disease_profiles (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    disease_type TEXT NOT NULL,
+    targets TEXT NOT NULL,
+    diagnosed_date TEXT,
+    notes TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+CREATE INDEX IF NOT EXISTS idx_chronic_disease_member
+    ON chronic_disease_profiles(member_id, disease_type, is_active);
+""")
+                    conn.execute("UPDATE schema_version SET version=?", (15,))
+                    conn.commit()
     finally:
         conn.close()
     _set_last_status(status)
@@ -1335,15 +1379,18 @@ def _resolve_member_owner_id(conn, member_id):
 def verify_member_ownership(conn, member_id, owner_id):
     """Verify member belongs to owner.
 
-    When ``owner_id`` is omitted, the check is skipped for backward compatibility.
-    When ``owner_id`` is provided, the member must exist and match exactly.
+    Resolution order:
+    1. Explicit ``owner_id`` argument
+    2. ``MEDIWISE_OWNER_ID`` environment variable
+    3. No owner context → allow (admin / direct CLI use)
     """
-    if not owner_id:
+    effective = owner_id or os.environ.get("MEDIWISE_OWNER_ID")
+    if not effective:
         return True
     actual_owner_id = _resolve_member_owner_id(conn, member_id)
     if not actual_owner_id:
         return False
-    return actual_owner_id == owner_id
+    return actual_owner_id == effective
 
 
 def get_record_member_id(conn, table, record_id):
@@ -1358,13 +1405,14 @@ def get_record_member_id(conn, table, record_id):
 
 
 def verify_record_ownership(conn, table, record_id, owner_id):
-    """Verify a member-owned record belongs to ``owner_id``."""
-    if not owner_id:
+    """Verify a member-owned record belongs to ``owner_id`` (or env-var context)."""
+    effective = owner_id or os.environ.get("MEDIWISE_OWNER_ID")
+    if not effective:
         return True
     member_id = get_record_member_id(conn, table, record_id)
     if not member_id:
         return False
-    return verify_member_ownership(conn, member_id, owner_id)
+    return verify_member_ownership(conn, member_id, effective)
 
 
 def get_member_owner_id(conn, member_id):

@@ -53,6 +53,21 @@ def normalize_metrics(raw_metrics: list[RawMetric], provider: str) -> list[dict]
     if "sleep_raw" in by_type:
         normalized.extend(_aggregate_sleep_sessions(by_type["sleep_raw"], provider))
 
+    # Direct pass-through: Apple Health single-value types
+    for metric_type in ("weight", "height", "body_fat", "calories", "blood_sugar"):
+        for rm in by_type.get(metric_type, []):
+            normalized.append({
+                "metric_type": metric_type,
+                "value": rm.value,
+                "measured_at": rm.timestamp,
+                "source": provider,
+            })
+
+    # Blood pressure pairing (Apple Health stores systolic/diastolic separately)
+    bp_raw = by_type.get("bp_systolic_raw", []) + by_type.get("bp_diastolic_raw", [])
+    if bp_raw:
+        normalized.extend(_pair_blood_pressure(bp_raw, provider))
+
     return normalized
 
 
@@ -145,3 +160,60 @@ def _aggregate_sleep_sessions(raw_sleep: list[RawMetric], provider: str) -> list
         })
 
     return result
+
+
+def _pair_blood_pressure(raw_bp: list[RawMetric], provider: str) -> list[dict]:
+    """Pair Apple Health systolic and diastolic readings within a 60-second window.
+
+    Apple Health stores blood pressure as two separate record types. This function
+    matches them by timestamp proximity and combines them into the standard
+    {"systolic": N, "diastolic": N} JSON format.
+    """
+    systolic = [rm for rm in raw_bp if rm.metric_type == "bp_systolic_raw"]
+    diastolic = [rm for rm in raw_bp if rm.metric_type == "bp_diastolic_raw"]
+
+    systolic.sort(key=lambda r: r.timestamp)
+    diastolic.sort(key=lambda r: r.timestamp)
+
+    paired = []
+    used_dia = set()
+
+    for sys_rm in systolic:
+        try:
+            sys_dt = datetime.strptime(sys_rm.timestamp[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        sys_val = sys_rm.value
+
+        best_match = None
+        best_gap = None
+        for i, dia_rm in enumerate(diastolic):
+            if i in used_dia:
+                continue
+            try:
+                dia_dt = datetime.strptime(dia_rm.timestamp[:19], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+            gap = abs((dia_dt - sys_dt).total_seconds())
+            if gap <= 60 and (best_gap is None or gap < best_gap):
+                best_match = (i, dia_rm)
+                best_gap = gap
+
+        if best_match:
+            idx, dia_rm = best_match
+            used_dia.add(idx)
+            try:
+                bp_value = json.dumps(
+                    {"systolic": float(sys_val), "diastolic": float(dia_rm.value)},
+                    ensure_ascii=False,
+                )
+                paired.append({
+                    "metric_type": "blood_pressure",
+                    "value": bp_value,
+                    "measured_at": sys_rm.timestamp,
+                    "source": provider,
+                })
+            except (ValueError, TypeError):
+                continue
+
+    return paired

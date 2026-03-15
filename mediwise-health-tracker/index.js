@@ -384,16 +384,64 @@ const ROUTES = {
     if (inputs.params?.limit) args.push('--limit', String(inputs.params.limit));
     return { script: 'medication_log.py', args };
   },
+
+  // Chronic disease management
+  'setup-chronic-profile': (inputs) => {
+    const args = ['setup-profile', '--member-id', inputs.member_id,
+                  '--disease-type', inputs.params?.disease_type ?? ''];
+    if (inputs.params?.targets) args.push('--targets', JSON.stringify(inputs.params.targets));
+    if (inputs.params?.diagnosed_date) args.push('--diagnosed-date', inputs.params.diagnosed_date);
+    if (inputs.params?.notes) args.push('--notes', inputs.params.notes);
+    return { script: 'chronic_disease.py', args };
+  },
+  'view-chronic-profile': (inputs) => {
+    const args = ['view-profile', '--member-id', inputs.member_id,
+                  '--disease-type', inputs.params?.disease_type ?? ''];
+    return { script: 'chronic_disease.py', args };
+  },
+  'analyze-diabetes': (inputs) => {
+    const args = ['analyze-diabetes', '--member-id', inputs.member_id];
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    return { script: 'chronic_disease.py', args };
+  },
+  'analyze-hypertension': (inputs) => {
+    const args = ['analyze-hypertension', '--member-id', inputs.member_id];
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    return { script: 'chronic_disease.py', args };
+  },
+  'chronic-disease-summary': (inputs) => {
+    const args = ['disease-summary', '--member-id', inputs.member_id];
+    if (inputs.params?.disease_type) args.push('--disease-type', inputs.params.disease_type);
+    return { script: 'chronic_disease.py', args };
+  },
+
+  // Checkup report interpretation
+  'interpret-checkup': (inputs) => {
+    const args = ['interpret', '--member-id', inputs.member_id];
+    if (inputs.params?.text) args.push('--text', inputs.params.text);
+    if (inputs.params?.pdf) args.push('--pdf', inputs.params.pdf);
+    if (inputs.params?.report_date) args.push('--report-date', inputs.params.report_date);
+    if (inputs.params?.save) args.push('--save');
+    if (inputs.params?.gender) args.push('--gender', inputs.params.gender);
+    return { script: 'checkup_report.py', args };
+  },
+  'compare-checkups': (inputs) => {
+    const args = ['compare', '--member-id', inputs.member_id];
+    if (inputs.params?.date1) args.push('--date1', inputs.params.date1);
+    if (inputs.params?.date2) args.push('--date2', inputs.params.date2);
+    return { script: 'checkup_report.py', args };
+  },
 };
 
 /**
  * Run a Python script and return parsed JSON output.
+ * Accepts an optional env object to inject into the subprocess environment.
  */
-async function runScript(script, args) {
+async function runScript(script, args, env = {}) {
   const scriptPath = resolve(SCRIPTS_DIR, script);
   const { stdout } = await execFileAsync('python3', [scriptPath, ...args], {
     timeout: 30_000,
-    env: { ...process.env, PYTHONPATH: SCRIPTS_DIR },
+    env: { ...process.env, PYTHONPATH: SCRIPTS_DIR, ...env },
   });
   return JSON.parse(stdout.trim());
 }
@@ -419,35 +467,17 @@ export async function execute(inputs, context) {
   try {
     const { script, args } = routeFn(inputs);
 
-    // Inject --owner-id for multi-tenant isolation when provided
+    // Build subprocess environment: inject MEDIWISE_OWNER_ID for all scripts
+    // so isolation is enforced automatically regardless of which script is called.
     const ownerId = inputs.owner_id;
-    const OWNER_ID_SCRIPTS = [
-      'member.py',
-      'medical_record.py',
-      'query.py',
-      'health_metric.py',
-      'export.py',
-      'reminder.py',
-      'attachment.py',
-      'health_advisor.py',
-      'briefing_report.py',
-      'doctor_visit_report.py',
-      'cycle_tracker.py',
-      'quick_entry.py',
-      'smart_intake.py',
-      'drug_interaction.py',
-      'openfda_query.py',
-      'visit_lifecycle.py',
-      'health_memory.py',
-      'medication_log.py',
-    ];
-    if (ownerId && OWNER_ID_SCRIPTS.includes(script)) {
-      args.push('--owner-id', ownerId);
+    const subEnv = {};
+    if (ownerId) {
+      subEnv.MEDIWISE_OWNER_ID = ownerId;
     }
 
-    log(`[mediwise-health-tracker] script=${script} args=${args.join(' ')}`);
+    log(`[mediwise-health-tracker] script=${script} owner=${ownerId ?? 'none'} args=${args.join(' ')}`);
 
-    const result = await runScript(script, args);
+    const result = await runScript(script, args, subEnv);
     return { status: 'ok', result };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -28,12 +28,14 @@ from providers.gadgetbridge import GadgetbridgeProvider
 from providers.huawei import HuaweiProvider
 from providers.zepp import ZeppProvider
 from providers.openwearables import OpenWearablesProvider
+from providers.apple_health import AppleHealthProvider
 
 PROVIDERS = {
     "gadgetbridge": GadgetbridgeProvider,
     "huawei": HuaweiProvider,
     "zepp": ZeppProvider,
     "openwearables": OpenWearablesProvider,
+    "apple_health": AppleHealthProvider,
 }
 
 
@@ -349,7 +351,7 @@ def main():
     p_run = sub.add_parser("run", help="同步设备数据")
     p_run.add_argument("--device-id", default=None)
     p_run.add_argument("--member-id", default=None)
-    p_run.add_argument("--owner-id", default=None, help="调用方的 owner_id，用于归属校验")
+    p_run.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="调用方的 owner_id，用于归属校验")
 
     sub.add_parser("run-all", help="同步所有活跃设备")
 

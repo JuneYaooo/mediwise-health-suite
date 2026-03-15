@@ -130,14 +130,14 @@ def main():
     p.add_argument("--taken-at", default=None, help="服药时间 (YYYY-MM-DD HH:MM)，默认当前时间")
     p.add_argument("--dose-taken", default=None, help="本次剂量，如 '1粒'、'500mg'")
     p.add_argument("--note", default=None, help="备注")
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("list", help="查看打卡历史")
     p.add_argument("--member-id", required=True)
     p.add_argument("--medication-name", default=None, help="按药物名筛选")
     p.add_argument("--days", type=int, default=30, help="查看最近几天（默认 30）")
     p.add_argument("--limit", type=int, default=None, help="最多返回条数")
-    p.add_argument("--owner-id", default=None)
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     {"log-taken": cmd_log_taken, "list": cmd_list}[args.command](args)

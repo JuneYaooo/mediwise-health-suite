@@ -21,12 +21,14 @@ from providers.gadgetbridge import GadgetbridgeProvider
 from providers.huawei import HuaweiProvider
 from providers.zepp import ZeppProvider
 from providers.openwearables import OpenWearablesProvider
+from providers.apple_health import AppleHealthProvider
 
 PROVIDERS = {
     "gadgetbridge": GadgetbridgeProvider,
     "huawei": HuaweiProvider,
     "zepp": ZeppProvider,
     "openwearables": OpenWearablesProvider,
+    "apple_health": AppleHealthProvider,
 }
 
 
@@ -173,6 +175,14 @@ def auth_device(args):
             })
             return
         existing_config["export_path"] = export_path
+    elif provider_name == "apple_health":
+        if not args.export_path:
+            health_db.output_json({
+                "status": "error",
+                "message": "Apple Health 需指定 --export-path (.xml 或 .zip)"
+            })
+            return
+        existing_config["export_path"] = os.path.abspath(args.export_path)
     else:
         # OAuth-based providers
         if args.client_id:

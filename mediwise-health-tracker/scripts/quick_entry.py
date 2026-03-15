@@ -208,12 +208,12 @@ def main():
     p_parse = sub.add_parser("parse", help="解析文本中的健康指标（不保存）")
     p_parse.add_argument("--text", required=True, help="待解析的文本")
     p_parse.add_argument("--member-id", required=True, help="成员 ID")
-    p_parse.add_argument("--owner-id", default=None, help="所有者 ID")
+    p_parse.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
 
     p_save = sub.add_parser("parse-and-save", help="解析并保存健康指标")
     p_save.add_argument("--text", required=True, help="待解析的文本")
     p_save.add_argument("--member-id", required=True, help="成员 ID")
-    p_save.add_argument("--owner-id", default=None, help="所有者 ID")
+    p_save.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
 
     args = parser.parse_args()
 
