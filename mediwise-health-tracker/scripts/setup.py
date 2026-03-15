@@ -256,11 +256,18 @@ def cmd_test_vision(args):
 
     # Locate test image
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    test_image = os.path.join(script_dir, "..", "references", "test-vision.jpg")
+    if getattr(args, "image", None):
+        test_image = os.path.abspath(args.image)
+    else:
+        test_image = os.path.join(script_dir, "..", "references", "test-vision.jpg")
     if not os.path.isfile(test_image):
         output_json({
             "status": "error",
-            "message": f"测试图片不存在: {test_image}"
+            "message": (
+                f"测试图片不存在: {test_image}。"
+                "请使用 --image /path/to/any_medical_image.jpg 指定一张本地图片进行测试，"
+                "或将测试图片放置到 mediwise-health-tracker/references/test-vision.jpg。"
+            )
         })
         return
 
@@ -268,9 +275,15 @@ def cmd_test_vision(args):
     with open(test_image, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode("ascii")
 
+    ext = os.path.splitext(test_image)[1].lower()
+    mime_type = {"jpg": "image/jpeg", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                 ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}.get(ext, "image/jpeg")
+
     # Expected keywords that a working vision model must identify
     # Test image is a blood lipid report with: TC 7.23, LDL-C 4.33, diagnosis 高胆固醇血症
-    expected_keywords = ["7.23", "4.33", "胆固醇"]
+    # When using a custom image (--image), skip keyword check and just verify non-empty response
+    using_custom_image = bool(getattr(args, "image", None))
+    expected_keywords = [] if using_custom_image else ["7.23", "4.33", "胆固醇"]
 
     # Call vision model
     try:
@@ -280,7 +293,7 @@ def cmd_test_vision(args):
             "输出格式：每行一个项目，格式为 项目名: 结果值 单位。"
             "最后列出诊断结论。"
         )
-        text, _ = _call_vision_llm(prompt, img_b64, "image/jpeg", vision_cfg)
+        text, _ = _call_vision_llm(prompt, img_b64, mime_type, vision_cfg)
     except Exception as e:
         output_json({
             "status": "error",
@@ -297,15 +310,19 @@ def cmd_test_vision(args):
         })
         return
 
-    # Check if response contains expected keywords
+    # Check if response contains expected keywords (skipped for custom images)
     matched = [kw for kw in expected_keywords if kw in text]
     missing = [kw for kw in expected_keywords if kw not in text]
 
-    if len(matched) >= 2:
+    if using_custom_image or len(matched) >= 2:
         output_json({
             "status": "ok",
-            "message": f"视觉模型测试通过！成功识别 {len(matched)}/{len(expected_keywords)} 个关键指标。",
-            "matched_keywords": matched,
+            "message": (
+                "视觉模型测试通过！图片内容已成功识别。"
+                if using_custom_image
+                else f"视觉模型测试通过！成功识别 {len(matched)}/{len(expected_keywords)} 个关键指标。"
+            ),
+            "matched_keywords": matched if not using_custom_image else [],
             "model": f"{vision_cfg.get('provider')}/{vision_cfg.get('model')}",
             "response_preview": text[:500]
         })
@@ -713,7 +730,8 @@ def main():
     p.add_argument("--base-url", default="", help="API Base URL（如硅基智能: https://api.siliconflow.cn/v1）")
 
     sub.add_parser("disable-vision", help="禁用多模态视觉模型")
-    sub.add_parser("test-vision", help="测试视觉模型是否能正确识别医疗报告图片")
+    p = sub.add_parser("test-vision", help="测试视觉模型是否能正确识别医疗报告图片")
+    p.add_argument("--image", default="", help="自定义测试图片路径（可选，默认使用内置测试图片）")
     sub.add_parser("show", help="显示当前配置")
 
     p = sub.add_parser("set-embedding", help="配置 Embedding 模型")

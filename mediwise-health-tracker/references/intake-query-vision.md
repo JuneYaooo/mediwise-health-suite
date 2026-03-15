@@ -21,8 +21,8 @@
 - 血氧
 
 ```bash
-python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id>
-python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id>
+python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
+python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
 ```
 
 如果返回 `fallback: true`，再切换到 `smart_intake.py`。
@@ -81,7 +81,10 @@ python3 {baseDir}/scripts/setup.py check
 
 ```bash
 python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --model "Qwen/Qwen2.5-VL-72B-Instruct" --api-key <KEY> --base-url "https://api.siliconflow.cn/v1"
+# 用内置测试图测试（需 references/test-vision.jpg 存在）：
 python3 {baseDir}/scripts/setup.py test-vision
+# 或指定任意本地图片测试（推荐）：
+python3 {baseDir}/scripts/setup.py test-vision --image /path/to/any_lab_report.jpg
 ```
 
 ### 已配置后处理附件

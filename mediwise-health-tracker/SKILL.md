@@ -22,14 +22,22 @@ description: Family health and medical record management. Tracks members, visits
 
 ## 核心工作流
 
+### 0. 确定 owner_id（每次必做）
+
+从会话上下文获取当前发送者 ID，格式为 `<channel>:<user_id>`，用于所有脚本的 `--owner-id` 参数。例如：
+- 飞书用户：`feishu:ou_707461a1baa7790213d30230b88fb575`
+- QQ 用户：`qqbot:12345678`
+
+后续所有脚本调用均以此 ID 作为 `--owner-id`，不得省略。
+
 ### 1. 先确认成员
 
 ```bash
-python3 {baseDir}/scripts/member.py list
-python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人"
+python3 {baseDir}/scripts/member.py list --owner-id "<sender_id>"
+python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人" --owner-id "<sender_id>"
 ```
 
-每次增删改查前先确认目标成员；共享实例场景优先带 `--owner-id`。
+每次增删改查前先确认目标成员。
 
 ### 2. 选择录入路径
 
@@ -67,8 +75,8 @@ python3 {baseDir}/scripts/query.py family-overview
 ### 快速录入指标
 
 ```bash
-python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id>
-python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id>
+python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
+python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
 ```
 
 ### 录入后发现异常，记录并跟进
@@ -147,7 +155,7 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 3. **药物安全问题必须先搜**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答。
 4. **发简报默认发图片版**：优先 `briefing_report.py screenshot`，不是纯文本。
 5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
-6. **共享实例要做租户隔离**：有 `owner_id` 时始终带上。
+6. **每次调用脚本必须携带 `--owner-id`（强制）**：从当前会话上下文获取发送者 ID，格式为 `<channel>:<user_id>`（如 `feishu:ou_707461a1baa7790213d30230b88fb575` 或 `qqbot:12345`），作为所有脚本的 `--owner-id` 参数。这是多用户数据隔离的核心机制，任何脚本调用都不得省略。不知道 owner_id 时，先停下来确认，不要在没有 owner_id 的情况下写入数据。
 7. **就医前摘要默认先短文版**：先用 `doctor_visit_report.py text` 生成；用户需要时，再导出图片或 PDF。
 
 ## 能力介绍模板
