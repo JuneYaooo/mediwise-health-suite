@@ -1,7 +1,7 @@
 ---
 name: mediwise-health-suite
 description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 1.0.7
+version: 1.0.8
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
@@ -142,8 +142,8 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 
 | 方案 | 适用场景 | PROVIDER | MODEL | BASE_URL |
 |------|---------|----------|-------|----------|
-| 硅基流动 Qwen2.5-VL（**国内首选**） | 国内部署，价格低 | `siliconflow` | `Qwen/Qwen2.5-VL-72B-Instruct` | `https://api.siliconflow.cn/v1` |
-| Google Gemini 2.0 Flash | 海外，免费额度充足 | `openai` | `gemini-2.0-flash` | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| 硅基流动 Qwen2.5-VL（**国内首选**） | 国内部署，价格低，[注册链接](https://cloud.siliconflow.cn/i/MOlLXTYM) | `siliconflow` | `Qwen/Qwen2.5-VL-72B-Instruct` | `https://api.siliconflow.cn/v1` |
+| Google Gemini 3.1 Pro（**海外首选**） | 多模态效果强 | `openai` | `gemini-3.1-pro-preview` | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | OpenAI GPT-4o | 通用，效果稳定 | `openai` | `gpt-4o` | `https://api.openai.com/v1` |
 | 阶跃星辰 Step-1V | 国内备选 | `openai` | `step-1v-32k` | `https://api.stepfun.com/v1` |
 | 本地 Ollama | 完全离线 | `ollama` | `qwen2-vl:7b` | `http://localhost:11434/v1` |
