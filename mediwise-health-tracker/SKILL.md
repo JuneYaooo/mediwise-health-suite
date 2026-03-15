@@ -30,14 +30,28 @@ description: Family health and medical record management. Tracks members, visits
 
 后续所有脚本调用均以此 ID 作为 `--owner-id`，不得省略。
 
-### 1. 先确认成员
+### 1. 先确认成员（必须等用户回复）
 
 ```bash
 python3 {baseDir}/scripts/member.py list --owner-id "<sender_id>"
-python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人" --owner-id "<sender_id>"
 ```
 
-每次增删改查前先确认目标成员。
+每次增删改查前先调用 `list` 查询现有成员，**将结果展示给用户，明确询问"是为哪位成员操作？"，等待用户明确回复后再继续。**
+
+**禁止以下行为：**
+- 未经询问自动创建新成员（包括"本人"）
+- 在用户未确认目标成员的情况下继续写入数据
+- 假设"只有一个成员所以自动选择"
+
+**成员不存在时的处理：**
+```
+列表为空或未找到目标成员 → 告知用户 → 询问是否新建成员 → 等待用户确认姓名和关系 → 再调用 member.py add
+```
+
+```bash
+# 用户确认后才执行创建
+python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人" --owner-id "<sender_id>"
+```
 
 ### 2. 选择录入路径
 
@@ -157,6 +171,8 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
 6. **每次调用脚本必须携带 `--owner-id`（强制）**：从当前会话上下文获取发送者 ID，格式为 `<channel>:<user_id>`（如 `feishu:ou_707461a1baa7790213d30230b88fb575` 或 `qqbot:12345`），作为所有脚本的 `--owner-id` 参数。这是多用户数据隔离的核心机制，任何脚本调用都不得省略。不知道 owner_id 时，先停下来确认，不要在没有 owner_id 的情况下写入数据。
 7. **就医前摘要默认先短文版**：先用 `doctor_visit_report.py text` 生成；用户需要时，再导出图片或 PDF。
+8. **成员确认必须等用户明确回复**：先调用 `member.py list` 展示已有成员，问清楚"是为哪位成员操作"，等待用户回复后再继续。不得自动创建成员（包括"本人"），不得在成员未确认的情况下写入任何数据。
+9. **记录饮食前必须先查食物数据库**：通过 diet-tracker 的 `food_lookup.py search` 查每种食物的营养数据，用查询结果填写 `--items`。禁止凭 AI 自身知识估算营养值后直接写入。
 
 ## 能力介绍模板
 
