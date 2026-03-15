@@ -232,3 +232,6 @@ logs/
 **/test_data/*.sqlite
 **/test_data/*.json
 !**/test_data/.gitkeep
+# Mediwise - local config may contain API keys (default stored outside repo, but guard anyway)
+config.json
+**/config.json

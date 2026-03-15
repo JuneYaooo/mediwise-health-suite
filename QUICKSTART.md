@@ -122,8 +122,25 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 | 饮食记录 | "记录早餐" |
 | 体重管理 | "设定减重目标" |
 | 就医准备 | "整理就医摘要" |
+| 数据备份 | "帮我备份健康数据" |
 
-### 6. 配置（可选）
+### 6. 数据备份与迁移
+
+换设备或换 OpenClaw 实例时，可以把全部数据打包带走：
+
+```bash
+# 旧环境打包
+python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
+  backup --output ~/mediwise-backup.tar.gz
+
+# 新环境恢复（Schema 自动升级）
+python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
+  restore --input ~/mediwise-backup.tar.gz
+```
+
+详细说明见 [INSTALLATION.md](docs/INSTALLATION.md)。
+
+### 7. 配置（可选）
 
 **视觉模型配置**（图片/PDF 识别必填）：
 
@@ -275,8 +292,25 @@ Assistant: Okay, let me sync your band data...
 | Diet Tracking | "Record breakfast" |
 | Weight Management | "Set weight loss goal" |
 | Doctor Visit Prep | "Organize medical summary" |
+| Backup Data | "Back up my health data" |
 
-### 6. Configuration (Optional)
+### 6. Data Backup and Migration
+
+When switching devices or OpenClaw instances, you can pack all your data and take it with you:
+
+```bash
+# Old environment: create backup
+python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
+  backup --output ~/mediwise-backup.tar.gz
+
+# New environment: restore data (schema auto-upgrades)
+python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
+  restore --input ~/mediwise-backup.tar.gz
+```
+
+See [INSTALLATION.md](docs/INSTALLATION.md) for full details.
+
+### 7. Configuration (Optional)
 
 **Vision model configuration** (required for image/PDF recognition):
 

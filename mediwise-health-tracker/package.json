@@ -1,6 +1,6 @@
 {
   "name": "@mediwise/health-tracker-skill",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "main": "index.js",
   "description": "家庭健康管理 OpenClaw Skill",

@@ -8,6 +8,8 @@ Usage:
   python3 scripts/setup.py disable-vision
   python3 scripts/setup.py set-privacy --level anonymized
   python3 scripts/setup.py show           # Show current config
+  python3 scripts/setup.py backup --output mediwise-backup.tar.gz
+  python3 scripts/setup.py restore --input mediwise-backup.tar.gz
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ import json
 import sys
 import os
 import sqlite3
+import tarfile
+import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
@@ -31,6 +35,52 @@ from health_db import (
     MEDICAL_TABLES,
     LIFESTYLE_TABLES,
 )
+
+# ---------------------------------------------------------------------------
+# Vision provider presets — users only need to supply --api-key
+# ---------------------------------------------------------------------------
+VISION_PROVIDER_PRESETS = {
+    "siliconflow": {
+        "label": "硅基流动（国内推荐）",
+        "provider": "siliconflow",
+        "model": "Qwen/Qwen2.5-VL-72B-Instruct",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "api_key_hint": "在 https://cloud.siliconflow.cn 注册获取，有免费额度",
+        "notes": "国内访问速度快，Qwen2.5-VL 中文医疗报告识别效果佳",
+    },
+    "gemini": {
+        "label": "Google Gemini（海外推荐）",
+        "provider": "openai",  # uses OpenAI-compatible endpoint
+        "model": "gemini-3.1-pro-preview",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "api_key_hint": "在 https://aistudio.google.com/apikey 获取，免费",
+        "notes": "Google Gemini，多语言医疗文档识别，需海外网络",
+    },
+    "openai": {
+        "label": "OpenAI GPT-4o",
+        "provider": "openai",
+        "model": "gpt-4o",
+        "base_url": "https://api.openai.com/v1",
+        "api_key_hint": "在 https://platform.openai.com 获取",
+        "notes": "全球通用，需海外网络及付费账户",
+    },
+    "stepfun": {
+        "label": "阶跃星辰 Step-1V（国内备选）",
+        "provider": "openai",
+        "model": "step-1v-32k",
+        "base_url": "https://api.stepfun.com/v1",
+        "api_key_hint": "在 https://platform.stepfun.com 注册获取",
+        "notes": "国产多模态模型，支持中文医疗文档",
+    },
+    "ollama": {
+        "label": "本地 Ollama（完全离线）",
+        "provider": "ollama",
+        "model": "qwen2-vl:7b",
+        "base_url": "http://localhost:11434/v1",
+        "api_key_hint": "本地运行无需 API Key，填任意字符（如 ollama）即可",
+        "notes": "需本地安装 Ollama 并 `ollama pull qwen2-vl:7b`，完全私有化",
+    },
+}
 
 
 def output_json(data):
@@ -63,6 +113,17 @@ def cmd_check(args):
             status.setdefault("issues", []).append(f"后端 API 连接失败: {e}")
     else:
         status["backend_enabled"] = False
+
+    # When vision is not configured, include a step-by-step quick setup guide
+    if not status.get("vision_configured"):
+        status["vision_quick_setup"] = {
+            "message": "配置视觉模型只需两步：① 选方案 ② 填 API Key",
+            "step1_list_providers": "python3 setup.py list-vision-providers",
+            "step2_example": "python3 setup.py set-vision --provider siliconflow --api-key sk-xxx",
+            "step3_test": "python3 setup.py test-vision",
+            "note": "--model 和 --base-url 有默认值，只需填 --provider 和 --api-key 即可完成配置",
+        }
+
     output_json({"status": "ok", **status})
 
 
@@ -100,14 +161,34 @@ def cmd_set_db_path(args):
 
 
 def cmd_set_vision(args):
-    """Configure vision model."""
+    """Configure vision model, with provider presets for common choices."""
+    preset = VISION_PROVIDER_PRESETS.get(args.provider, {})
+
+    # Resolve actual provider name (gemini maps to "openai" for API compat)
+    resolved_provider = preset.get("provider", args.provider)
+
+    # Fill defaults from preset when caller omits model / base-url
+    model = args.model or preset.get("model", "")
+    base_url = args.base_url or preset.get("base_url", "")
+
+    if not model:
+        output_json({
+            "status": "error",
+            "message": (
+                f"未知的提供商预设 '{args.provider}'，且未提供 --model。"
+                f" 已知预设: {', '.join(VISION_PROVIDER_PRESETS)}。"
+                " 对于未知提供商，请同时指定 --model 和 --base-url。"
+            ),
+        })
+        return
+
     cfg = load_config()
     cfg["vision"] = {
         "enabled": True,
-        "provider": args.provider,
-        "model": args.model,
+        "provider": resolved_provider,
+        "model": model,
         "api_key": args.api_key,
-        "base_url": args.base_url or ""
+        "base_url": base_url,
     }
     save_config(cfg)
     # Mask API key in output
@@ -115,8 +196,33 @@ def cmd_set_vision(args):
     display["vision"] = {**cfg["vision"], "api_key": _mask_key(cfg["vision"]["api_key"])}
     output_json({
         "status": "ok",
-        "message": f"多模态视觉模型已配置: {args.provider}/{args.model}",
-        "config": display
+        "message": (
+            f"多模态视觉模型已配置: {resolved_provider}/{model}"
+            + (f"（使用 {args.provider} 预设）" if preset else "")
+        ),
+        "next_step": "运行 `python3 setup.py test-vision` 验证配置是否正常",
+        "config": display,
+    })
+
+
+def cmd_list_vision_providers(args):
+    """List all built-in vision provider presets with default model and base URL."""
+    providers = []
+    for key, p in VISION_PROVIDER_PRESETS.items():
+        providers.append({
+            "preset_name": key,
+            "label": p["label"],
+            "provider": p["provider"],
+            "default_model": p["model"],
+            "default_base_url": p["base_url"],
+            "api_key_hint": p["api_key_hint"],
+            "notes": p["notes"],
+            "quick_command": f"python3 setup.py set-vision --provider {key} --api-key <YOUR_KEY>",
+        })
+    output_json({
+        "status": "ok",
+        "message": "以下是内置的视觉模型预设。使用 --provider <preset_name> 即可自动填入模型和 Base URL。",
+        "providers": providers,
     })
 
 
@@ -713,6 +819,112 @@ def cmd_migration_status(args):
     output_json(status)
 
 
+def cmd_backup(args):
+    """Pack databases and config into a portable tar.gz archive."""
+    from config import DATA_DIR, CONFIG_PATH
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    if args.output:
+        output_path = os.path.abspath(args.output)
+    else:
+        output_path = os.path.abspath(f"mediwise-backup-{timestamp}.tar.gz")
+
+    candidates = [
+        os.path.join(DATA_DIR, "medical.db"),
+        os.path.join(DATA_DIR, "lifestyle.db"),
+        os.path.join(DATA_DIR, "health.db"),  # legacy single-db
+        CONFIG_PATH,
+    ]
+    included = []
+    missing = []
+    for path in candidates:
+        if os.path.exists(path):
+            included.append(path)
+        else:
+            missing.append(path)
+
+    if not included:
+        output_json({
+            "status": "error",
+            "message": "数据目录中没有找到任何数据库或配置文件，请先初始化。",
+            "data_dir": DATA_DIR,
+        })
+        sys.exit(1)
+
+    with tarfile.open(output_path, "w:gz") as tar:
+        for path in included:
+            # Store files with path relative to DATA_DIR so restore is location-independent
+            arcname = os.path.relpath(path, DATA_DIR)
+            tar.add(path, arcname=arcname)
+
+    output_json({
+        "status": "ok",
+        "message": f"备份已保存到 {output_path}",
+        "output": output_path,
+        "files": [os.path.relpath(p, DATA_DIR) for p in included],
+        "skipped": [os.path.relpath(p, DATA_DIR) for p in missing],
+    })
+
+
+def cmd_restore(args):
+    """Restore databases and config from a tar.gz archive created by backup."""
+    from config import DATA_DIR, CONFIG_PATH
+    from health_db import ensure_db
+
+    input_path = os.path.abspath(args.input)
+    if not os.path.exists(input_path):
+        output_json({
+            "status": "error",
+            "message": f"备份文件不存在: {input_path}",
+        })
+        sys.exit(1)
+
+    if not tarfile.is_tarfile(input_path):
+        output_json({
+            "status": "error",
+            "message": f"文件不是有效的 tar 归档: {input_path}",
+        })
+        sys.exit(1)
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    restored = []
+    with tarfile.open(input_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            # Security: strip any leading / or .. components
+            safe_name = os.path.normpath(member.name)
+            if safe_name.startswith(".."):
+                continue
+            dest = os.path.join(DATA_DIR, safe_name)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            source = tar.extractfile(member)
+            if source is None:
+                continue
+            with open(dest, "wb") as f:
+                f.write(source.read())
+            restored.append(safe_name)
+
+    # Apply any pending schema migrations automatically
+    try:
+        ensure_db()
+        migration_ok = True
+        migration_error = None
+    except Exception as e:
+        migration_ok = False
+        migration_error = str(e)
+
+    result = {
+        "status": "ok" if migration_ok else "warning",
+        "message": "数据恢复完成，Schema 已自动升级到最新版本。" if migration_ok
+                   else f"数据已恢复，但 Schema 自动升级失败: {migration_error}",
+        "data_dir": DATA_DIR,
+        "restored_files": restored,
+    }
+    if migration_error:
+        result["migration_error"] = migration_error
+    output_json(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description="MediWise Health Tracker 配置管理")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -723,11 +935,15 @@ def main():
     p = sub.add_parser("set-db-path", help="设置数据库路径")
     p.add_argument("--path", required=True)
 
-    p = sub.add_parser("set-vision", help="配置多模态视觉模型")
-    p.add_argument("--provider", required=True, help="提供商: siliconflow / openai / anthropic / ollama")
-    p.add_argument("--model", required=True, help="模型名称")
+    p = sub.add_parser("set-vision", help="配置多模态视觉模型（--model/--base-url 对内置预设可省略）")
+    p.add_argument("--provider", required=True,
+                   help="提供商预设名或自定义名: siliconflow / gemini / openai / stepfun / ollama，"
+                        "或任意自定义值（需同时指定 --model 和 --base-url）")
+    p.add_argument("--model", default="", help="模型名称（内置预设会自动填入，可省略）")
     p.add_argument("--api-key", required=True, help="API Key")
-    p.add_argument("--base-url", default="", help="API Base URL（如硅基智能: https://api.siliconflow.cn/v1）")
+    p.add_argument("--base-url", default="", help="API Base URL（内置预设会自动填入，可省略）")
+
+    sub.add_parser("list-vision-providers", help="列出所有内置视觉模型预设及默认配置")
 
     sub.add_parser("disable-vision", help="禁用多模态视觉模型")
     p = sub.add_parser("test-vision", help="测试视觉模型是否能正确识别医疗报告图片")
@@ -761,10 +977,17 @@ def main():
     sub.add_parser("migrate-split-db", help="将旧版单库数据迁移到 medical/lifestyle 双库")
     sub.add_parser("migration-status", help="查看拆库迁移状态和表行数对比")
 
+    p = sub.add_parser("backup", help="将数据库和配置打包为可迁移的 tar.gz 备份文件")
+    p.add_argument("--output", default="", help="输出路径（默认: ./mediwise-backup-<时间戳>.tar.gz）")
+
+    p = sub.add_parser("restore", help="从备份文件恢复数据库和配置，并自动升级 Schema")
+    p.add_argument("--input", required=True, help="备份文件路径（.tar.gz）")
+
     args = parser.parse_args()
     commands = {
         "check": cmd_check, "init": cmd_init, "set-db-path": cmd_set_db_path,
         "set-vision": cmd_set_vision, "disable-vision": cmd_disable_vision,
+        "list-vision-providers": cmd_list_vision_providers,
         "test-vision": cmd_test_vision,
         "show": cmd_show, "set-embedding": cmd_set_embedding,
         "test-embedding": cmd_test_embedding,
@@ -773,6 +996,8 @@ def main():
         "set-privacy": cmd_set_privacy,
         "migrate-split-db": cmd_migrate_split_db,
         "migration-status": cmd_migration_status,
+        "backup": cmd_backup,
+        "restore": cmd_restore,
     }
     commands[args.command](args)
 

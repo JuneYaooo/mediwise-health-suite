@@ -38,6 +38,8 @@ description: >-
 
 ## 核心工作流
 
+> **强制规则**：每次调用脚本必须携带 `--owner-id`，从会话上下文获取发送者 ID（格式 `<channel>:<user_id>`，如 `feishu:ou_xxx` 或 `qqbot:12345`）。所有查询和写入操作均需携带，不得省略。
+
 ### 1. 阈值管理
 
 ```bash

@@ -85,15 +85,20 @@ export MEDIWISE_VISION_API_KEY=AIzaxxx
 export MEDIWISE_VISION_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 ```
 
-**方案 C：通过 setup.py 配置（保存到 config.json）**
+**方案 C：通过 setup.py 配置（内置预设，只需填 API Key）**
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
-python3 setup.py set-vision \
-  --provider siliconflow \
-  --model Qwen/Qwen2.5-VL-72B-Instruct \
-  --api-key sk-xxx \
-  --base-url https://api.siliconflow.cn/v1
+
+# 查看所有内置预设（含默认模型和 Base URL）
+python3 setup.py list-vision-providers
+
+# 选择预设后只需填 --provider 和 --api-key，模型和 Base URL 自动填入
+python3 setup.py set-vision --provider siliconflow --api-key sk-xxx   # 国内
+python3 setup.py set-vision --provider gemini --api-key AIza-xxx      # 海外
+python3 setup.py set-vision --provider ollama --api-key ollama         # 本地离线
+
+# 验证配置
 python3 setup.py test-vision
 ```
 
@@ -164,6 +169,26 @@ cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py migrate-split-db
 python3 setup.py migration-status
 ```
+
+### 数据备份与迁移（换设备 / 换小龙虾）
+
+如需将数据迁移到新设备或新的 OpenClaw 实例，使用内置的备份/恢复命令：
+
+```bash
+# 旧环境：打包所有数据库和配置
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py backup --output ~/mediwise-backup.tar.gz
+```
+
+将生成的 `mediwise-backup.tar.gz` 文件传到新设备，然后在新环境执行：
+
+```bash
+# 新环境：安装 skill 后恢复数据（Schema 自动升级）
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py restore --input ~/mediwise-backup.tar.gz
+```
+
+备份文件包含：`medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）。恢复完成后，Schema 会自动升级到最新版本，无需手动干预。
 
 ### 故障排查
 
@@ -283,15 +308,20 @@ export MEDIWISE_VISION_API_KEY=AIzaxxx
 export MEDIWISE_VISION_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 ```
 
-**Option C: Configure via setup.py (saved to config.json)**
+**Option C: Configure via setup.py (built-in presets — only API Key required)**
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
-python3 setup.py set-vision \
-  --provider siliconflow \
-  --model Qwen/Qwen2.5-VL-72B-Instruct \
-  --api-key sk-xxx \
-  --base-url https://api.siliconflow.cn/v1
+
+# List all built-in presets (with default model and Base URL)
+python3 setup.py list-vision-providers
+
+# Pick a preset: --model and --base-url are auto-filled
+python3 setup.py set-vision --provider siliconflow --api-key sk-xxx   # China
+python3 setup.py set-vision --provider gemini --api-key AIza-xxx      # International
+python3 setup.py set-vision --provider ollama --api-key ollama         # Fully offline
+
+# Verify configuration
 python3 setup.py test-vision
 ```
 
@@ -362,6 +392,26 @@ cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py migrate-split-db
 python3 setup.py migration-status
 ```
+
+### Data Backup and Migration (New Device / New Instance)
+
+To migrate data to a new device or a new OpenClaw instance, use the built-in backup/restore commands:
+
+```bash
+# Old environment: pack all databases and config
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py backup --output ~/mediwise-backup.tar.gz
+```
+
+Transfer `mediwise-backup.tar.gz` to the new device, then run:
+
+```bash
+# New environment: install the skill, then restore data (schema auto-upgrades)
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py restore --input ~/mediwise-backup.tar.gz
+```
+
+The archive contains `medical.db`, `lifestyle.db`, `config.json` (and the legacy `health.db` if present). The database schema is automatically upgraded to the latest version after restore — no manual steps needed.
 
 ### Troubleshooting
 

@@ -140,6 +140,7 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 
 ## 注意事项
 
+- **每次调用脚本必须携带 `--owner-id`（强制）**：从会话上下文获取发送者 ID（格式 `<channel>:<user_id>`，如 `feishu:ou_xxx` 或 `qqbot:12345`），作为所有脚本的 `--owner-id` 参数，不得省略。
 - goal_type 支持: lose（减重）、gain（增重）、maintain（维持）
 - 每个成员同时只能有一个 active 状态的目标
 - 体重数据通过 health_metrics 表记录，本 skill 只读取不写入体重数据

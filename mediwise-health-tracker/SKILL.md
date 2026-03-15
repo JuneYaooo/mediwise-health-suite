@@ -162,6 +162,56 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 
 待跟进的健康备注会自动出现在每日简报（`health_advisor.py briefing`）中，确保不遗漏。
 
+## 初始配置引导
+
+当用户首次使用、或表示"图片识别不工作""无法识别报告"时，先在后台运行配置检查：
+
+```bash
+python3 {baseDir}/scripts/setup.py check
+```
+
+若输出中 `vision_configured` 为 `false`，**不要把命令行细节暴露给用户**，而是用自然语言引导他们完成对话式配置：
+
+### 对话式配置流程
+
+**第一步：询问地区/偏好**
+
+> 检测到图片和 PDF 识别功能还没配置，需要接入一个视觉模型才能用。
+>
+> 你用的是国内网络还是海外网络？或者想完全在本地离线运行？
+
+根据回答推荐方案：
+- 国内 → **硅基流动**（免费注册有额度，在 https://cloud.siliconflow.cn 获取 API Key）
+- 海外 → **Google Gemini**（免费，在 https://aistudio.google.com/apikey 获取）
+- 离线 → **本地 Ollama**（需提前安装 Ollama 并下载模型）
+
+**第二步：收集 API Key**
+
+> 好的，推荐你用 [方案名]。去 [链接] 注册后复制 API Key，直接发给我就行。
+
+用户回复 API Key 后，**在后台静默执行**（不要把命令贴给用户看）：
+
+```bash
+python3 {baseDir}/scripts/setup.py set-vision --provider <preset> --api-key <用户提供的key>
+```
+
+`--model` 和 `--base-url` 对内置预设（siliconflow / gemini / openai / stepfun / ollama）均可省略，自动填入。
+
+**第三步：验证并告知结果**
+
+```bash
+python3 {baseDir}/scripts/setup.py test-vision
+```
+
+- 测试通过 → "配置好了！现在可以直接把报告图片或 PDF 发给我来识别。"
+- 测试失败 → 根据错误信息提示用户检查 API Key 是否正确，或网络是否可用。
+
+### 原则
+
+- **用户侧零命令**：整个过程用户只需回答问题、粘贴 API Key，不需要接触任何命令行。
+- **后台静默执行**：所有 `setup.py` 调用在后台完成，不要把命令或 JSON 输出贴给用户。
+- **配置失败友好提示**：失败时给出具体原因和可操作的修复建议，不要直接贴报错。
+
 ## 不可跳过的规则
 
 1. **不要直接展示 JSON**：查询结果必须转成自然中文。
@@ -197,6 +247,25 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 ```
 
 如果用户已经明确说最近要去医院、复诊、看专科，优先提“就医前摘要图”，不要把它埋在能力列表最后。
+
+## 数据备份与迁移
+
+当用户需要换设备、换环境，或者迁移到新的小龙虾实例时，使用以下命令打包和恢复数据：
+
+```bash
+# 备份：将所有数据库和配置打包到一个文件
+python3 {baseDir}/scripts/setup.py backup --output mediwise-backup.tar.gz
+
+# 恢复：在新环境中还原数据（Schema 自动升级到最新版本）
+python3 {baseDir}/scripts/setup.py restore --input mediwise-backup.tar.gz
+```
+
+备份文件包含：`medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）。
+
+**迁移流程**：
+1. 旧环境：`setup.py backup --output xxx.tar.gz`，将文件发给用户
+2. 用户把文件传到新设备
+3. 新环境：`setup.py restore --input xxx.tar.gz`，数据恢复并自动完成 Schema 迁移
 
 ## 参考导航
 
