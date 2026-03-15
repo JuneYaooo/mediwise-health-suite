@@ -12,6 +12,7 @@ description: "Wearable device data sync: import health data from Huawei watches,
 | Provider | 状态 | 数据来源 | 支持指标 |
 |----------|------|----------|----------|
 | Gadgetbridge | ✅ 已实现 | 本地 SQLite 导出文件 | 心率、步数、血氧、睡眠 |
+| Apple Health | ✅ 已实现 | export.xml / export.zip | 心率、步数、血氧、睡眠、体重、身高、体脂、血糖、血压、卡路里 |
 | 华为 Health Kit | 🔜 Stub | REST API（需企业开发者资质） | — |
 | Zepp Health | 🔜 Stub | REST API（需开发者账号） | — |
 | OpenWearables | 🔜 Stub | 统一 API（暂不支持华为/小米） | — |
@@ -87,6 +88,25 @@ Skill 本身不运行后台进程。可通过 cron 定时调用：
 1. 打开 Gadgetbridge App → 设置 → 数据库管理 → 导出数据库
 2. 导出文件为 `Gadgetbridge` 或 `Gadgetbridge.db`（SQLite 格式）
 3. 将文件传输到电脑，使用 `device.py auth --export-path` 配置路径
+
+## Apple Health 导出说明
+
+1. iPhone → 健康 App → 右上角头像 → 导出健康数据
+2. 生成 `export.zip`（内含 `export.xml`）
+3. 将文件传输到电脑，按以下步骤绑定：
+
+```bash
+# 添加 Apple Health 设备
+python3 {baseDir}/scripts/device.py add --member-id <id> --provider apple_health --device-name "iPhone"
+
+# 配置导出文件路径（支持 .xml 或 .zip）
+python3 {baseDir}/scripts/device.py auth --device-id <id> --export-path /path/to/export.zip
+
+# 同步数据
+python3 {baseDir}/scripts/sync.py run --device-id <id>
+```
+
+支持指标：心率、静息心率、步数、血氧、睡眠分期、体重、身高、体脂率、血糖、血压、卡路里消耗。
 
 ## 反模式
 

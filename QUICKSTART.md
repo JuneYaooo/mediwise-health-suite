@@ -82,10 +82,28 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 ### 4. 高级功能
 
 #### 图片识别
+
+> **前提条件**：需先配置多模态视觉模型，否则图片识别功能不可用。
+> 快速配置方法（以硅基流动为例）：
+> ```bash
+> export MEDIWISE_VISION_PROVIDER=siliconflow
+> export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
+> export MEDIWISE_VISION_API_KEY=sk-xxx
+> export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
+> ```
+> 详细配置见 `.env.example` 或 [INSTALLATION.md](docs/INSTALLATION.md)。
+
 ```
 用户：[发送化验单图片]
 用户："帮我识别这张化验单"
 助手：我来帮您识别化验单内容...
+```
+
+#### 体检报告解读
+
+```
+用户："帮我解读这张体检报告"
+助手：为您解读体检报告，空腹血糖 5.8 mmol/L（正常），甘油三酯 2.1 mmol/L（偏高）...
 ```
 
 #### 可穿戴设备同步
@@ -106,6 +124,19 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
 | 就医准备 | "整理就医摘要" |
 
 ### 6. 配置（可选）
+
+**视觉模型配置**（图片/PDF 识别必填）：
+
+复制并编辑环境变量文件：
+
+```bash
+cp .env.example .env
+# 填入 MEDIWISE_VISION_API_KEY 等变量
+```
+
+详细配置方案见 [INSTALLATION.md](docs/INSTALLATION.md) 或 `.env.example`。
+
+**OpenClaw 插件配置**（可选）：
 
 编辑 `~/.openclaw/config.json`：
 
@@ -204,10 +235,28 @@ Assistant: Recorded fasting blood sugar 6.8 mmol/L for "Mom"
 ### 4. Advanced Features
 
 #### Image Recognition
+
+> **Prerequisite**: A multimodal vision model must be configured first. Without it, image recognition is unavailable.
+> Quick setup example (SiliconFlow):
+> ```bash
+> export MEDIWISE_VISION_PROVIDER=siliconflow
+> export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
+> export MEDIWISE_VISION_API_KEY=sk-xxx
+> export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
+> ```
+> See `.env.example` or [INSTALLATION.md](docs/INSTALLATION.md) for all options.
+
 ```
 User: [Send lab report image]
 User: "Help me recognize this lab report"
 Assistant: Let me help you recognize the lab report content...
+```
+
+#### Checkup Report Interpretation
+
+```
+User: "Help me interpret this health checkup report"
+Assistant: Interpreting your checkup report: fasting glucose 5.8 mmol/L (normal), triglycerides 2.1 mmol/L (elevated)...
 ```
 
 #### Wearable Device Sync
@@ -228,6 +277,19 @@ Assistant: Okay, let me sync your band data...
 | Doctor Visit Prep | "Organize medical summary" |
 
 ### 6. Configuration (Optional)
+
+**Vision model configuration** (required for image/PDF recognition):
+
+Copy and edit the environment variables file:
+
+```bash
+cp .env.example .env
+# Fill in MEDIWISE_VISION_API_KEY and related variables
+```
+
+See [INSTALLATION.md](docs/INSTALLATION.md) or `.env.example` for all configuration options.
+
+**OpenClaw plugin configuration** (optional):
 
 Edit `~/.openclaw/config.json`:
 

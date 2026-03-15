@@ -35,7 +35,54 @@ cd ~/.openclaw/skills/mediwise-health-suite
 pip install -r requirements.txt
 ```
 
-#### 步骤 3：验证安装
+#### 步骤 3：配置多模态视觉模型（图片识别必填）
+
+**图片/PDF 识别（化验单、体检报告等）需要配置外部视觉模型**，否则图片类功能无法使用。
+
+**推荐方式：通过环境变量配置（支持 .env 文件）**
+
+复制模板文件并填入你的 API Key：
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite
+cp .env.example .env
+# 编辑 .env，填入 MEDIWISE_VISION_API_KEY 等变量
+```
+
+**方案 A（国内推荐）：硅基流动 Qwen2.5-VL**
+
+```bash
+# 免费注册（含邀请奖励）：https://cloud.siliconflow.cn/i/MOlLXTYM
+export MEDIWISE_VISION_PROVIDER=siliconflow
+export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
+export MEDIWISE_VISION_API_KEY=sk-xxx
+export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
+```
+
+**方案 B（海外推荐）：Google Gemini**
+
+```bash
+export MEDIWISE_VISION_PROVIDER=openai
+export MEDIWISE_VISION_MODEL=gemini-3.1-pro-preview
+export MEDIWISE_VISION_API_KEY=AIzaxxx
+export MEDIWISE_VISION_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+```
+
+**方案 C：通过 setup.py 配置（保存到 config.json）**
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py set-vision \
+  --provider siliconflow \
+  --model Qwen/Qwen2.5-VL-72B-Instruct \
+  --api-key sk-xxx \
+  --base-url https://api.siliconflow.cn/v1
+python3 setup.py test-vision
+```
+
+> 不配置视觉模型时，文本录入和基础健康记录功能仍可正常使用，只有图片/PDF 识别功能不可用。
+
+#### 步骤 4：验证安装
 
 重启 OpenClaw，然后测试：
 
@@ -90,7 +137,7 @@ pip install -r requirements.txt
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
-python3 init_db.py
+python3 setup.py init
 ```
 
 如果从旧版本升级（单库 `health.db`），可执行迁移命令：
@@ -171,7 +218,52 @@ cd ~/.openclaw/skills/mediwise-health-suite
 pip install -r requirements.txt
 ```
 
-#### Step 3: Verify Installation
+#### Step 3: Configure Multimodal Vision Model (Required for Image Recognition)
+
+**Image/PDF recognition (lab reports, checkup reports, etc.) requires configuring an external vision model.** Without this, image-based features will not work.
+
+**Recommended: Configure via environment variables (supports .env file)**
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite
+cp .env.example .env
+# Edit .env and fill in MEDIWISE_VISION_API_KEY and related variables
+```
+
+**Option A (Recommended for China): SiliconFlow Qwen2.5-VL**
+
+```bash
+# Register free (with referral bonus): https://cloud.siliconflow.cn/i/MOlLXTYM
+export MEDIWISE_VISION_PROVIDER=siliconflow
+export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
+export MEDIWISE_VISION_API_KEY=sk-xxx
+export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
+```
+
+**Option B (Recommended internationally): Google Gemini**
+
+```bash
+export MEDIWISE_VISION_PROVIDER=openai
+export MEDIWISE_VISION_MODEL=gemini-3.1-pro-preview
+export MEDIWISE_VISION_API_KEY=AIzaxxx
+export MEDIWISE_VISION_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+```
+
+**Option C: Configure via setup.py (saved to config.json)**
+
+```bash
+cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py set-vision \
+  --provider siliconflow \
+  --model Qwen/Qwen2.5-VL-72B-Instruct \
+  --api-key sk-xxx \
+  --base-url https://api.siliconflow.cn/v1
+python3 setup.py test-vision
+```
+
+> Without a vision model, text-based entry and basic health recording still work. Only image/PDF recognition is unavailable.
+
+#### Step 4: Verify Installation
 
 Restart OpenClaw, then test:
 
@@ -226,7 +318,7 @@ To manually initialize:
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
-python3 init_db.py
+python3 setup.py init
 ```
 
 If upgrading from the legacy single database (`health.db`), run the migration:

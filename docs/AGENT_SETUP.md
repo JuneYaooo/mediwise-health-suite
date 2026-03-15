@@ -196,6 +196,30 @@ git clone https://github.com/JuneYaooo/mediwise-health-suite.git
 clawdhub install mediwise-health-suite --agent health
 ```
 
+## 配置视觉模型（图片/PDF 识别必填）
+
+化验单图片、体检报告等识别功能需要配置外部多模态视觉模型：
+
+```bash
+cd ~/.openclaw/workspace-health/skills/mediwise-health-suite
+cp .env.example .env
+# 编辑 .env，填入视觉模型 API Key
+```
+
+或通过 setup.py 交互配置：
+
+```bash
+cd ~/.openclaw/workspace-health/skills/mediwise-health-suite/mediwise-health-tracker/scripts
+python3 setup.py set-vision \
+  --provider siliconflow \
+  --model Qwen/Qwen2.5-VL-72B-Instruct \
+  --api-key sk-xxx \
+  --base-url https://api.siliconflow.cn/v1
+python3 setup.py test-vision
+```
+
+详细配置方案（含 Gemini、GPT-4o 等选项）见 `.env.example` 或 [INSTALLATION.md](INSTALLATION.md)。
+
 ## 验证配置
 
 ```bash
