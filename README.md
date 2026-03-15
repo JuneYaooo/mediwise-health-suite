@@ -42,12 +42,12 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 - 热量计算
 - 营养素统计
 
-#### ⚖️ 体重管理
+#### ⚖ 体重管理
 - 体重记录与趋势分析
 - BMI/BMR/TDEE 计算
 - 目标设定与进度追踪
 
-### ⚠️ 部分实现功能（待完善）
+### ⚠ 部分实现功能（待完善）
 
 #### 📊 智能监测与提醒（待完善）
 - 多级健康告警
@@ -128,7 +128,7 @@ clawdhub install mediwise-health-suite
 
 ---
 
-## 👨‍👩‍👧‍👦 家庭共用场景
+## 👪 家庭共用场景
 
 ### 一家人在同一个群里使用
 
@@ -173,8 +173,8 @@ clawdhub install mediwise-health-suite
 | 健康档案 | ✅ 已实现 | 成员管理、病程记录、用药追踪、健康指标 |
 | 饮食追踪 | ✅ 已实现 | 饮食记录、营养分析、热量计算 |
 | 体重管理 | ✅ 已实现 | 体重记录、BMI/BMR/TDEE 计算、趋势分析 |
-| 健康监测 | ⚠️ 待完善 | 智能告警、趋势分析 |
-| 可穿戴设备 | ⚠️ 待完善 | 小米手环、华为手表数据同步 |
+| 健康监测 | ⚠ 待完善 | 智能告警、趋势分析 |
+| 可穿戴设备 | ⚠ 待完善 | 小米手环、华为手表数据同步 |
 
 ---
 
@@ -205,7 +205,7 @@ clawdhub install mediwise-health-suite
 
 ---
 
-## ⚠️ 免责声明
+## ⚠ 免责声明
 
 本工具仅供健康信息记录和参考，不构成医疗建议。任何健康问题请咨询专业医生。
 
@@ -215,6 +215,6 @@ clawdhub install mediwise-health-suite
 
 **⭐ 如果这个项目对你有帮助，请给个 Star！**
 
-Made with ❤️ by MediWise Team
+Made with ❤ by MediWise Team
 
 </div>

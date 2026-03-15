@@ -81,7 +81,7 @@ If you find a bug or have a feature suggestion:
 
 ### 隐私和安全 / Privacy and Security
 
-⚠️ **重要提醒**：
+⚠ **重要提醒**：
 - 不要提交包含真实用户数据的文件
 - 不要提交 API keys、密码等敏感信息
 - 不要提交 `.db` 或 `.sqlite` 文件
