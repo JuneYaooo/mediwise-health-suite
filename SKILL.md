@@ -50,12 +50,12 @@ requires:
 - 热量收支分析
 - 达标预测
 
-### ⚠️ 4. 智能健康监测 (health-monitor) - 待完善
+### ⚠ 4. 智能健康监测 (health-monitor) - 待完善
 - 多级阈值告警（info/warning/urgent/emergency）
 - 趋势分析与异常检测
 - 自动提醒：用药提醒、复查提醒、指标测量提醒
 
-### ⚠️ 5. 可穿戴设备同步 (wearable-sync) - 待完善
+### ⚠ 5. 可穿戴设备同步 (wearable-sync) - 待完善
 - 支持 Gadgetbridge（小米手环、华为手表等）
 - 自动同步：心率、步数、血氧、睡眠
 - 可插拔 Provider 架构
@@ -172,7 +172,7 @@ python3 scripts/setup.py set-vision \
 
 | 变量名 | 用途 | 默认行为 |
 |--------|------|----------|
-| `MEDIWISE_OWNER_ID` | 多租户隔离：限定当前进程只能访问该 owner 的数据（共享实例必填） | 未设置时为管理员模式，可访问全部数据 |
+| `MEDIWISE_OWNER_ID` | 多租户隔离：限定当前进程只能访问该 owner 的数据。**个人/单用户使用时无需设置**；仅在将本工具部署为多人共享服务（如群聊机器人）时才需要为每个用户设置不同值以实现数据隔离 | 未设置时为单用户模式（访问本机全部数据），适合个人或家庭独立部署 |
 | `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材兜底查询。免费注册：https://api.data.gov/signup/ | 未设置时跳过 USDA 查询，使用内置离线数据库 |
 | `MEDIWISE_DATA_DIR` | 覆盖 SQLite 数据库存储目录 | 默认 OS 用户数据目录（Linux: `~/.local/share/mediwise`） |
 | `MEDIWISE_MEDICAL_DB_PATH` | 覆盖医疗数据库（medical.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
