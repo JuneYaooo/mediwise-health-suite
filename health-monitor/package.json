@@ -1,6 +1,6 @@
 {
   "name": "@mediwise/health-monitor-skill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "智能健康监测与告警 OpenClaw Skill",
   "author": "mediwise",

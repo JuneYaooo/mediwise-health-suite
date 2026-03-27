@@ -2,16 +2,16 @@
 name: health-monitor
 description: >-
   智能健康监测与告警。基于阈值检测、趋势分析和多级告警系统，
-  对家庭成员的健康指标进行持续监测，发现异常时及时预警。
+  对家庭成员的健康指标进行持续监测，发现异常时及时预警。支持全家健康 dashboard 一屏总览。
   Intelligent health monitoring and alerting. Uses threshold detection,
   trend analysis, and multi-level alert system to continuously monitor
-  family members' health metrics and warn on anomalies.
-  关键词：健康监测、异常告警、指标预警、趋势分析、健康报告、心率异常、血压异常、血氧低、告警管理。
+  family members' health metrics and warn on anomalies. Supports family dashboard.
+  关键词：健康监测、异常告警、指标预警、趋势分析、健康报告、心率异常、血压异常、血氧低、告警管理、全家概览、健康dashboard。
 ---
 
 # Health Monitor - 智能健康监测
 
-持续监测健康指标，多级阈值告警 + 趋势分析，发现异常及时通知。
+持续监测健康指标，多级阈值告警 + 趋势分析，发现异常及时通知。支持全家健康 dashboard 一屏总览。
 
 ## 告警级别
 
@@ -39,6 +39,43 @@ description: >-
 ## 核心工作流
 
 > **强制规则**：每次调用脚本必须携带 `--owner-id`，从会话上下文获取发送者 ID（格式 `<channel>:<user_id>`，如 `feishu:ou_xxx` 或 `qqbot:12345`）。所有查询和写入操作均需携带，不得省略。
+
+### 0. 全家健康 Dashboard（首选入口）
+
+用户说「看看全家健康」「今天家人状态怎样」「健康概览」时，优先调用此接口。
+返回所有成员的风险级别、未解决告警数、最新关键指标和趋势警告。
+
+```bash
+# 全家健康一屏总览
+python3 {baseDir}/scripts/dashboard.py show
+
+# 按 owner 过滤（多租户场景）
+python3 {baseDir}/scripts/dashboard.py show --owner-id <owner_id>
+```
+
+**返回结构示例：**
+```json
+{
+  "family_risk": "warning",
+  "family_risk_label": "需关注",
+  "total_open_alerts": 3,
+  "summary": "【紧急】张三 有紧急告警；共 3 条未解决告警",
+  "members": [
+    {
+      "name": "张三",
+      "risk_level": "urgent",
+      "risk_label": "紧急",
+      "open_alerts": 2,
+      "alerts": [{"level": "urgent", "title": "张三 heart_rate 高于阈值", ...}],
+      "latest_metrics": {
+        "heart_rate": {"value": 125, "unit": "bpm", "measured_at": "2026-03-27 08:30"},
+        "blood_pressure": {"value": "145/95", "unit": "mmHg", "measured_at": "2026-03-27 08:30"}
+      },
+      "trend_warnings": ["heart_rate 呈上升趋势"]
+    }
+  ]
+}
+```
 
 ### 1. 阈值管理
 
