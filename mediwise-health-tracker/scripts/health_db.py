@@ -62,6 +62,7 @@ LIFESTYLE_TABLES = {
     "exercise_records",
     "wearable_devices",
     "wearable_sync_log",
+    "nutrition_goals",
 }
 
 TABLE_DOMAIN = {
@@ -701,6 +702,23 @@ CREATE TABLE IF NOT EXISTS exercise_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_exercise_records_member ON exercise_records(member_id, exercise_date);
+
+CREATE TABLE IF NOT EXISTS nutrition_goals (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    calories INTEGER,
+    protein_g REAL,
+    fat_g REAL,
+    carbs_g REAL,
+    fiber_g REAL,
+    is_active INTEGER DEFAULT 1,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_nutrition_goals_member ON nutrition_goals(member_id, is_active);
 
 CREATE TABLE IF NOT EXISTS wearable_devices (
     id TEXT PRIMARY KEY,

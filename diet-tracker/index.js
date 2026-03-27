@@ -84,6 +84,32 @@ const ROUTES = {
     return { script: 'food_lookup.py', args };
   },
   'food-stats': () => ({ script: 'food_lookup.py', args: ['stats'] }),
+  // Nutrition goals
+  'nutrition-goal-set': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['set', '--member-id', inputs.member_id];
+    if (p.calories != null) args.push('--calories', String(p.calories));
+    if (p.protein != null)  args.push('--protein',  String(p.protein));
+    if (p.fat != null)      args.push('--fat',       String(p.fat));
+    if (p.carbs != null)    args.push('--carbs',     String(p.carbs));
+    if (p.fiber != null)    args.push('--fiber',     String(p.fiber));
+    if (p.note)             args.push('--note',      p.note);
+    return { script: 'nutrition_goal.py', args };
+  },
+  'nutrition-goal-view': (inputs) => ({
+    script: 'nutrition_goal.py',
+    args: ['view', '--member-id', inputs.member_id],
+  }),
+  'nutrition-goal-daily': (inputs) => {
+    const args = ['daily', '--member-id', inputs.member_id];
+    if (inputs.params?.date) args.push('--date', inputs.params.date);
+    return { script: 'nutrition_goal.py', args };
+  },
+  'nutrition-goal-weekly': (inputs) => {
+    const args = ['weekly', '--member-id', inputs.member_id];
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    return { script: 'nutrition_goal.py', args };
+  },
 };
 
 /**
