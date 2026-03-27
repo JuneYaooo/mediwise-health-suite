@@ -77,7 +77,7 @@ def _aggregate_daily_steps(raw_steps: list[RawMetric], provider: str) -> list[di
     for rm in raw_steps:
         day = rm.timestamp[:10]  # YYYY-MM-DD
         try:
-            daily[day] += int(rm.value)
+            daily[day] += int(float(rm.value))
         except (ValueError, TypeError):
             pass
 
