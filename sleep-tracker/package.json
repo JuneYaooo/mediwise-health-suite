@@ -1,0 +1,10 @@
+{
+  "name": "@mediwise/sleep-tracker-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "睡眠追踪与质量分析 OpenClaw Skill",
+  "author": "mediwise",
+  "license": "MIT",
+  "keywords": ["openclaw", "skill", "health", "sleep", "sleep-tracker"]
+}
