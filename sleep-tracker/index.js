@@ -42,30 +42,37 @@ const ROUTES = {
   },
 };
 
-export async function handler(action, inputs) {
+export async function execute(inputs, context) {
+  const action = inputs.action;
+  const log = context?.log ?? console.log;
+  log(`[sleep-tracker] action=${action}`);
+
   const route = ROUTES[action];
   if (!route) {
-    return { status: 'error', message: `未知 action: ${action}` };
+    return { status: 'error', error: `未知 action: ${action}` };
   }
 
   const { script, args } = route(inputs);
   const scriptPath = resolve(SCRIPTS_DIR, script);
 
-  const env = { ...process.env };
-  if (inputs.owner_id) env.MEDIWISE_OWNER_ID = inputs.owner_id;
+  if (inputs.owner_id) args.push('--owner-id', inputs.owner_id);
+
+  log(`[sleep-tracker] script=${script} args=${args.join(' ')}`);
 
   try {
     const { stdout } = await execFileAsync('python3', [scriptPath, ...args], {
-      env,
+      env: { ...process.env },
       timeout: 30000,
     });
-    return JSON.parse(stdout.trim());
+    return { status: 'ok', result: JSON.parse(stdout.trim()) };
   } catch (err) {
     const stdout = err.stdout ?? '';
     try {
-      return JSON.parse(stdout.trim());
+      return { status: 'ok', result: JSON.parse(stdout.trim()) };
     } catch {
-      return { status: 'error', message: (err.stderr ?? '') || err.message };
+      const message = (err.stderr ?? '') || err.message;
+      log(`[sleep-tracker] error: ${message}`);
+      return { status: 'error', error: message };
     }
   }
 }

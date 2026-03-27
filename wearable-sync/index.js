@@ -68,32 +68,37 @@ const ROUTES = {
   }),
 };
 
-export async function handler(action, inputs) {
+export async function execute(inputs, context) {
+  const action = inputs.action;
+  const log = context?.log ?? console.log;
+  log(`[wearable-sync] action=${action}`);
+
   const route = ROUTES[action];
   if (!route) {
-    return { status: 'error', message: `未知 action: ${action}` };
+    return { status: 'error', error: `未知 action: ${action}` };
   }
 
   const { script, args } = route(inputs);
   const scriptPath = resolve(SCRIPTS_DIR, script);
 
-  const env = { ...process.env };
-  if (inputs.owner_id) {
-    env.MEDIWISE_OWNER_ID = inputs.owner_id;
-  }
+  if (inputs.owner_id) args.push('--owner-id', inputs.owner_id);
+
+  log(`[wearable-sync] script=${script} args=${args.join(' ')}`);
 
   try {
     const { stdout } = await execFileAsync('python3', [scriptPath, ...args], {
-      env,
-      timeout: 60000,  // sync can take longer for large exports
+      env: { ...process.env },
+      timeout: 60000,
     });
-    return JSON.parse(stdout.trim());
+    return { status: 'ok', result: JSON.parse(stdout.trim()) };
   } catch (err) {
     const stdout = err.stdout ?? '';
     try {
-      return JSON.parse(stdout.trim());
+      return { status: 'ok', result: JSON.parse(stdout.trim()) };
     } catch {
-      return { status: 'error', message: (err.stderr ?? '') || err.message };
+      const message = (err.stderr ?? '') || err.message;
+      log(`[wearable-sync] error: ${message}`);
+      return { status: 'error', error: message };
     }
   }
 }

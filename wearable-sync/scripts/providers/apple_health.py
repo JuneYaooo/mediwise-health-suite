@@ -2,6 +2,47 @@
 
 Supports both .xml and .zip (containing export.xml) formats.
 Uses iterparse for memory-efficient streaming of large files.
+
+## Implementation References
+
+### Apple HealthKit Official Documentation
+- HKQuantityTypeIdentifier enumeration (all supported type strings):
+  https://developer.apple.com/documentation/healthkit/hkquantitytypeidentifier
+- HKCategoryTypeIdentifier (sleep, mindfulness, etc.):
+  https://developer.apple.com/documentation/healthkit/hkcategorytypeidentifier
+- HKCategoryValueSleepAnalysis (int values 0-5 mapped to sleep stages):
+  https://developer.apple.com/documentation/healthkit/hkcategoryvaluesleepanalysis
+  Values used in SLEEP_VALUE_MAP:
+    0 = inBed (awake)  1 = asleepUnspecified (awake)  2 = awake
+    3 = asleepCore / light_sleep  4 = asleepDeep / deep_sleep  5 = asleepREM / rem_sleep
+  Note: values 0-2 were the original API; 3-5 added in iOS 16 (WWDC 2022 session 10005).
+- HealthKit export XML format (Record element attributes: type, startDate, value, unit):
+  https://developer.apple.com/documentation/healthkit/data_types
+
+### Unit Conversions
+- Blood glucose mg/dL → mmol/L: divide by 18.0182
+  Reference: WHO / SI unit standard; 18.0182 is the molar mass of glucose (g/mol)
+  See also: https://www.diabetes.co.uk/blood-sugar-converter.html
+- Body height metres → cm: multiply by 100 (SI)
+- Body mass lbs → kg: multiply by 0.453592 (1 lb = 0.453592 kg, NIST)
+- Blood oxygen / body fat stored as fraction 0-1 on older iOS versions → multiply by 100
+
+### Blood Pressure Pairing (60-second window)
+- Apple Health stores HKQuantityTypeIdentifierBloodPressureSystolic and
+  HKQuantityTypeIdentifierBloodPressureDiastolic as separate Record entries.
+- The 60-second co-occurrence window follows the HealthKit Correlation model:
+  https://developer.apple.com/documentation/healthkit/hkcorrelation
+  (BloodPressure correlation groups systolic + diastolic taken at the same moment.)
+
+### Memory-Efficient XML Parsing
+- xml.etree.ElementTree.iterparse with elem.clear() pattern:
+  https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.iterparse
+  Recommended for Apple Health exports which can exceed 1 GB.
+
+### Step Count Aggregation
+- HKQuantityTypeIdentifierStepCount records are per-interval samples (not cumulative).
+  Daily totals are obtained by summing all samples within a calendar day.
+  Reference: Apple Developer Forums QA1952 and HealthKit best practices guide.
 """
 
 from __future__ import annotations

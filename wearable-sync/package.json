@@ -2,6 +2,7 @@
   "name": "@mediwise/wearable-sync-skill",
   "version": "0.2.0",
   "type": "module",
+  "main": "index.js",
   "description": "可穿戴设备数据同步 OpenClaw Skill",
   "author": "mediwise",
   "license": "MIT",

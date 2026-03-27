@@ -2,6 +2,7 @@
   "name": "@mediwise/health-monitor-skill",
   "version": "0.2.0",
   "type": "module",
+  "main": "index.js",
   "description": "智能健康监测与告警 OpenClaw Skill",
   "author": "mediwise",
   "license": "MIT",
