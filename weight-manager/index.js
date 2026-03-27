@@ -75,6 +75,11 @@ const ROUTES = {
     script: 'weight_analysis.py',
     args: ['projection', '--member-id', inputs.member_id],
   }),
+  'diet-weight-correlation': (inputs) => {
+    const args = ['diet-weight-correlation', '--member-id', inputs.member_id];
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    return { script: 'weight_analysis.py', args };
+  },
   // Exercise routes
   'add-exercise': (inputs) => {
     const args = ['add', '--member-id', inputs.member_id,

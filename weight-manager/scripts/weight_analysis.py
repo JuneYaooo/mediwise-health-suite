@@ -523,6 +523,149 @@ def projection(args):
     })
 
 
+def diet_weight_correlation(args):
+    """饮食热量收支与体重变化对照分析。
+
+    计算每日理论体重变化（热量赤字/盈余÷7700 kcal/kg）与实际体重变化的对比，
+    帮助用户理解饮食执行效果。
+    """
+    ensure_db()
+    m = _get_member_name(args.member_id, args.owner_id)
+    if not m:
+        output_json({"status": "error", "message": f"未找到成员或无权访问: {args.member_id}"})
+        return
+
+    days = args.days or 14
+    end = datetime.now().date()
+    start = end - timedelta(days=days - 1)
+
+    # 获取 TDEE（用于计算热量赤字）
+    tdee = None
+    medical_conn = get_medical_connection()
+    try:
+        member = medical_conn.execute(
+            "SELECT gender, birth_date FROM members WHERE id=? AND is_deleted=0",
+            (args.member_id,)
+        ).fetchone()
+        if member and member["gender"] in ("male", "female") and member["birth_date"]:
+            w_row = medical_conn.execute(
+                "SELECT value FROM health_metrics WHERE member_id=? AND metric_type='weight' "
+                "AND is_deleted=0 ORDER BY measured_at DESC LIMIT 1",
+                (args.member_id,)
+            ).fetchone()
+            h_row = medical_conn.execute(
+                "SELECT value FROM health_metrics WHERE member_id=? AND metric_type='height' "
+                "AND is_deleted=0 ORDER BY measured_at DESC LIMIT 1",
+                (args.member_id,)
+            ).fetchone()
+            if w_row and h_row:
+                try:
+                    age = calculate_age(member["birth_date"])
+                    bmr = calculate_bmr(float(w_row["value"]), float(h_row["value"]),
+                                       age, member["gender"])
+                    tdee = round(calculate_tdee(bmr, "sedentary"), 1)
+                except (ValueError, TypeError):
+                    pass
+
+        # 获取各天体重记录（最近测量值）
+        weight_rows = medical_conn.execute(
+            """SELECT DATE(measured_at) as day, AVG(CAST(value AS REAL)) as avg_weight
+               FROM health_metrics
+               WHERE member_id=? AND metric_type='weight' AND is_deleted=0
+               AND DATE(measured_at) BETWEEN ? AND ?
+               GROUP BY DATE(measured_at)
+               ORDER BY day""",
+            (args.member_id, start.isoformat(), end.isoformat())
+        ).fetchall()
+    finally:
+        medical_conn.close()
+
+    weight_by_day = {r["day"]: round(r["avg_weight"], 2) for r in weight_rows}
+
+    # 获取饮食热量和运动消耗
+    lifestyle_conn = get_lifestyle_connection()
+    try:
+        diet_rows = lifestyle_conn.execute(
+            """SELECT meal_date, SUM(total_calories) as intake
+               FROM diet_records
+               WHERE member_id=? AND meal_date BETWEEN ? AND ? AND is_deleted=0
+               GROUP BY meal_date""",
+            (args.member_id, start.isoformat(), end.isoformat())
+        ).fetchall()
+        exercise_rows = lifestyle_conn.execute(
+            """SELECT exercise_date, SUM(calories_burned) as burned
+               FROM exercise_records
+               WHERE member_id=? AND exercise_date BETWEEN ? AND ? AND is_deleted=0
+               GROUP BY exercise_date""",
+            (args.member_id, start.isoformat(), end.isoformat())
+        ).fetchall()
+    finally:
+        lifestyle_conn.close()
+
+    intake_by_day = {r["meal_date"]: round(r["intake"] or 0, 1) for r in diet_rows}
+    burned_by_day = {r["exercise_date"]: round(r["burned"] or 0, 1) for r in exercise_rows}
+
+    # 按天构建对照表
+    KCAL_PER_KG = 7700.0  # 理论值：消耗7700 kcal ≈ 减少1kg体重
+    daily = []
+    current = start
+    while current <= end:
+        ds = current.isoformat()
+        intake = intake_by_day.get(ds, None)
+        burned = burned_by_day.get(ds, 0)
+        weight = weight_by_day.get(ds, None)
+
+        entry = {"date": ds, "weight": weight, "intake": intake, "burned": burned}
+
+        if intake is not None and tdee is not None:
+            net = intake - burned
+            deficit = tdee - net  # 正=赤字(减重方向), 负=盈余(增重方向)
+            entry["net_intake"] = round(net, 1)
+            entry["calorie_deficit"] = round(deficit, 1)
+            entry["theoretical_weight_change"] = round(-deficit / KCAL_PER_KG, 4)
+
+        daily.append(entry)
+        current += timedelta(days=1)
+
+    # 汇总：实际体重变化 vs 理论预期
+    weight_days = [(d["date"], d["weight"]) for d in daily if d["weight"] is not None]
+    actual_change = None
+    if len(weight_days) >= 2:
+        actual_change = round(weight_days[-1][1] - weight_days[0][1], 2)
+
+    theory_days = [d for d in daily if "theoretical_weight_change" in d]
+    theoretical_total = round(sum(d["theoretical_weight_change"] for d in theory_days), 2) \
+        if theory_days else None
+
+    insight = []
+    if actual_change is not None and theoretical_total is not None:
+        diff = actual_change - theoretical_total
+        if abs(diff) < 0.3:
+            insight.append("实际体重变化与热量收支理论值吻合，饮食记录较准确")
+        elif diff > 0.3:
+            insight.append(f"实际体重比预期多增/少减 {abs(diff):.1f} kg，可能有未记录的饮食或水分变化")
+        else:
+            insight.append(f"实际体重比预期多减/少增 {abs(diff):.1f} kg，可能有运动消耗未记录")
+
+    diet_days_count = len([d for d in daily if d["intake"] is not None])
+    if diet_days_count < days // 2:
+        insight.append(f"仅 {diet_days_count}/{days} 天有饮食记录，建议每日记录以提高分析准确性")
+
+    output_json({
+        "status": "ok",
+        "member_name": m["name"],
+        "days": days,
+        "period": {"start": start.isoformat(), "end": end.isoformat()},
+        "estimated_tdee": tdee,
+        "kcal_per_kg": KCAL_PER_KG,
+        "actual_weight_change": actual_change,
+        "theoretical_weight_change": theoretical_total,
+        "diet_days_recorded": diet_days_count,
+        "daily": daily,
+        "insight": insight,
+    })
+
+
 def main():
     parser = argparse.ArgumentParser(description="体重分析")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -550,6 +693,11 @@ def main():
     p_proj.add_argument("--member-id", required=True)
     p_proj.add_argument("--owner-id", default=None)
 
+    p_corr = sub.add_parser("diet-weight-correlation")
+    p_corr.add_argument("--member-id", required=True)
+    p_corr.add_argument("--days", type=int, default=14)
+    p_corr.add_argument("--owner-id", default=None)
+
     args = parser.parse_args()
     commands = {
         "progress": progress,
@@ -557,6 +705,7 @@ def main():
         "calorie-balance": calorie_balance,
         "weekly-report": weekly_report,
         "projection": projection,
+        "diet-weight-correlation": diet_weight_correlation,
     }
     commands[args.command](args)
 
