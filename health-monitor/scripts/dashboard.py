@@ -118,11 +118,10 @@ def generate_dashboard(owner_id: str | None = None) -> dict:
     try:
         if owner_id:
             members = health_db.rows_to_list(conn.execute(
-                """SELECT m.id, m.name, m.birth_date, m.gender
-                   FROM members m
-                   JOIN member_ownership mo ON mo.member_id=m.id AND mo.is_deleted=0
-                   WHERE mo.owner_id=? AND m.is_deleted=0
-                   ORDER BY m.name""",
+                """SELECT id, name, birth_date, gender
+                   FROM members
+                   WHERE owner_id=? AND is_deleted=0
+                   ORDER BY name""",
                 (owner_id,)
             ).fetchall())
         else:
