@@ -110,6 +110,54 @@ python3 {baseDir}/scripts/sync.py run --device-id <id>
 
 支持指标：心率、静息心率、步数、血氧、睡眠分期、体重、身高、体脂率、血糖、血压、卡路里消耗。
 
+### Apple Health 持续更新方案
+
+Apple Health 导出是**手动触发的快照**，不是实时流。要实现持续监测，需要定期更新导出文件并重新同步。
+
+**推荐流程（每日自动化）：**
+
+```
+iPhone 健康 App 导出
+    → AirDrop / iCloud Drive / USB 传输到 Mac
+    → 覆盖固定路径的 export.zip
+    → cron 定时触发 sync.py
+    → health-monitor check.py 检测异常
+```
+
+**方案一：iCloud Drive 自动同步（推荐，Mac 用户）**
+
+1. iPhone 导出时选择保存到 iCloud Drive 固定目录（如 `iCloud Drive/HealthExports/export.zip`）
+2. Mac 上 iCloud Drive 自动同步该文件
+3. 配置 `--export-path` 指向本地 iCloud 同步目录：
+   ```bash
+   ~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthExports/export.zip
+   ```
+4. 用户每次在 iPhone 重新导出覆盖该文件，Mac 自动同步，cron 定期执行同步
+
+**方案二：快捷指令（Shortcuts）自动导出**
+
+iOS「快捷指令」App 可设置每日定时自动导出健康数据并上传到固定位置：
+1. 新建快捷指令 → 添加「导出健康数据」动作
+2. 添加「上传文件」动作（保存到 iCloud Drive 或通过 SSH/SFTP 上传到服务器）
+3. 设置「自动化」→「每天早上 7:00 运行」
+
+**方案三：手动定期导出（最简单）**
+
+用户每周或每天手动在 iPhone 导出一次，通过 AirDrop 传到 Mac，覆盖固定路径即可。适合数据精度要求不高的场景。
+
+**cron 自动同步配置（配合以上任一方案）：**
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 每小时同步一次 Apple Health 数据并触发健康检测
+0 * * * * cd /path/to/wearable-sync/scripts && python3 sync.py run --device-id <device-id> >> ~/mediwise-sync.log 2>&1
+5 * * * * cd /path/to/health-monitor/scripts && python3 check.py run-all --window 2h >> ~/mediwise-check.log 2>&1
+```
+
+> **注意**：Apple Health 导出文件更新频率决定了数据新鲜度上限。iCloud 方案约有 5-15 分钟延迟；手动方案取决于用户导出频率。系统内置去重，重复同步同一文件不会产生重复数据。
+
 ## 反模式
 
 - **不要手动修改 Gadgetbridge 导出数据库** — 直接读取即可
