@@ -35,6 +35,11 @@ const ROUTES = {
   'device-auth': (inputs) => {
     const args = ['auth', '--device-id', inputs.params?.device_id ?? ''];
     if (inputs.params?.export_path) args.push('--export-path', inputs.params.export_path);
+    // Garmin Connect credentials
+    if (inputs.params?.username) args.push('--username', inputs.params.username);
+    if (inputs.params?.password) args.push('--password', inputs.params.password);
+    if (inputs.params?.tokenstore) args.push('--tokenstore', inputs.params.tokenstore);
+    // OAuth providers
     if (inputs.params?.client_id) args.push('--client-id', inputs.params.client_id);
     if (inputs.params?.client_secret) args.push('--client-secret', inputs.params.client_secret);
     if (inputs.params?.redirect_uri) args.push('--redirect-uri', inputs.params.redirect_uri);

@@ -6,3 +6,6 @@
 # Optional dependencies for enhanced features:
 # requests>=2.28.0  # For medical search API calls (if needed)
 # pillow>=9.0.0     # For image processing (if needed)
+
+# Garmin Connect provider (wearable-sync)
+# garminconnect>=0.2.0  # pip install garminconnect

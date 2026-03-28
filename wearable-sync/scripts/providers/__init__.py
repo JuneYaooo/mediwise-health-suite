@@ -2,5 +2,6 @@
 
 from .base import BaseProvider
 from .gadgetbridge import GadgetbridgeProvider
+from .garmin import GarminProvider
 
-__all__ = ["BaseProvider", "GadgetbridgeProvider"]
+__all__ = ["BaseProvider", "GadgetbridgeProvider", "GarminProvider"]

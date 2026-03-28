@@ -22,6 +22,7 @@ from providers.huawei import HuaweiProvider
 from providers.zepp import ZeppProvider
 from providers.openwearables import OpenWearablesProvider
 from providers.apple_health import AppleHealthProvider
+from providers.garmin import GarminProvider
 
 PROVIDERS = {
     "gadgetbridge": GadgetbridgeProvider,
@@ -29,6 +30,7 @@ PROVIDERS = {
     "zepp": ZeppProvider,
     "openwearables": OpenWearablesProvider,
     "apple_health": AppleHealthProvider,
+    "garmin": GarminProvider,
 }
 
 
@@ -102,7 +104,7 @@ def list_devices(args):
             # Mask sensitive config
             try:
                 cfg = json.loads(d.get("config") or "{}")
-                for k in ("access_token", "refresh_token", "client_secret"):
+                for k in ("access_token", "refresh_token", "client_secret", "password"):
                     if k in cfg:
                         cfg[k] = "***"
                 d["config"] = cfg
@@ -183,6 +185,22 @@ def auth_device(args):
             })
             return
         existing_config["export_path"] = os.path.abspath(args.export_path)
+    elif provider_name == "garmin":
+        if not args.username or not args.password:
+            health_db.output_json({
+                "status": "error",
+                "message": (
+                    "佳明（Garmin）设备需要提供 Garmin Connect 账号信息：\n"
+                    "  --username  你的 Garmin Connect 登录邮箱\n"
+                    "  --password  你的 Garmin Connect 密码\n"
+                    "  --tokenstore（可选）存放登录令牌的目录路径，配置后下次无需重新输入密码"
+                )
+            })
+            return
+        existing_config["username"] = args.username
+        existing_config["password"] = args.password
+        if args.tokenstore:
+            existing_config["tokenstore"] = args.tokenstore
     else:
         # OAuth-based providers
         if args.client_id:
@@ -197,6 +215,9 @@ def auth_device(args):
     try:
         valid = provider.authenticate(existing_config)
     except NotImplementedError as e:
+        health_db.output_json({"status": "error", "message": str(e)})
+        return
+    except RuntimeError as e:
         health_db.output_json({"status": "error", "message": str(e)})
         return
 
@@ -282,6 +303,8 @@ def test_device(args):
         })
     except NotImplementedError as e:
         health_db.output_json({"status": "error", "message": str(e)})
+    except RuntimeError as e:
+        health_db.output_json({"status": "error", "message": str(e)})
 
 
 def main():
@@ -301,7 +324,10 @@ def main():
 
     p_auth = sub.add_parser("auth", help="配置设备认证")
     p_auth.add_argument("--device-id", required=True)
-    p_auth.add_argument("--export-path", default=None, help="Gadgetbridge 导出文件路径")
+    p_auth.add_argument("--export-path", default=None, help="Gadgetbridge/Apple Health 导出文件路径")
+    p_auth.add_argument("--username", default=None, help="Garmin Connect 登录邮箱")
+    p_auth.add_argument("--password", default=None, help="Garmin Connect 密码")
+    p_auth.add_argument("--tokenstore", default=None, help="Garmin token 缓存目录（可选，避免重复登录）")
     p_auth.add_argument("--client-id", default=None, help="OAuth Client ID")
     p_auth.add_argument("--client-secret", default=None, help="OAuth Client Secret")
     p_auth.add_argument("--redirect-uri", default=None, help="OAuth Redirect URI")

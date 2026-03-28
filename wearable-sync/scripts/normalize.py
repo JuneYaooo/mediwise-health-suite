@@ -63,6 +63,25 @@ def normalize_metrics(raw_metrics: list[RawMetric], provider: str) -> list[dict]
                 "source": provider,
             })
 
+    # Garmin-specific: direct pass-through time-series and summary types
+    for metric_type in ("stress", "body_battery", "hrv", "activity"):
+        for rm in by_type.get(metric_type, []):
+            normalized.append({
+                "metric_type": metric_type,
+                "value": rm.value,
+                "measured_at": rm.timestamp,
+                "source": provider,
+            })
+
+    # Garmin sleep: already fully aggregated by the provider, pass through directly
+    for rm in by_type.get("sleep", []):
+        normalized.append({
+            "metric_type": "sleep",
+            "value": rm.value,
+            "measured_at": rm.timestamp,
+            "source": provider,
+        })
+
     # Blood pressure pairing (Apple Health stores systolic/diastolic separately)
     bp_raw = by_type.get("bp_systolic_raw", []) + by_type.get("bp_diastolic_raw", [])
     if bp_raw:

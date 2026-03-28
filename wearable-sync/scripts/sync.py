@@ -29,6 +29,7 @@ from providers.huawei import HuaweiProvider
 from providers.zepp import ZeppProvider
 from providers.openwearables import OpenWearablesProvider
 from providers.apple_health import AppleHealthProvider
+from providers.garmin import GarminProvider
 
 PROVIDERS = {
     "gadgetbridge": GadgetbridgeProvider,
@@ -36,6 +37,7 @@ PROVIDERS = {
     "zepp": ZeppProvider,
     "openwearables": OpenWearablesProvider,
     "apple_health": AppleHealthProvider,
+    "garmin": GarminProvider,
 }
 
 
@@ -106,6 +108,8 @@ def sync_device(device_id, owner_id=None):
         if not provider.authenticate(config):
             return {"status": "error", "message": "设备认证失败，请检查配置"}
     except NotImplementedError as e:
+        return {"status": "error", "message": str(e)}
+    except RuntimeError as e:
         return {"status": "error", "message": str(e)}
 
     # Create sync log entry

@@ -1,6 +1,6 @@
 ---
 name: wearable-sync
-description: "Wearable device data sync: import health data from Huawei watches, Xiaomi bands (Gadgetbridge), Zepp devices. Pluggable provider architecture; currently supports Gadgetbridge local SQLite import."
+description: "Wearable device data sync: import health data from Garmin watches (Body Battery, HRV, sleep, heart rate), Apple Health, Huawei, Xiaomi (Gadgetbridge), Zepp devices. Pluggable provider architecture."
 ---
 
 # Wearable Sync - 可穿戴设备数据同步
@@ -13,11 +13,89 @@ description: "Wearable device data sync: import health data from Huawei watches,
 |----------|------|----------|----------|
 | Gadgetbridge | ✅ 已实现 | 本地 SQLite 导出文件 | 心率、步数、血氧、睡眠 |
 | Apple Health | ✅ 已实现 | export.xml / export.zip | 心率、步数、血氧、睡眠、体重、身高、体脂、血糖、血压、卡路里 |
+| **Garmin Connect** | ✅ 已实现 | Garmin Connect 账号（非官方 API） | 心率、睡眠分期、HRV、身体电量、压力、步数、卡路里、血氧、活动记录 |
 | 华为 Health Kit | 🔜 Stub | REST API（需企业开发者资质） | — |
 | Zepp Health | 🔜 Stub | REST API（需开发者账号） | — |
 | OpenWearables | 🔜 Stub | 统一 API（暂不支持华为/小米） | — |
 
 > **强制规则**：每次调用脚本必须携带 `--owner-id`，从会话上下文获取发送者 ID（格式 `<channel>:<user_id>`，如 `feishu:ou_xxx` 或 `qqbot:12345`）。所有设备管理和同步操作均需携带，不得省略。
+
+## Garmin Connect 接入说明
+
+### 前置依赖
+
+```bash
+pip install garminconnect
+```
+
+> Garmin 使用非官方 API（模拟 Web 登录），无需申请开发者账号。需要用户的 Garmin Connect 账号和密码。
+
+### 绑定流程
+
+```bash
+# 1. 添加 Garmin 设备
+python3 {baseDir}/scripts/device.py add --member-id <id> --provider garmin --device-name "Garmin Fenix 7"
+
+# 2. 配置账号（用实际参数，不是 JSON 字符串）
+python3 {baseDir}/scripts/device.py auth --device-id <id> \
+  --username you@example.com \
+  --password yourpass \
+  --tokenstore /home/ubuntu/.garmin_tokens
+# --tokenstore 可选：保存登录 token，下次无需重新输入密码
+
+# 3. 测试连接
+python3 {baseDir}/scripts/device.py test --device-id <id>
+
+# 4. 同步数据
+python3 {baseDir}/scripts/sync.py run --device-id <id>
+```
+
+### Agent 引导用户配置佳明的对话规则
+
+当用户表达以下意图时，agent 应主动引导完成绑定流程：
+- "我用佳明"、"我有 Garmin 手表"、"帮我绑定佳明"
+- "我想同步佳明数据"、"我的 Fenix / Forerunner / Venu / Vivoactive"
+
+**引导步骤（agent 对话中按序询问）：**
+
+1. **确认设备名称**：请问你的佳明手表型号是？（如 Fenix 7、Forerunner 965，填写任意名称即可）
+2. **收集账号信息**：需要你的 Garmin Connect 登录邮箱和密码（凭据仅保存在本地）
+3. **询问是否保存登录状态**：是否保存登录状态？保存后下次同步无需重新输入密码（推荐）
+
+**安全提示（必须在收集密码前告知用户）**：
+
+> 你的 Garmin Connect 密码将以明文存储在本地数据库中。如果担心安全风险，可以为本系统单独创建一个 Garmin 子账号，或改用 Apple Health 导出方式。
+
+**收集完信息后依次调用**：
+
+1. `device-add`（provider: garmin，device_name: 用户填写的型号）
+2. `device-auth`（username, password, tokenstore 可选）
+   - 若返回错误含「升级库」提示，告知用户联系管理员执行 `pip install --upgrade garminconnect`
+   - 若返回错误含「两步验证」提示，告知用户需要在服务器终端完成一次性验证
+3. 认证成功后自动调用 `sync-device` 拉取近 7 天数据
+
+**同步频率建议**：每小时最多同步一次，可通过 cron 自动定时同步。
+
+### 支持的 Garmin 指标
+
+| metric_type | 说明 | 数据格式 |
+|---|---|---|
+| `heart_rate` | 全天心率（5分钟间隔） | `"72"` |
+| `sleep` | 睡眠分期汇总 | `{"duration_min":420,"deep_min":80,"light_min":210,"rem_min":100,"awake_min":30,"score":78}` |
+| `hrv` | 夜间 HRV（RMSSD） | `{"rmssd":45.2,"weekly_avg":43.0,"status":"BALANCED"}` |
+| `body_battery` | 身体电量（5分钟间隔） | `{"level":72,"charged":5,"drained":2}` |
+| `stress` | 压力指数（3分钟间隔） | `"28"` |
+| `steps` | 每日步数汇总 | `{"count":8500,"distance_m":6200,"calories":320}` |
+| `calories` | 活动卡路里 | `"320"` |
+| `blood_oxygen` | 血氧（SpO2，小时均值） | `"97"` |
+| `activity` | 运动记录 | `{"activity_type":"running","duration_sec":3600,"distance_m":10000,"avg_hr":152}` |
+
+### 注意事项
+
+- Garmin 账号若开启双重验证（2FA），首次登录需要在终端手动输入验证码；配置 `tokenstore` 后后续无需重复验证。
+- Garmin Connect 服务器有速率限制，建议同步频率不超过每小时一次。
+- 佳明「身体电量」（Body Battery）是 Garmin 专有指标，存储为 `body_battery` 类型，可与饮食数据联合分析恢复趋势。
+- 高驰（COROS）、Polar、Suunto 暂无官方 API，可通过 Strava 同步后使用 Strava provider（待实现）间接接入活动记录。
 
 ## 核心工作流
 
