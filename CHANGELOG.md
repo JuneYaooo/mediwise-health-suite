@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mobile app companion
 - Export to standard medical formats (HL7, FHIR)
 
+## [1.0.15] - 2026-03-28
+
+### Added
+- **Garmin Connect provider** (`wearable-sync`): full implementation via `python-garminconnect`
+  - 支持指标：全天心率、睡眠分期、夜间 HRV（RMSSD）、身体电量（Body Battery）、压力指数、步数、卡路里、血氧（SpO2）、活动记录
+  - 认证错误分类处理：账号密码错误、两步验证、API 变更需升级库、限流等场景均有中文提示
+  - Agent 对话引导规则：用户说"帮我绑定佳明"时，自动引导收集邮箱/密码/设备名称
+  - `device.py` 新增 `--username`/`--password`/`--tokenstore` 参数
+  - `list` 命令对 password 字段脱敏显示
+- `normalize.py` 新增 `hrv`、`body_battery`、`stress`、`activity` 指标直通处理
+- `requirements.txt` 注明 `garminconnect` 依赖
+
+### Changed
+- `wearable-sync/SKILL.md` 更新 description，修正 Garmin 绑定命令示例，补充 Agent 对话引导规则
+- `wearable-sync/index.js` `device-auth` action 新增透传 Garmin 账号参数
+
+
 ## [0.3.0] - 2026-03-15
 
 ### Added
