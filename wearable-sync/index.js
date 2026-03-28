@@ -81,7 +81,11 @@ export async function execute(inputs, context) {
   const { script, args } = route(inputs);
   const scriptPath = resolve(SCRIPTS_DIR, script);
 
-  if (inputs.owner_id) args.push('--owner-id', inputs.owner_id);
+  if (inputs.owner_id) {
+    args.push('--owner-id', inputs.owner_id);
+  } else {
+    log('[wearable-sync] WARNING: owner_id not provided; operating in single-user mode (all local data accessible)');
+  }
 
   log(`[wearable-sync] script=${script} args=${args.join(' ')}`);
 

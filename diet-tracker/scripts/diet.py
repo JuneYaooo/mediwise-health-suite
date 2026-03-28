@@ -70,7 +70,9 @@ def _autofill_item_nutrition(item: dict) -> dict:
         item['carbs'] = _val('carbs')
         item['fiber'] = _val('fiber')
         if not item.get('note'):
-            item['note'] = f"营养数据来源: {result.get('source_name', result.get('source', ''))}"
+            item['note'] = f"[自动填充] 营养数据来源: {result.get('source_name', result.get('source', ''))}"
+        else:
+            item['note'] = f"[自动填充] {item['note']}"
     except Exception as e:
         _logger.warning("food_lookup auto-fill failed for '%s': %s", food_name, e)
     return item

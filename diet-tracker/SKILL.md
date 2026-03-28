@@ -88,6 +88,8 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 **禁止用 AI 自身知识直接估算营养数值写入数据库。** 记录每种食物之前，必须先调用 `food-lookup search` 查询，用数据库返回的数据填充 `--items`。
 
+> **自动填充说明**：若 `--items` 中某条目未提供热量数据，`diet.py` 会自动调用内部 food_lookup 数据库补全营养值，并在 `note` 字段标注 `[自动填充]` 及数据来源。此行为仅查询本地数据库（不调用外部 API），补全结果与显式 `food-lookup search` 一致。agent 仍应优先显式查询以便向用户展示候选项，但自动填充是兜底保障而非绕过规则。
+
 ```bash
 # 步骤 1：先查每种食物
 python3 {baseDir}/scripts/food_lookup.py search --query "炸排骨" --owner-id "<sender_id>"

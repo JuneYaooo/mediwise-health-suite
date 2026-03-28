@@ -182,6 +182,8 @@ export async function execute(inputs, context) {
     const ownerId = inputs.owner_id;
     if (ownerId) {
       args.push('--owner-id', ownerId);
+    } else {
+      log('[weight-manager] WARNING: owner_id not provided; operating in single-user mode (all local data accessible)');
     }
 
     log(`[weight-manager] script=${script} args=${args.join(' ')}`);
