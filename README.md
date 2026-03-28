@@ -69,7 +69,7 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
                      └──────────────────────┘   └──────────────────────┘
 
 外部集成（可选）：
-  - Wearable Provider: gadgetbridge / huawei / zepp / apple_health / openwearables
+  - Wearable Provider: gadgetbridge / apple_health / garmin / huawei / zepp / openwearables
   - 视觉识别模型：图片/PDF 走外部模型（通过 setup 配置）
   - Backend API 模式（可切换）
 ```
@@ -142,9 +142,11 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 - 趋势分析与异常检测
 - 用药提醒、复查提醒
 
-#### ⌚ 可穿戴设备同步（待完善）
-- 小米手环、华为手表等数据同步
-- 运动数据导入
+#### ⌚ 可穿戴设备同步
+- ✅ **佳明（Garmin）**：Garmin Connect 账号直连，支持心率、睡眠分期、HRV、身体电量（Body Battery）、压力、步数、血氧、活动记录
+- ✅ **Apple Watch / iPhone**：Health App 导出 export.xml/zip，支持心率、步数、血氧、睡眠、体重、血糖、血压等
+- ✅ **小米手环 / Amazfit**：Gadgetbridge 本地 SQLite 导出，支持心率、步数、血氧、睡眠
+- 🔜 华为手表、高驰（COROS）等（开发中）
 
 ---
 
@@ -214,6 +216,17 @@ clawdhub install mediwise-health-suite
 助手：好的，我先为您生成一份就医前摘要...
 ```
 
+### 绑定佳明手表
+```
+用户："帮我绑定佳明手表"
+助手：好的，请问您的手表型号是？（如 Fenix 7、Forerunner 965 等）
+用户："Fenix 7"
+助手：需要您的 Garmin Connect 登录邮箱和密码，凭据仅保存在本地...
+用户："邮箱 xxx@gmail.com 密码 xxx"
+助手：正在连接 Garmin Connect，验证成功！正在同步近 7 天数据...
+       已同步：心率 1240 条、睡眠 7 条、身体电量 2016 条、HRV 7 条
+```
+
 ---
 
 ## 👪 家庭共用场景
@@ -262,7 +275,7 @@ clawdhub install mediwise-health-suite
 | 饮食追踪 | ✅ 已实现 | 饮食记录、营养分析、热量计算 |
 | 体重管理 | ✅ 已实现 | 体重记录、BMI/BMR/TDEE 计算、趋势分析 |
 | 健康监测 | ⚠ 待完善 | 智能告警、趋势分析 |
-| 可穿戴设备 | ⚠ 待完善 | 小米手环、华为手表数据同步 |
+| 可穿戴设备 | ✅ 已实现 | 佳明/Apple Watch/Gadgetbridge 数据同步；HRV、身体电量、睡眠分期 |
 
 ---
 
