@@ -52,6 +52,7 @@ MEDICAL_TABLES = {
     "attachment_links",
     "health_notes",
     "medication_logs",
+    "daily_health_snapshots",
     "chronic_disease_profiles",
 }
 
@@ -587,6 +588,28 @@ CREATE TABLE IF NOT EXISTS health_notes (
 );
 CREATE INDEX IF NOT EXISTS idx_health_notes_member ON health_notes(member_id, is_resolved);
 CREATE INDEX IF NOT EXISTS idx_health_notes_follow_up ON health_notes(follow_up_date, is_resolved);
+
+-- Daily health snapshots (每日健康状态记忆)
+
+CREATE TABLE IF NOT EXISTS daily_health_snapshots (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    owner_id TEXT,
+    snapshot_date TEXT NOT NULL,
+    risk_level TEXT,
+    summary_text TEXT,
+    briefing_json TEXT,
+    metrics_summary TEXT,
+    alerts_count INTEGER DEFAULT 0,
+    warnings_count INTEGER DEFAULT 0,
+    reminders_count INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_snapshots_member ON daily_health_snapshots(member_id, snapshot_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_snapshots_date ON daily_health_snapshots(snapshot_date DESC);
 
 -- Medication intake logs (voluntary check-in)
 
