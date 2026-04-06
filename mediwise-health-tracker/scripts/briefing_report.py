@@ -420,6 +420,15 @@ def generate_report(member_id: str = None, owner_id: str = None) -> dict:
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
 
+    # 7. Persist daily health snapshot for each member (memory)
+    try:
+        import daily_snapshot
+        for m in members:
+            daily_snapshot.save_snapshot(m["id"], owner_id, briefing)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("daily_snapshot save failed: %s", e)
+
     file_size = os.path.getsize(report_path)
     return {
         "status": "ok",
