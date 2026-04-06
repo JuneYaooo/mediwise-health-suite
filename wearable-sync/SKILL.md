@@ -36,12 +36,16 @@ pip install garminconnect
 # 1. 添加 Garmin 设备
 python3 {baseDir}/scripts/device.py add --member-id <id> --provider garmin --device-name "Garmin Fenix 7"
 
-# 2. 配置账号（用实际参数，不是 JSON 字符串）
+# 2. 配置账号（--prompt-password 交互输入，密码不经过模型）
 python3 {baseDir}/scripts/device.py auth --device-id <id> \
   --username you@example.com \
-  --password yourpass \
+  --prompt-password \
   --tokenstore /home/ubuntu/.garmin_tokens
-# --tokenstore 可选：保存登录 token，下次无需重新输入密码
+# 终端会提示"请输入密码"，输入时不回显，密码不出现在命令行/日志/模型上下文中
+
+# 也可通过环境变量传入（适合 CI/cron 无终端场景）
+# export GARMIN_PASSWORD='yourpass'
+# python3 device.py auth --device-id <id> --username you@example.com --tokenstore ...
 
 # 3. 测试连接
 python3 {baseDir}/scripts/device.py test --device-id <id>
@@ -50,29 +54,33 @@ python3 {baseDir}/scripts/device.py test --device-id <id>
 python3 {baseDir}/scripts/sync.py run --device-id <id>
 ```
 
+**Agent 引导规则（重要）：**
+
+- **禁止在聊天中索要密码**：密码一旦在对话框输入，就会出现在模型上下文和服务端日志中
+- 正确做法：先收集邮箱和 tokenstore 路径，然后生成一条 `device.py auth ... --prompt-password` 命令，让用户在自己的终端运行（可用 `! <命令>` 直接在会话执行），密码由终端 `getpass` 读取，全程不经过模型
+
+**Agent 引导步骤（agent 对话中按序询问）：**
+
+1. **确认设备名称**：请问你的佳明手表型号是？（如 Fenix 7、Forerunner 965，填写任意名称即可）
+2. **收集邮箱**：你的 Garmin Connect 登录邮箱是？
+3. **是否保存登录状态**：是否保存登录 token？（推荐，设置后登录一次即可，后续同步无需密码）
+   - 是 → 询问 tokenstore 目录（可用默认值 `~/.garmin_tokens`）
+4. **生成命令让用户自行输入密码**（不在聊天里问密码）：
+
+   ```
+   请在你的终端运行以下命令，运行后会提示输入密码（不回显，不经过我）：
+   ! python3 {baseDir}/scripts/device.py auth --device-id <id> --username <邮箱> --prompt-password --tokenstore ~/.garmin_tokens
+   ```
+
+5. 命令运行成功后，调用 `device-test` 验证连接，再调用 `sync-device` 拉取近 7 天数据
+   - 若返回错误含「升级库」提示，告知用户执行 `pip install --upgrade garminconnect`
+   - 若返回错误含「两步验证」提示，告知用户需要在终端完成一次性验证后重试
+
 ### Agent 引导用户配置佳明的对话规则
 
 当用户表达以下意图时，agent 应主动引导完成绑定流程：
 - "我用佳明"、"我有 Garmin 手表"、"帮我绑定佳明"
 - "我想同步佳明数据"、"我的 Fenix / Forerunner / Venu / Vivoactive"
-
-**引导步骤（agent 对话中按序询问）：**
-
-1. **确认设备名称**：请问你的佳明手表型号是？（如 Fenix 7、Forerunner 965，填写任意名称即可）
-2. **收集账号信息**：需要你的 Garmin Connect 登录邮箱和密码（凭据仅保存在本地）
-3. **询问是否保存登录状态**：是否保存登录状态？保存后下次同步无需重新输入密码（推荐）
-
-**安全提示（必须在收集密码前告知用户）**：
-
-> 你的 Garmin Connect 密码将以明文存储在本地数据库中。如果担心安全风险，可以为本系统单独创建一个 Garmin 子账号，或改用 Apple Health 导出方式。
-
-**收集完信息后依次调用**：
-
-1. `device-add`（provider: garmin，device_name: 用户填写的型号）
-2. `device-auth`（username, password, tokenstore 可选）
-   - 若返回错误含「升级库」提示，告知用户联系管理员执行 `pip install --upgrade garminconnect`
-   - 若返回错误含「两步验证」提示，告知用户需要在服务器终端完成一次性验证
-3. 认证成功后自动调用 `sync-device` 拉取近 7 天数据
 
 **同步频率建议**：每小时最多同步一次，可通过 cron 自动定时同步。
 
@@ -141,11 +149,26 @@ python3 {baseDir}/scripts/sync.py history --device-id <id> --limit 10
 
 ### 3. 定时同步
 
-Skill 本身不运行后台进程。可通过 cron 定时调用：
+Skill 本身不运行后台进程。由 OpenClaw agent 每日定时触发，或用户手动请求时触发。
+
+**OpenClaw 定时触发规范（agent 按此执行）：**
+
+每日早晨 7:30 前，agent 应自动触发一次全量同步，流程如下：
+
+1. 调用 `sync-all` 同步所有活跃设备
+2. 若返回 `synced > 0`，继续触发 health-monitor 检测（见 health-monitor/SKILL.md）
+3. 若有告警，合并进当日健康简报推送（见 mediwise-health-tracker/SKILL.md 的「每日简报推送规范」）
+4. 若同步失败（认证错误/网络错误），**不静默忽略**，主动通知用户：
+   > "今日佳明手表数据同步失败：{错误原因}，请检查网络或重新绑定设备。"
+
+**用户手动请求时触发规范：**
+
+当用户说"同步一下手表"、"更新健康数据"、"刷新佳明数据"等时，立即执行 `sync-device` 或 `sync-all`，同步完成后告知结果。
 
 ```bash
-# crontab 示例：每30分钟同步一次
-*/30 * * * * cd /path/to/wearable-sync/scripts && python3 sync.py run-all
+# 备用：cron 直接调用（不依赖 agent，适合服务器独立部署）
+# 每小时整点同步一次
+0 * * * * cd /path/to/wearable-sync/scripts && python3 sync.py run-all >> ~/mediwise-sync.log 2>&1
 ```
 
 ## 数据标准化
