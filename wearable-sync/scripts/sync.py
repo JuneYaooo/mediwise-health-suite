@@ -104,6 +104,7 @@ def sync_device(device_id, owner_id=None):
         config = {}
 
     # Authenticate
+    config_before = json.dumps(config, ensure_ascii=False, sort_keys=True)
     try:
         if not provider.authenticate(config):
             return {"status": "error", "message": "设备认证失败，请检查配置"}
@@ -111,6 +112,18 @@ def sync_device(device_id, owner_id=None):
         return {"status": "error", "message": str(e)}
     except RuntimeError as e:
         return {"status": "error", "message": str(e)}
+
+    # If authenticate() scrubbed sensitive fields (e.g. Garmin password after
+    # tokenstore login), persist the cleaned config back to the database now.
+    config_after = json.dumps(config, ensure_ascii=False, sort_keys=True)
+    if config_after != config_before:
+        with health_db.transaction(domain="lifestyle") as conn:
+            conn.execute(
+                "UPDATE wearable_devices SET config=?, updated_at=? WHERE id=?",
+                (json.dumps(config, ensure_ascii=False), health_db.now_iso(), device_id),
+            )
+            conn.commit()
+        logger.info("Garmin: sensitive fields removed from stored config for device %s", device_id)
 
     # Create sync log entry
     sync_id = health_db.generate_id()

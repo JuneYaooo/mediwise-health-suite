@@ -63,7 +63,7 @@ def normalize_metrics(raw_metrics: list[RawMetric], provider: str) -> list[dict]
                 "source": provider,
             })
 
-    # Garmin-specific: direct pass-through time-series and summary types
+    # Direct pass-through: time-series and summary types (Garmin, Huawei, Zepp, etc.)
     for metric_type in ("stress", "body_battery", "hrv", "activity"):
         for rm in by_type.get(metric_type, []):
             normalized.append({

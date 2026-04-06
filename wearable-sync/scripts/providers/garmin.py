@@ -89,16 +89,39 @@ class GarminProvider(BaseProvider):
     # ------------------------------------------------------------------
 
     def authenticate(self, config: dict) -> bool:
-        """Login to Garmin Connect with username/password.
+        """Login to Garmin Connect with username/password (or cached token).
 
-        On success, stores the session in tokenstore path (if configured)
-        so subsequent runs skip re-login.
+        Flow:
+        1. If tokenstore exists and contains valid tokens → load them directly,
+           no password needed. Password is removed from config after first
+           successful tokenstore login so it is never persisted further.
+        2. Otherwise fall back to username/password login, then persist the
+           session tokens to tokenstore (if configured) and wipe the password
+           from config so subsequent runs use the token only.
         """
         gc = _require_garminconnect()
 
-        username = config.get("username", "")
-        password = config.get("password", "")
+        username   = config.get("username", "")
+        password   = config.get("password", "")
         tokenstore = config.get("tokenstore", None)
+
+        # Fast path: try token-only login when tokenstore exists and has files.
+        # Pass username (not password) so display_name resolves correctly;
+        # garth.load() + refresh_oauth2() never use the password field.
+        if tokenstore and os.path.isdir(tokenstore) and os.listdir(tokenstore):
+            try:
+                client = gc.Garmin(username, "")
+                client.login(tokenstore)
+                self._client   = client
+                self._username = username
+                logger.info("Garmin: loaded session from tokenstore (no password used)")
+                # Password is no longer needed — remove it from the live config
+                # dict so auth_device will persist the scrubbed version to DB.
+                config.pop("password", None)
+                return True
+            except Exception:
+                # Token expired or invalid — fall through to password login.
+                logger.info("Garmin: tokenstore login failed, retrying with password")
 
         if not username or not password:
             logger.error("Garmin: missing username or password in config")
@@ -108,13 +131,19 @@ class GarminProvider(BaseProvider):
             client = gc.Garmin(username, password)
             if tokenstore:
                 os.makedirs(tokenstore, exist_ok=True)
-            # login(tokenstore) loads saved tokens if dir exists, else does
-            # fresh username/password login and saves tokens to tokenstore.
+                os.chmod(tokenstore, 0o700)  # owner-only: rwx------
+            # login(tokenstore) saves tokens to disk after fresh login.
             client.login(tokenstore)
 
-            self._client = client
+            self._client   = client
             self._username = username
             logger.info("Garmin: authenticated as %s", username)
+
+            # Tokens are now persisted to tokenstore — wipe password from config.
+            if tokenstore:
+                config.pop("password", None)
+                logger.info("Garmin: password removed from config (token saved to %s)", tokenstore)
+
             return True
 
         except gc.GarminConnectAuthenticationError as e:

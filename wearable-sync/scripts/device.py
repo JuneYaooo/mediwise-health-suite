@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import argparse
+import getpass
 
 # Unified path setup
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
@@ -25,13 +26,16 @@ from providers.apple_health import AppleHealthProvider
 from providers.garmin import GarminProvider
 
 PROVIDERS = {
-    "gadgetbridge": GadgetbridgeProvider,
-    "huawei": HuaweiProvider,
-    "zepp": ZeppProvider,
-    "openwearables": OpenWearablesProvider,
-    "apple_health": AppleHealthProvider,
-    "garmin": GarminProvider,
+    "gadgetbridge":  GadgetbridgeProvider,
+    "huawei":        HuaweiProvider,
+    "zepp":          ZeppProvider,
+    "openwearables":  OpenWearablesProvider,
+    "apple_health":  AppleHealthProvider,
+    "garmin":        GarminProvider,
 }
+
+# Providers that use a local export file (--export-path) for authentication
+_FILE_EXPORT_PROVIDERS = {"gadgetbridge", "apple_health"}
 
 
 def _get_provider(name):
@@ -162,11 +166,16 @@ def auth_device(args):
 
     provider_name = device["provider"]
 
-    if provider_name == "gadgetbridge":
+    if provider_name in _FILE_EXPORT_PROVIDERS:
         if not args.export_path:
+            _file_hints = {
+                "gadgetbridge": "Gadgetbridge SQLite 导出文件路径（Gadgetbridge.db）",
+                "apple_health": "Apple 健康导出文件路径（export.xml 或 export.zip）",
+            }
+            hint = _file_hints.get(provider_name, "导出文件路径")
             health_db.output_json({
                 "status": "error",
-                "message": "Gadgetbridge 设备需要指定 --export-path 参数"
+                "message": f"此 Provider 需要指定 --export-path 参数：{hint}"
             })
             return
         export_path = os.path.abspath(args.export_path)
@@ -177,30 +186,69 @@ def auth_device(args):
             })
             return
         existing_config["export_path"] = export_path
-    elif provider_name == "apple_health":
-        if not args.export_path:
-            health_db.output_json({
-                "status": "error",
-                "message": "Apple Health 需指定 --export-path (.xml 或 .zip)"
-            })
-            return
-        existing_config["export_path"] = os.path.abspath(args.export_path)
     elif provider_name == "garmin":
-        if not args.username or not args.password:
+        # Resolve password: --prompt-password > env var > --password (plaintext, discouraged)
+        password = args.password
+        if getattr(args, "prompt_password", False):
+            if not sys.stdin.isatty():
+                health_db.output_json({
+                    "status": "error",
+                    "message": "无法使用 --prompt-password：当前环境没有终端（non-TTY）。\n"
+                               "请改用环境变量：export GARMIN_PASSWORD='你的密码'",
+                })
+                return
+            password = getpass.getpass("请输入 Garmin Connect 密码（输入不回显）：")
+        elif not password:
+            password = os.environ.get("GARMIN_PASSWORD", "")
+
+        if not args.username or not password:
             health_db.output_json({
                 "status": "error",
                 "message": (
                     "佳明（Garmin）设备需要提供 Garmin Connect 账号信息：\n"
-                    "  --username  你的 Garmin Connect 登录邮箱\n"
-                    "  --password  你的 Garmin Connect 密码\n"
-                    "  --tokenstore（可选）存放登录令牌的目录路径，配置后下次无需重新输入密码"
+                    "  --username       你的 Garmin Connect 登录邮箱\n"
+                    "  --prompt-password  交互式输入密码（推荐，密码不经过模型）\n"
+                    "  或设置环境变量：   export GARMIN_PASSWORD='你的密码'\n"
+                    "  --tokenstore     存放登录令牌的目录路径（可选，配置后登录一次即可）"
                 )
             })
             return
         existing_config["username"] = args.username
-        existing_config["password"] = args.password
+        existing_config["password"] = password
         if args.tokenstore:
             existing_config["tokenstore"] = args.tokenstore
+    elif provider_name == "zepp":
+        # Resolve password: --prompt-password > env var > --password (plaintext, discouraged)
+        password = args.password
+        if getattr(args, "prompt_password", False):
+            if not sys.stdin.isatty():
+                health_db.output_json({
+                    "status": "error",
+                    "message": "无法使用 --prompt-password：当前环境没有终端（non-TTY）。\n"
+                               "请改用环境变量：export ZEPP_PASSWORD='你的密码'",
+                })
+                return
+            password = getpass.getpass("请输入 Zepp / 小米账号密码（输入不回显）：")
+        elif not password:
+            password = os.environ.get("ZEPP_PASSWORD", "")
+
+        if not args.username or not password:
+            health_db.output_json({
+                "status": "error",
+                "message": (
+                    "Zepp / 小米设备需要提供账号信息：\n"
+                    "  --username       小米运动健康 / Zepp Life 登录邮箱\n"
+                    "  --prompt-password  交互式输入密码（推荐，密码不经过模型）\n"
+                    "  或设置环境变量：   export ZEPP_PASSWORD='你的密码'\n"
+                    "登录成功后 token 会自动缓存，下次同步无需重新输入密码"
+                )
+            })
+            return
+        existing_config["username"] = args.username
+        existing_config["password"] = password
+        # Clear cached token to force fresh login with new credentials
+        existing_config.pop("app_token", None)
+        existing_config.pop("user_id", None)
     else:
         # OAuth-based providers
         if args.client_id:
@@ -228,7 +276,7 @@ def auth_device(args):
         })
         return
 
-    # Save config
+    # Save config (provider.authenticate() may have written back new tokens, e.g. Zepp app_token)
     with health_db.transaction(domain="lifestyle") as conn:
         conn.execute(
             "UPDATE wearable_devices SET config=?, updated_at=? WHERE id=?",
@@ -325,8 +373,10 @@ def main():
     p_auth = sub.add_parser("auth", help="配置设备认证")
     p_auth.add_argument("--device-id", required=True)
     p_auth.add_argument("--export-path", default=None, help="Gadgetbridge/Apple Health 导出文件路径")
-    p_auth.add_argument("--username", default=None, help="Garmin Connect 登录邮箱")
-    p_auth.add_argument("--password", default=None, help="Garmin Connect 密码")
+    p_auth.add_argument("--username", default=None, help="Garmin/Zepp Connect 登录邮箱")
+    p_auth.add_argument("--password", default=None, help="密码（明文，不推荐；建议用 --prompt-password）")
+    p_auth.add_argument("--prompt-password", action="store_true",
+                        help="交互式输入密码（不回显，不经过模型/日志，推荐）")
     p_auth.add_argument("--tokenstore", default=None, help="Garmin token 缓存目录（可选，避免重复登录）")
     p_auth.add_argument("--client-id", default=None, help="OAuth Client ID")
     p_auth.add_argument("--client-secret", default=None, help="OAuth Client Secret")
