@@ -170,9 +170,9 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 python3 {baseDir}/scripts/setup.py check
 ```
 
-若输出中 `vision_configured` 为 `false`，**不要把命令行细节暴露给用户**，而是用自然语言引导他们完成对话式配置：
+若输出中 `vision_configured` 为 `false`，**不要在聊天中索要 API Key**，而是引导用户在终端完成配置：
 
-### 对话式配置流程
+### 配置流程
 
 **第一步：询问地区/偏好**
 
@@ -180,24 +180,29 @@ python3 {baseDir}/scripts/setup.py check
 >
 > 你用的是国内网络还是海外网络？或者想完全在本地离线运行？
 
-根据回答推荐方案：
+根据回答推荐方案，并给出对应的注册链接：
 - 国内 → **硅基流动**（免费注册有额度，在 https://cloud.siliconflow.cn 获取 API Key）
 - 海外 → **Google Gemini**（免费，在 https://aistudio.google.com/apikey 获取）
 - 离线 → **本地 Ollama**（需提前安装 Ollama 并下载模型）
 
-**第二步：收集 API Key**
+**第二步：引导在终端配置（不在聊天中收集密钥）**
 
-> 好的，推荐你用 [方案名]。去 [链接] 注册后复制 API Key，直接发给我就行。
+告知用户在终端执行以下命令（`sk-xxx` 替换为实际 Key）：
 
-用户回复 API Key 后，**在后台静默执行**（不要把命令贴给用户看）：
+```
+# 示例：硅基流动
+python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --api-key sk-xxx
 
-```bash
-python3 {baseDir}/scripts/setup.py set-vision --provider <preset> --api-key <用户提供的key>
+# 示例：Google Gemini
+python3 {baseDir}/scripts/setup.py set-vision --provider gemini --api-key AIza-xxx
+
+# 示例：本地 Ollama
+python3 {baseDir}/scripts/setup.py set-vision --provider ollama
 ```
 
-`--model` 和 `--base-url` 对内置预设（siliconflow / gemini / openai / stepfun / ollama）均可省略，自动填入。
+> ⚠️ **API Key 请在终端输入，不要通过聊天发送。** 在终端执行完成后告诉我一声，我来帮你验证是否配置成功。
 
-**第三步：验证并告知结果**
+**第三步：用户告知完成后，验证配置**
 
 ```bash
 python3 {baseDir}/scripts/setup.py test-vision
@@ -208,8 +213,8 @@ python3 {baseDir}/scripts/setup.py test-vision
 
 ### 原则
 
-- **用户侧零命令**：整个过程用户只需回答问题、粘贴 API Key，不需要接触任何命令行。
-- **后台静默执行**：所有 `setup.py` 调用在后台完成，不要把命令或 JSON 输出贴给用户。
+- **不在聊天中收集凭据**：API Key 属于敏感信息，必须由用户在本机终端直接输入，不得经过对话传递。
+- **后台静默执行**：`setup.py test-vision` 等验证命令在后台完成，不要把 JSON 输出贴给用户。
 - **配置失败友好提示**：失败时给出具体原因和可操作的修复建议，不要直接贴报错。
 
 ## 不可跳过的规则

@@ -1,7 +1,7 @@
 ---
 name: mediwise-health-suite
 description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 2.0.3
+version: 2.0.4
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
@@ -208,20 +208,23 @@ python3 scripts/setup.py set-vision \
 
 ### 第三方凭据处理
 
-- **Garmin Connect 密码**：首次绑定必须通过终端交互输入（`--prompt-password`，不回显），密码**绝不经过模型对话或日志**。认证成功后自动保存 OAuth token，后续同步无需密码。
-- **视觉/LLM API Key**：通过 `setup.py set-vision` 保存到本机 `config.json`，不会出现在聊天记录中。
+- **凭据绝不经过聊天传递**：所有 API Key、密码等敏感信息必须由用户在本机终端直接输入，agent 不会在对话中索要、接收或代为保存凭据。
+- **Garmin Connect 密码**：首次绑定通过终端交互输入（`--prompt-password`，不回显），密码不经过模型或日志。认证成功后自动保存 OAuth token，后续同步无需密码。
+- **视觉/LLM API Key**：用户在终端执行 `setup.py set-vision --api-key <key>` 完成配置，key 保存在本机 `config.json`，不会出现在聊天记录中。
 - **所有凭据**均保存在本机，不上传到任何远程服务器。
 
 ### 可选外部访问（默认关闭）
 
-默认完全离线，以下网络请求**仅在用户主动配置后**才会发生：
+默认完全离线，以下网络请求**仅在用户主动在终端执行配置命令后**才会发生：
 
-| 触发操作 | 外部主机 | 发送内容 |
-|----------|----------|----------|
+| 触发操作（需用户在终端执行） | 外部主机 | 发送内容 |
+|------------------------------|----------|----------|
 | `setup.py set-vision` 启用视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 图片 base64 + 提示词（不含姓名/身份证等 PII） |
 | `USDA_API_KEY` 环境变量 | `api.nal.usda.gov` | 食物名称搜索词 |
 | `setup.py set-embedding` 启用向量搜索 | `api.siliconflow.cn` | 匿名文本片段 |
-| `setup.py set-backend` 启用后端 API | 用户自配置的端点 | **完整健康记录**，仅适用于自托管可信端点 |
+| `setup.py set-backend` 启用后端 API | 用户自配置的端点 | **完整健康记录** — 仅在自托管可信端点使用，不建议指向第三方服务 |
+
+> **set-backend 风险说明**：启用后端 API 后，所有健康记录（病历、指标、用药等）将发送至配置的端点。请仅在完全信任该端点的情况下启用，且优先使用本地或自托管服务。
 
 ### 备份文件
 
