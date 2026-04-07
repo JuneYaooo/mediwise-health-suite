@@ -1,7 +1,7 @@
 ---
 name: mediwise-health-suite
 description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 2.0.7
+version: 2.0.8
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
