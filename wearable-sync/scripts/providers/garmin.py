@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -228,7 +229,9 @@ class GarminProvider(BaseProvider):
         dates = _date_range(start_time, end_time)
         metrics: list[RawMetric] = []
 
-        for date in dates:
+        for i, date in enumerate(dates):
+            if i > 0:
+                time.sleep(1)  # 天与天之间额外间隔 1s
             metrics.extend(self._fetch_day(date))
 
         logger.info("Garmin: fetched %d metrics across %d days", len(metrics), len(dates))
@@ -261,9 +264,13 @@ class GarminProvider(BaseProvider):
         for fetcher in fetchers:
             try:
                 metrics.extend(fetcher(date))
+                time.sleep(0.5)  # 每次请求间隔 0.5s，避免触发 Garmin 限流
             except gc.GarminConnectTooManyRequestsError:
-                logger.warning("Garmin: rate limited on %s/%s, stopping further requests for this day",
-                               fetcher.__name__, date)
+                logger.warning(
+                    "Garmin: rate limited on %s/%s, backing off 60s then stopping for this day",
+                    fetcher.__name__, date,
+                )
+                time.sleep(60)  # 429 后退避 60s，再跳过当天剩余
                 break  # stop fetching more endpoints for today
             except Exception as e:
                 logger.warning("Garmin: %s failed for %s: %s", fetcher.__name__, date, e)
