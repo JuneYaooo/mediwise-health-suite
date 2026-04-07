@@ -98,6 +98,11 @@ python3 {baseDir}/scripts/sync.py run --device-id <id>
 | `blood_oxygen` | 血氧（SpO2，小时均值） | `"97"` |
 | `weight` | 体重（kg，来自 Garmin Connect 体重记录） | `"72.5"`，extra 含 `bmi`/`bodyFat`/`muscleMass` 等（设备支持时） |
 | `activity` | 运动记录 | `{"activity_type":"running","duration_sec":3600,"distance_m":10000,"avg_hr":152}` |
+| `respiration` | 呼吸频率（次/分钟，睡眠期间采样，设备支持时） | `"14.5"` |
+| `training_readiness` | 训练准备度评分（0-100，综合睡眠/HRV/负荷等子项） | `{"score":72,"level":"GOOD","sleep_score":80,"hrv_status":"BALANCED"}` |
+| `training_status` | 训练状态（VO2 Max、有氧/无氧负荷，需设备支持） | `{"vo2_max":48.2,"status":"PRODUCTIVE","aerobic_load":1.2}` |
+| `floors` | 爬楼层数（每日累计） | `{"ascended":12,"descended":10}` |
+| `hydration` | 水分摄入（ml，需在 Garmin Connect App 手动记录） | `{"intake_ml":1800.0,"sweat_loss_ml":650.0}` |
 
 ### 注意事项
 

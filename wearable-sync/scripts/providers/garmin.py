@@ -9,16 +9,21 @@ Configuration keys (stored in wearable_devices.config as JSON):
 - tokenstore:  (optional) path to persist session tokens between runs
 
 Supported metrics:
-- heart_rate        全天每5分钟心率
-- sleep             睡眠分期（深睡/浅睡/REM/清醒）
-- hrv               夜间HRV（RMSSD，毫秒）
-- body_battery      身体电量（0-100，每5分钟）
-- stress            压力指数（0-100）
-- steps             每日步数
-- calories          活动卡路里
-- blood_oxygen      血氧（SpO2）
-- weight            体重（kg，来自 Garmin Connect 体重记录）
-- activity          活动记录（跑步/骑行/游泳等）
+- heart_rate          全天每5分钟心率
+- sleep               睡眠分期（深睡/浅睡/REM/清醒）
+- hrv                 夜间HRV（RMSSD，毫秒）
+- body_battery        身体电量（0-100，每5分钟）
+- stress              压力指数（0-100）
+- steps               每日步数
+- calories            活动卡路里
+- blood_oxygen        血氧（SpO2）
+- weight              体重（kg，含BMI/体脂率等扩展字段）
+- respiration         呼吸频率（次/分钟，夜间睡眠期间）
+- training_readiness  训练准备度评分（0-100）
+- training_status     训练状态（VO2 Max、训练负荷等）
+- floors              爬楼层数（每日汇总）
+- hydration           水分摄入（ml，来自 Garmin Connect 记录）
+- activity            活动记录（跑步/骑行/游泳等）
 """
 
 from __future__ import annotations
@@ -196,8 +201,10 @@ class GarminProvider(BaseProvider):
 
     def get_supported_metrics(self) -> list[str]:
         return [
-            "heart_rate", "sleep", "hrv", "body_battery",
-            "stress", "steps", "calories", "blood_oxygen", "weight", "activity",
+            "heart_rate", "sleep", "hrv", "body_battery", "stress",
+            "steps", "calories", "blood_oxygen", "weight",
+            "respiration", "training_readiness", "training_status",
+            "floors", "hydration", "activity",
         ]
 
     def fetch_metrics(
@@ -244,6 +251,11 @@ class GarminProvider(BaseProvider):
             self._fetch_stats,
             self._fetch_blood_oxygen,
             self._fetch_weight,
+            self._fetch_respiration,
+            self._fetch_training_readiness,
+            self._fetch_training_status,
+            self._fetch_floors,
+            self._fetch_hydration,
             self._fetch_activities,
         ]
         for fetcher in fetchers:
@@ -472,6 +484,171 @@ class GarminProvider(BaseProvider):
                 extra=extra if extra else None,
             ))
         return metrics
+
+    def _fetch_respiration(self, date: str) -> list[RawMetric]:
+        """Fetch overnight respiration rate (breaths/min).
+
+        get_respiration_data(cdate) returns a dict with 'respirationValues',
+        a list of [timestamp_ms, breaths_per_min]. Only available on devices
+        with respiration tracking (Fenix 6+, Forerunner 945+, etc.).
+        Returns [] silently if the device doesn't support it.
+        """
+        try:
+            data = self._client.get_respiration_data(date)
+        except Exception:
+            return []
+
+        metrics = []
+        for entry in (data.get("respirationValues") or []):
+            if not entry or len(entry) < 2:
+                continue
+            ts_ms, bpm = entry[0], entry[1]
+            if bpm is None or bpm <= 0:
+                continue
+            iso = datetime.fromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d %H:%M:%S")
+            metrics.append(RawMetric(
+                metric_type="respiration",
+                value=str(round(float(bpm), 1)),
+                timestamp=iso,
+            ))
+        return metrics
+
+    def _fetch_training_readiness(self, date: str) -> list[RawMetric]:
+        """Fetch training readiness score (0-100) and contributing factors.
+
+        get_training_readiness(cdate) returns a dict with 'score', 'level'
+        ('EXCELLENT'/'GOOD'/'MODERATE'/'LOW'/'NO_DATA'), and sub-scores like
+        'sleepScore', 'recoveryTime', 'acuteLoad', 'hrv'. Newer devices only.
+        """
+        try:
+            data = self._client.get_training_readiness(date)
+        except Exception:
+            return []
+
+        score = data.get("score")
+        if score is None:
+            return []
+
+        val = {
+            "score":         int(score),
+            "level":         data.get("level"),
+            "sleep_score":   data.get("sleepScore"),
+            "recovery_time": data.get("recoveryTime"),
+            "hrv_status":    data.get("hrvStatus"),
+            "acute_load":    data.get("acuteLoad"),
+        }
+        # Remove None values to keep output clean
+        val = {k: v for k, v in val.items() if v is not None}
+
+        return [RawMetric(
+            metric_type="training_readiness",
+            value=json.dumps(val),
+            timestamp=f"{date} 06:00:00",
+            extra={"date": date},
+        )]
+
+    def _fetch_training_status(self, date: str) -> list[RawMetric]:
+        """Fetch training status: VO2 Max estimate and training load balance.
+
+        get_training_status(cdate) returns a dict with 'vo2MaxValue',
+        'fitnessAge', 'trainingLoadBalance' (aerobic/anaerobic split),
+        and 'trainingStatus' string. Most fields require newer Garmin devices.
+        """
+        try:
+            data = self._client.get_training_status(date)
+        except Exception:
+            return []
+
+        # Top-level or nested under 'latestTrainingStatus'
+        latest = data.get("latestTrainingStatus") or data
+        vo2 = latest.get("vo2MaxValue") or data.get("vo2MaxValue")
+        if vo2 is None:
+            return []
+
+        val = {
+            "vo2_max":        round(float(vo2), 1),
+            "fitness_age":    latest.get("fitnessAge") or data.get("fitnessAge"),
+            "status":         latest.get("trainingStatus") or data.get("trainingStatus"),
+        }
+        load = data.get("trainingLoadBalance") or {}
+        if load:
+            val["aerobic_load"]    = load.get("aerobicTrainingEffect")
+            val["anaerobic_load"]  = load.get("anaerobicTrainingEffect")
+        val = {k: v for k, v in val.items() if v is not None}
+
+        return [RawMetric(
+            metric_type="training_status",
+            value=json.dumps(val),
+            timestamp=f"{date} 06:00:00",
+            extra={"date": date},
+        )]
+
+    def _fetch_floors(self, date: str) -> list[RawMetric]:
+        """Fetch floors climbed for the day (daily summary).
+
+        get_floors(cdate) returns a list of dicts with 'floorsValueDescriptorDTOList'
+        and 'floorValuesArray'. Each entry in floorValuesArray: [ts_ms, ascended, descended].
+        We emit a single daily summary (last entry = end-of-day total).
+        """
+        try:
+            data = self._client.get_floors(date)
+        except Exception:
+            return []
+
+        entries = []
+        for day in (data or []):
+            for entry in (day.get("floorValuesArray") or []):
+                if entry and len(entry) >= 2:
+                    entries.append(entry)
+
+        if not entries:
+            return []
+
+        # Last entry represents end-of-day cumulative total
+        last = entries[-1]
+        ascended  = last[1] if len(last) > 1 else None
+        descended = last[2] if len(last) > 2 else None
+        if ascended is None:
+            return []
+
+        val = {"ascended": int(ascended)}
+        if descended is not None:
+            val["descended"] = int(descended)
+
+        return [RawMetric(
+            metric_type="floors",
+            value=json.dumps(val),
+            timestamp=f"{date} 23:59:00",
+            extra={"aggregated": True},
+        )]
+
+    def _fetch_hydration(self, date: str) -> list[RawMetric]:
+        """Fetch hydration intake logged in Garmin Connect (ml).
+
+        get_hydration_data(cdate) returns a dict with 'valueInML' (total for day)
+        and 'sweatLossInML' (estimated sweat loss). Only populated if the user
+        logs water intake in the Garmin Connect app.
+        """
+        try:
+            data = self._client.get_hydration_data(date)
+        except Exception:
+            return []
+
+        intake_ml = data.get("valueInML")
+        if not intake_ml:
+            return []
+
+        val = {"intake_ml": round(float(intake_ml), 1)}
+        sweat = data.get("sweatLossInML")
+        if sweat:
+            val["sweat_loss_ml"] = round(float(sweat), 1)
+
+        return [RawMetric(
+            metric_type="hydration",
+            value=json.dumps(val),
+            timestamp=f"{date} 23:59:00",
+            extra={"aggregated": True},
+        )]
 
     def _fetch_activities(self, date: str) -> list[RawMetric]:
         """Fetch activity records (runs, rides, swims, etc.) for the day."""
