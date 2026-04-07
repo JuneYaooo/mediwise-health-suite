@@ -96,6 +96,7 @@ python3 {baseDir}/scripts/sync.py run --device-id <id>
 | `steps` | 每日步数汇总 | `{"count":8500,"distance_m":6200,"calories":320}` |
 | `calories` | 活动卡路里 | `"320"` |
 | `blood_oxygen` | 血氧（SpO2，小时均值） | `"97"` |
+| `weight` | 体重（kg，来自 Garmin Connect 体重记录） | `"72.5"`，extra 含 `bmi`/`bodyFat`/`muscleMass` 等（设备支持时） |
 | `activity` | 运动记录 | `{"activity_type":"running","duration_sec":3600,"distance_m":10000,"avg_hr":152}` |
 
 ### 注意事项

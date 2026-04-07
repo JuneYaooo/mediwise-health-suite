@@ -17,6 +17,7 @@ Supported metrics:
 - steps             每日步数
 - calories          活动卡路里
 - blood_oxygen      血氧（SpO2）
+- weight            体重（kg，来自 Garmin Connect 体重记录）
 - activity          活动记录（跑步/骑行/游泳等）
 """
 
@@ -196,7 +197,7 @@ class GarminProvider(BaseProvider):
     def get_supported_metrics(self) -> list[str]:
         return [
             "heart_rate", "sleep", "hrv", "body_battery",
-            "stress", "steps", "calories", "blood_oxygen", "activity",
+            "stress", "steps", "calories", "blood_oxygen", "weight", "activity",
         ]
 
     def fetch_metrics(
@@ -242,6 +243,7 @@ class GarminProvider(BaseProvider):
             self._fetch_stress,
             self._fetch_stats,
             self._fetch_blood_oxygen,
+            self._fetch_weight,
             self._fetch_activities,
         ]
         for fetcher in fetchers:
@@ -432,6 +434,42 @@ class GarminProvider(BaseProvider):
                 metric_type="blood_oxygen",
                 value=str(spo2),
                 timestamp=iso,
+            ))
+        return metrics
+
+    def _fetch_weight(self, date: str) -> list[RawMetric]:
+        """Fetch weight entries logged in Garmin Connect for the day.
+
+        get_weight(cdate) returns a dict with 'dateWeightList', each entry has
+        'calendarDate', 'weight' (grams), 'bmi', 'bodyFat', 'bodyWater',
+        'boneMass', 'muscleMass', 'physiqueRating', 'visceralFat', 'metabolicAge'.
+        Not all devices support all fields; only weight (grams) is always present.
+        """
+        try:
+            data = self._client.get_weight(date)
+        except Exception:
+            return []
+
+        metrics = []
+        for entry in (data.get("dateWeightList") or []):
+            weight_g = entry.get("weight")
+            if weight_g is None:
+                continue
+            weight_kg = round(weight_g / 1000, 2)
+            calendar_date = entry.get("calendarDate", date)
+            iso = f"{calendar_date} 08:00:00"  # weight entries have no time component
+
+            extra = {}
+            for field in ("bmi", "bodyFat", "bodyWater", "boneMass", "muscleMass"):
+                v = entry.get(field)
+                if v is not None:
+                    extra[field] = v
+
+            metrics.append(RawMetric(
+                metric_type="weight",
+                value=str(weight_kg),
+                timestamp=iso,
+                extra=extra if extra else None,
             ))
         return metrics
 
