@@ -35,9 +35,10 @@ const ROUTES = {
   'device-auth': (inputs) => {
     const args = ['auth', '--device-id', inputs.params?.device_id ?? ''];
     if (inputs.params?.export_path) args.push('--export-path', inputs.params.export_path);
-    // Garmin Connect credentials
+    // Garmin Connect: username only; password is NEVER passed through the model.
+    // Use --prompt-password in the terminal for first-time login, or provide
+    // a pre-populated tokenstore path for token-only re-auth.
     if (inputs.params?.username) args.push('--username', inputs.params.username);
-    if (inputs.params?.password) args.push('--password', inputs.params.password);
     if (inputs.params?.tokenstore) args.push('--tokenstore', inputs.params.tokenstore);
     // OAuth providers
     if (inputs.params?.client_id) args.push('--client-id', inputs.params.client_id);
@@ -89,7 +90,8 @@ export async function execute(inputs, context) {
   if (inputs.owner_id) {
     args.push('--owner-id', inputs.owner_id);
   } else {
-    log('[wearable-sync] WARNING: owner_id not provided; operating in single-user mode (all local data accessible)');
+    log('[wearable-sync] WARNING: owner_id not provided — running in single-user mode. ' +
+        'In shared/multi-user deployments, set MEDIWISE_OWNER_ID to enforce data isolation.');
   }
 
   log(`[wearable-sync] script=${script} args=${args.join(' ')}`);

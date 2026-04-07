@@ -1,7 +1,7 @@
 ---
 name: mediwise-health-suite
 description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 1.0.14
+version: 2.0.3
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
@@ -19,6 +19,7 @@ requires:
   bins:
     - python3
     - sqlite3
+    - node
 ---
 
 # MediWise Health Suite - 家庭健康管理套件
@@ -194,16 +195,37 @@ python3 scripts/setup.py set-vision \
 
 ## 可选外部网络访问
 
-默认完全离线。以下外部主机**仅在用户主动配置后**才会被访问：
+## 安全说明
 
-| 主机 | 触发条件 | 发送内容 |
-|------|----------|----------|
-| `api.siliconflow.cn` | 设置 `MEDIWISE_VISION_*` 或 `setup.py set-vision` 启用视觉模型 | 图片 base64 + 提示词（不含个人身份信息） |
-| `generativelanguage.googleapis.com` | 配置 Gemini 作为视觉模型 | 图片 base64 + 提示词 |
-| `api.openai.com` | 配置 OpenAI GPT-4o 作为视觉模型 | 图片 base64 + 提示词 |
-| `api.nal.usda.gov` | 设置 `USDA_API_KEY` 环境变量 | 食物名称搜索词（不含个人健康数据） |
-| `api.siliconflow.cn` | 执行 `setup.py set-embedding` 启用向量搜索 | 匿名文本片段用于 embedding（默认不含 PII） |
-| 用户自行配置的地址 | 执行 `setup.py set-backend` 启用后端 API | 完整健康记录数据，仅限信任的自托管端点 |
+### 运行时环境
+
+本 skill 同时使用 **Python 3.8+**（业务脚本）和 **Node.js 18+**（action 路由层），两者均需已安装。
+
+### 数据隔离（多用户部署）
+
+- **个人/家庭单机使用**：无需任何配置，所有数据保存在本机 SQLite 文件中。
+- **多用户共享部署**（如群聊机器人）：必须为每个用户传入不同的 `owner_id`（格式 `<channel>:<user_id>`），否则所有用户共享同一份数据库视图。index.js 在 owner_id 缺失时会打印 WARNING 并进入单用户模式。
+
+### 第三方凭据处理
+
+- **Garmin Connect 密码**：首次绑定必须通过终端交互输入（`--prompt-password`，不回显），密码**绝不经过模型对话或日志**。认证成功后自动保存 OAuth token，后续同步无需密码。
+- **视觉/LLM API Key**：通过 `setup.py set-vision` 保存到本机 `config.json`，不会出现在聊天记录中。
+- **所有凭据**均保存在本机，不上传到任何远程服务器。
+
+### 可选外部访问（默认关闭）
+
+默认完全离线，以下网络请求**仅在用户主动配置后**才会发生：
+
+| 触发操作 | 外部主机 | 发送内容 |
+|----------|----------|----------|
+| `setup.py set-vision` 启用视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 图片 base64 + 提示词（不含姓名/身份证等 PII） |
+| `USDA_API_KEY` 环境变量 | `api.nal.usda.gov` | 食物名称搜索词 |
+| `setup.py set-embedding` 启用向量搜索 | `api.siliconflow.cn` | 匿名文本片段 |
+| `setup.py set-backend` 启用后端 API | 用户自配置的端点 | **完整健康记录**，仅适用于自托管可信端点 |
+
+### 备份文件
+
+`setup.py backup` 会将所有数据库打包为 `.tar.gz`，**包含完整的健康档案**，请妥善保管，不要分享给未授权人员。
 
 ## 技术架构
 
