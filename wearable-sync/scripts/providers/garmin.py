@@ -61,25 +61,37 @@ def _check_garminconnect_version():
     return current
 
 
-def _to_date(ts: Optional[str]) -> str:
-    """Convert ISO datetime string or None to YYYY-MM-DD."""
-    if ts:
-        return ts[:10]
-    return (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-
 def _date_range(start_time: Optional[str], end_time: Optional[str]) -> list[str]:
-    """Return list of YYYY-MM-DD strings between start and end (inclusive)."""
-    start = datetime.strptime(_to_date(start_time), "%Y-%m-%d")
-    end_str = end_time[:10] if end_time else datetime.now().strftime("%Y-%m-%d")
+    """Return list of YYYY-MM-DD strings between start and end (inclusive).
+
+    - If start_time is given (incremental sync), sync from that date up to
+      today, capped at 7 days to avoid hammering the API in normal operation.
+    - If start_time is None (first sync), default to yesterday + today only
+      (2 days) as a safe bootstrap; user can widen range manually if needed.
+    - Hard cap of 30 days applies only when the caller explicitly provides
+      a very old start_time (e.g. manual backfill).
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    end_str = end_time[:10] if end_time else today
     end = datetime.strptime(end_str, "%Y-%m-%d")
+
+    if start_time:
+        # Incremental: sync from last_sync_at date, cap at 7 days by default
+        start = datetime.strptime(start_time[:10], "%Y-%m-%d")
+        default_cap = 7
+    else:
+        # First sync: only yesterday + today
+        start = datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)
+        default_cap = 2
+
     days = []
     cur = start
     while cur <= end:
         days.append(cur.strftime("%Y-%m-%d"))
         cur += timedelta(days=1)
-    # Cap at 30 days to avoid hammering the API
-    return days[-30:]
+
+    # Cap: 30 days hard limit (for manual backfill); 7 days for incremental
+    return days[-30:] if len(days) > 30 else days[-default_cap:]
 
 
 class GarminProvider(BaseProvider):
