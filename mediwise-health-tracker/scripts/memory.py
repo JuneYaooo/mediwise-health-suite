@@ -1,4 +1,4 @@
-"""Memory and data compression management for MediWise Health Tracker.
+"""Memory and data compression management for MediWise Health Suite.
 
 Implements two core strategies:
 1. Hierarchical summarization (inspired by claude-mem):

@@ -116,8 +116,8 @@ def _call_llm_single(messages, config, model_override=None):
 
     if not provider or not model or not api_key:
         raise RuntimeError(
-            "LLM 未配置。请先配置 vision 或 llm：\n"
-            "  python3 scripts/setup.py set-vision --provider <provider> --model <model> --api-key <key> --base-url <url>"
+            "LLM 未配置。请让具备本机权限的配置 Agent 设置文本或视觉模型，"
+            "并通过安全的本地方式保存凭据；不要在聊天中发送 API Key。"
         )
 
     is_anthropic = provider == "anthropic"
@@ -177,8 +177,8 @@ def _call_vision_llm(prompt_text, image_base64, mime_type, config):
 
     if not provider or not model or not api_key:
         raise RuntimeError(
-            "视觉模型未配置。请先配置：\n"
-            "  python3 scripts/setup.py set-vision --provider <provider> --model <model> --api-key <key> --base-url <url>"
+            "视觉模型未配置。请让具备本机权限的配置 Agent 完成配置和脱敏图片测试；"
+            "不要在聊天中发送 API Key。"
         )
 
     is_anthropic = provider == "anthropic"
@@ -314,6 +314,112 @@ def _pdf_pages_to_images(path):
     return images
 
 
+def _create_paddleocr():
+    """Create a PaddleOCR instance compatible with both 2.x and 3.x."""
+    try:
+        from paddleocr import PaddleOCR
+    except ImportError:
+        return None
+
+    try:
+        # PaddleOCR 3.x options. Disable document transforms for medical reports
+        # so OCR does not silently rewrite the original page geometry.
+        return PaddleOCR(
+            lang="ch",
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=True,
+        )
+    except (TypeError, ValueError):
+        try:
+            # PaddleOCR 2.x compatibility.
+            return PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
+        except Exception as e:
+            print(f"⚠ PaddleOCR 初始化失败: {e}", file=sys.stderr)
+            return None
+    except Exception as e:
+        print(f"⚠ PaddleOCR 初始化失败: {e}", file=sys.stderr)
+        return None
+
+
+def _paddle_result_text(result):
+    """Normalize PaddleOCR 2.x/3.x result objects into plain text."""
+    texts = []
+
+    def add(value):
+        if isinstance(value, str) and value.strip():
+            texts.append(value.strip())
+
+    def walk(node):
+        if node is None:
+            return
+        if isinstance(node, dict):
+            payload = node.get("res", node)
+            rec_texts = payload.get("rec_texts") if isinstance(payload, dict) else None
+            if isinstance(rec_texts, (list, tuple)):
+                for value in rec_texts:
+                    add(value)
+                return
+            for key in ("text", "transcription"):
+                if isinstance(payload, dict) and key in payload:
+                    add(payload[key])
+            return
+        if isinstance(node, (list, tuple)):
+            # PaddleOCR 2.x line shape: [box, (text, confidence)].
+            if (
+                len(node) >= 2
+                and isinstance(node[1], (list, tuple))
+                and node[1]
+                and isinstance(node[1][0], str)
+            ):
+                add(node[1][0])
+                return
+            for child in node:
+                walk(child)
+
+    items = result if isinstance(result, (list, tuple)) else [result]
+    for item in items:
+        if item is None:
+            continue
+        json_value = getattr(item, "json", None)
+        if callable(json_value):
+            try:
+                json_value = json_value()
+            except Exception:
+                json_value = None
+        if json_value is not None:
+            walk(json_value)
+        else:
+            walk(item)
+
+    return "\n".join(texts)
+
+
+def _run_paddleocr(ocr, image):
+    """Run PaddleOCR against an image path/array across supported API versions."""
+    if hasattr(ocr, "predict"):
+        try:
+            return _paddle_result_text(ocr.predict(input=image))
+        except TypeError:
+            return _paddle_result_text(ocr.predict(image))
+    return _paddle_result_text(ocr.ocr(image, cls=True))
+
+
+def _extract_text_from_image_with_paddleocr(path):
+    """Extract local text from an image using PaddleOCR when available."""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"图片文件不存在: {path}")
+    ocr = _create_paddleocr()
+    if ocr is None:
+        return None
+    try:
+        text = _run_paddleocr(ocr, path)
+        return text if text.strip() else None
+    except Exception as e:
+        print(f"⚠ PaddleOCR 图片识别失败: {e}", file=sys.stderr)
+        return None
+
+
 def _extract_text_with_mineru(path):
     """Extract text from PDF using MinerU (magic-pdf). Returns None if unavailable."""
     import shutil
@@ -352,21 +458,14 @@ def _extract_text_with_mineru(path):
 
 def _extract_text_with_paddleocr(path):
     """Extract text from PDF using PaddleOCR. Returns None if unavailable."""
-    try:
-        from paddleocr import PaddleOCR
-    except ImportError:
-        return None
-
     # PaddleOCR works on images, need fitz to convert PDF pages
     try:
         page_images = _pdf_pages_to_images(path)
     except ImportError:
         return None
 
-    try:
-        ocr = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
-    except Exception as e:
-        print(f"⚠ PaddleOCR 初始化失败: {e}", file=sys.stderr)
+    ocr = _create_paddleocr()
+    if ocr is None:
         return None
 
     all_texts = []
@@ -376,15 +475,9 @@ def _extract_text_with_paddleocr(path):
             from PIL import Image
             img = Image.open(io.BytesIO(img_bytes))
             img_array = np.array(img)
-            result = ocr.ocr(img_array, cls=True)
-            if result:
-                page_lines = []
-                for line_group in result:
-                    if line_group:
-                        for line in line_group:
-                            page_lines.append(line[1][0])
-                if page_lines:
-                    all_texts.append("\n".join(page_lines))
+            page_text = _run_paddleocr(ocr, img_array)
+            if page_text:
+                all_texts.append(page_text)
         except Exception as e:
             print(f"⚠ PaddleOCR 第{page_idx + 1}页处理失败: {e}", file=sys.stderr)
 
@@ -400,26 +493,25 @@ def _build_pdf_install_hint(tools=None):
     hints = []
     if not tools["mineru"]:
         hints.append(
-            "  • MinerU（推荐，支持复杂版面分析）:\n"
-            "    pip install 'magic-pdf[full]'\n"
-            "    详见: https://github.com/opendatalab/MinerU"
+            "  • MinerU（复杂版面分析）：由配置 Agent 按官方兼容说明安装 magic-pdf"
         )
     if not tools["paddleocr"]:
         hints.append(
-            "  • PaddleOCR（轻量级中文 OCR）:\n"
-            "    pip install paddlepaddle paddleocr\n"
-            "    详见: https://github.com/PaddlePaddle/PaddleOCR"
+            "  • PaddleOCR（推荐的本地中文 OCR）：由配置 Agent 按当前平台兼容性安装 PaddlePaddle 与 PaddleOCR"
         )
     if not tools["pdfplumber"]:
-        hints.append("  • pdfplumber: pip install pdfplumber")
+        hints.append("  • pdfplumber：用于电子 PDF 文字与表格提取")
     if not tools["PyPDF2"]:
-        hints.append("  • PyPDF2: pip install PyPDF2")
+        hints.append("  • PyPDF2：电子 PDF 文字提取备用")
     if not tools["PyMuPDF"]:
-        hints.append("  • PyMuPDF: pip install PyMuPDF")
+        hints.append("  • PyMuPDF：PDF 页面渲染")
 
     if not hints:
         return ""
-    return "💡 建议安装以下工具以增强 PDF 处理能力:\n" + "\n".join(hints)
+    return (
+        "💡 请让具备本机权限的配置 Agent 检查并补齐以下能力，普通用户无需运行安装命令：\n"
+        + "\n".join(hints)
+    )
 
 
 def _extract_text_from_pdf(path, vision_config=None):
@@ -493,6 +585,12 @@ def _extract_text_from_pdf(path, vision_config=None):
         if paddle_text:
             return paddle_text
 
+    if ocr_engine in ("mineru", "paddleocr"):
+        raise RuntimeError(
+            f"已指定仅使用本地 {ocr_engine}，但没有提取到足够文字。"
+            "为保护隐私，本次不会自动把 PDF 发送给云端视觉模型；请让配置 Agent 检查本地 OCR。"
+        )
+
     # --- Stage 3: Vision LLM OCR fallback (requires API) ---
 
     try:
@@ -501,10 +599,10 @@ def _extract_text_from_pdf(path, vision_config=None):
         import_errors.append("PyMuPDF")
         tools = check_pdf_tools()
         hint = _build_pdf_install_hint(tools)
-        install_hint = "\n".join(f"  pip install {lib}" for lib in import_errors)
+        missing = "、".join(dict.fromkeys(import_errors))
         raise RuntimeError(
-            f"无法提取 PDF 文本。以下库均未安装：\n{install_hint}\n"
-            f"请至少安装其中一个以支持 PDF 处理。\n\n{hint}"
+            f"无法提取 PDF 文本，缺少相关本地组件：{missing}。\n"
+            f"请让具备本机权限的配置 Agent 完成安装和识别测试。\n\n{hint}"
         )
 
     if not vision_config:
@@ -518,8 +616,8 @@ def _extract_text_from_pdf(path, vision_config=None):
             "  • 视觉模型未配置（用于 Vision OCR）\n"
             "  • MinerU / PaddleOCR 未安装（用于本地 OCR）\n\n"
             f"{hint}\n\n"
-            "或配置视觉模型:\n"
-            "  python3 scripts/setup.py set-vision --provider <provider> --model <model> --api-key <key>"
+            "如需改用视觉模型，请让具备本机权限的配置 Agent 说明隐私差异后完成配置和脱敏图片测试；"
+            "不要在聊天中发送 API Key。"
         )
 
     ocr_texts = []
@@ -574,6 +672,17 @@ def preprocess(input_type, content, vision_config=None):
         return _extract_text_from_pdf(content, vision_config)
 
     if input_type == "image":
+        pdf_config = get_pdf_config()
+        ocr_engine = pdf_config.get("ocr_engine", "auto")
+        if ocr_engine in ("auto", "paddleocr"):
+            paddle_text = _extract_text_from_image_with_paddleocr(content)
+            if paddle_text:
+                return paddle_text
+            if ocr_engine == "paddleocr":
+                raise RuntimeError(
+                    "已指定仅使用本地 PaddleOCR，但没有识别到文字。"
+                    "为保护隐私，本次不会自动把图片发送给云端视觉模型；请让配置 Agent 检查本地 OCR。"
+                )
         if not vision_config:
             vision_config = get_vision_config()
         img_b64, mime = _image_to_base64(content)
@@ -698,17 +807,50 @@ def extract(input_type, content, member_id=None):
 
     today = date.today().isoformat()
     text = None
+    extraction_source = None
 
     try:
-        # Fix 3: Image → single vision call (OCR + extraction in one shot)
+        # Prefer local PaddleOCR for images when installed. The resulting text
+        # is structured by the text model; Vision LLM remains the fallback.
         if input_type == "image":
-            img_b64, mime = _image_to_base64(content)
-            prompt = _EXTRACTION_PROMPT.replace("{today}", today).replace(
-                "{text_content}", "[图片内容见上方]"
-            )
-            response_text = _call_vision_llm_with_continuation(
-                prompt, img_b64, mime, vision_config, llm_config
-            )
+            ocr_engine = get_pdf_config().get("ocr_engine", "auto")
+            if ocr_engine in ("auto", "paddleocr"):
+                if os.path.isfile(content):
+                    text = _extract_text_from_image_with_paddleocr(content)
+                elif ocr_engine == "paddleocr":
+                    raise FileNotFoundError(f"图片文件不存在: {content}")
+
+            if text:
+                extraction_source = "paddleocr"
+                if not all(llm_config.get(key) for key in ("provider", "model", "api_key")):
+                    return {
+                        "records": [],
+                        "source_summary": "PaddleOCR 已完成本地文字识别；当前未配置文本模型，需确认后再结构化录入。",
+                        "ocr_text": text,
+                        "text_preview": text[:200] + ("..." if len(text) > 200 else ""),
+                        "extraction_source": extraction_source,
+                        "requires_confirmation": True,
+                    }
+                prompt = _EXTRACTION_PROMPT.replace("{today}", today).replace("{text_content}", text)
+                messages = [
+                    {"role": "system", "content": "你是医疗数据结构化提取专家。请严格按照 JSON 格式输出。"},
+                    {"role": "user", "content": prompt},
+                ]
+                response_text = _call_llm_with_continuation(messages, llm_config)
+            else:
+                if ocr_engine == "paddleocr":
+                    raise RuntimeError(
+                        "已指定仅使用本地 PaddleOCR，但没有识别到文字。"
+                        "为保护隐私，本次不会自动把图片发送给云端视觉模型；请让配置 Agent 检查本地 OCR。"
+                    )
+                extraction_source = "vision_llm"
+                img_b64, mime = _image_to_base64(content)
+                prompt = _EXTRACTION_PROMPT.replace("{today}", today).replace(
+                    "{text_content}", "[图片内容见上方]"
+                )
+                response_text = _call_vision_llm_with_continuation(
+                    prompt, img_b64, mime, vision_config, llm_config
+                )
         else:
             # Step 1: Preprocess (text / pdf)
             text = preprocess(input_type, content, vision_config)
@@ -753,7 +895,8 @@ def extract(input_type, content, member_id=None):
     return {
         "records": records,
         "source_summary": source_summary,
-        "text_preview": text[:200] + ("..." if len(text) > 200 else "") if input_type != "image" and text else "[图片输入]" if input_type == "image" else "",
+        "text_preview": text[:200] + ("..." if len(text) > 200 else "") if text else "[图片输入]" if input_type == "image" else "",
+        "extraction_source": extraction_source,
     }
 
 

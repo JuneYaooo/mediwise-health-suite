@@ -75,12 +75,12 @@ python3 {baseDir}/scripts/setup.py check
 如果 `vision_configured: false`：
 
 1. 告知用户需要先配置视觉模型
-2. 推荐 SiliconFlow 的 `Qwen/Qwen2.5-VL-72B-Instruct`（国内首选）或 Google Gemini `gemini-3.1-pro-preview`（海外首选）
+2. 推荐 SiliconFlow 的 `Qwen/Qwen3.6-35B-A3B`（国内首选）、`zai-org/GLM-4.5V`（国内备选）或 Google Gemini `gemini-3.1-pro-preview`（海外备选）；保存前确认模型当前支持图片输入
 3. 用户给出 API Key 后执行配置
 4. 再运行测试验证
 
 ```bash
-python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --model "Qwen/Qwen2.5-VL-72B-Instruct" --api-key <KEY> --base-url "https://api.siliconflow.cn/v1"
+python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --model "Qwen/Qwen3.6-35B-A3B" --api-key <KEY> --base-url "https://api.siliconflow.cn/v1"
 # 用内置测试图测试（需 references/test-vision.jpg 存在）：
 python3 {baseDir}/scripts/setup.py test-vision
 # 或指定任意本地图片测试（推荐）：

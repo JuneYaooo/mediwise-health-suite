@@ -1,4 +1,4 @@
-"""Reminder management for MediWise Health Tracker.
+"""Reminder management for MediWise Health Suite.
 
 Supports medication reminders, metric measurement reminders, checkup reminders,
 and custom reminders with flexible scheduling (once, daily, weekly, monthly, cycle).

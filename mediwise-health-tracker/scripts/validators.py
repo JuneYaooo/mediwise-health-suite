@@ -1,4 +1,4 @@
-"""Shared validation module for MediWise Health Tracker.
+"""Shared validation module for MediWise Health Suite.
 
 Provides date validation, medical metric range checks, and intake schema validation.
 """

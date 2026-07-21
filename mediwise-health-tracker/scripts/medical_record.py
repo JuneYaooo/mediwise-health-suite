@@ -1,4 +1,4 @@
-"""Medical record management for MediWise Health Tracker."""
+"""Medical record management for MediWise Health Suite."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Physical checkup report interpretation and comparison for MediWise Health Tracker.
+"""Physical checkup report interpretation and comparison for MediWise Health Suite.
 
 Provides structured extraction and historical comparison of medical checkup reports.
 """

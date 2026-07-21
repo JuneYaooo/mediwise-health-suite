@@ -1,4 +1,4 @@
-"""Configuration management for MediWise Health Tracker.
+"""Configuration management for MediWise Health Suite.
 
 Manages config file at the platform-appropriate location:
 - Windows: %LOCALAPPDATA%/mediwise/config.json
@@ -406,7 +406,7 @@ def check_config_status():
     if not has_any_ocr and not vision_configured:
         issues.append(
             "扫描件 PDF 处理能力不足：MinerU、PaddleOCR 均未安装且视觉模型未配置。"
-            "建议运行 setup.py check-pdf 查看安装指引"
+            "请让具备本机权限的配置 Agent 检查并补齐本地 OCR 能力"
         )
 
     return {
@@ -430,9 +430,13 @@ def check_config_status():
 
 
 def get_pdf_config():
-    """Get PDF OCR engine config."""
+    """Get image/PDF OCR engine config."""
     cfg = load_config()
-    return cfg.get("pdf", DEFAULT_CONFIG["pdf"])
+    result = dict(cfg.get("pdf", DEFAULT_CONFIG["pdf"]))
+    env_engine = os.environ.get("MEDIWISE_OCR_ENGINE") or os.environ.get("MEDIWISE_PDF_OCR_ENGINE")
+    if env_engine in ("auto", "mineru", "paddleocr", "vision"):
+        result["ocr_engine"] = env_engine
+    return result
 
 
 def check_pdf_tools():

@@ -4,7 +4,7 @@ description: 健康做梦机制 — 每日健康信息回顾与记忆整合 skil
 trigger: scheduled (nightly ~22:00, ≥20h since last dream)
 ---
 
-# MediWise 健康做梦 (Dream) Skill
+# MediWise Health Suite · 健康回顾 Skill
 
 > **核心理念**：做梦不是实时操作，而是深夜的回顾与沉淀。
 > agent 以"做梦者"身份收集当日健康原始素材，对比历史趋势，
@@ -92,7 +92,7 @@ python3 {baseDir}/scripts/daily_snapshot.py history --member-id <id> --days 7 --
 
 **综合判断**
 - 本次做梦周期的整体健康状态：稳定 / 需关注 / 需及时处理
-- 是否有需要在下次简报中重点突出的事项？
+- 是否有需要在下一张健康记录卡片中重点突出的事项？
 
 ---
 
@@ -165,11 +165,11 @@ python3 {baseDir}/scripts/dream.py unlock --rollback --owner-id "<owner_id>"
 ## 推送规则
 
 做梦完成后，若写入了新的健康备注，**不主动推送消息**。
-这些备注会在次日早晨 8:00 的简报中自动出现（`health_advisor.py briefing` 会读取待跟进备注）。
+这些备注会在次日早晨 8:00 的健康记录卡片中自动出现（`health_advisor.py briefing` 会读取待跟进备注）。
 
 例外：若发现**严重的、需要立即关注的隐患**（如连续 5 天心率异常），可发送一条简短提醒：
 
-> "夜间健康回顾发现：[成员名]连续多日[指标名]异常，建议尽快关注或就医。详见今日简报。"
+> "夜间健康回顾发现：[成员名]连续多日[指标名]异常，建议尽快关注或咨询医生。详见今日健康记录卡片。"
 
 ---
 

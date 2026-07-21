@@ -1,4 +1,4 @@
-"""Backend API client for MediWise Health Tracker.
+"""Backend API client for MediWise Health Suite.
 
 Uses urllib.request (no extra dependencies) to call the backend REST API
 when backend mode is enabled in config.

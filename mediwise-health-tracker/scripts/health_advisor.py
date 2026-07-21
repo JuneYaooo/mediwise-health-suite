@@ -26,6 +26,23 @@ _logger = logging.getLogger(__name__)
 _ANOMALY_ALERT_RATIO_HIGH = 1.15  # >15% above the high bound → alert severity
 _ANOMALY_ALERT_RATIO_LOW = 0.85   # >15% below the low bound  → alert severity
 
+METRIC_DISPLAY = {
+    "blood_pressure": "血压",
+    "blood_sugar": "血糖",
+    "heart_rate": "心率",
+    "weight": "体重",
+    "temperature": "体温",
+    "blood_oxygen": "血氧",
+}
+
+METRIC_VALUE_DISPLAY = {
+    "systolic": "收缩压",
+    "diastolic": "舒张压",
+    "fasting": "空腹血糖",
+    "postprandial": "餐后血糖",
+    "value": "测量值",
+}
+
 
 # --- Metric normal ranges ---
 
@@ -144,6 +161,7 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
         alerts = []
         member_ranges = get_metric_ranges(member_id)
         for metric_type, ranges in member_ranges.items():
+            metric_name = METRIC_DISPLAY.get(metric_type, metric_type)
             rows = health_db.rows_to_list(conn.execute(
                 """SELECT * FROM health_metrics
                    WHERE member_id=? AND metric_type=? AND is_deleted=0
@@ -172,9 +190,9 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_anomaly",
                         "severity": "alert" if val > bounds["high"] * _ANOMALY_ALERT_RATIO_HIGH else "warning",
                         "member_id": member_id,
-                        "title": f"{metric_type} 偏高",
-                        "detail": f"{key}: {val} {bounds['unit']}（正常范围 {bounds['low']}-{bounds['high']}）",
-                        "suggestion": f"建议关注 {metric_type}，如持续偏高请就医",
+                        "title": f"{metric_name}偏高",
+                        "detail": f"{METRIC_VALUE_DISPLAY.get(key, key)}：{val} {bounds['unit']}（参考范围 {bounds['low']}-{bounds['high']}）",
+                        "suggestion": f"建议关注{metric_name}，如持续偏高请咨询医生",
                         "measured_at": latest["measured_at"],
                     })
                 elif val < bounds["low"]:
@@ -183,9 +201,9 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_anomaly",
                         "severity": "alert" if val < bounds["low"] * _ANOMALY_ALERT_RATIO_LOW else "warning",
                         "member_id": member_id,
-                        "title": f"{metric_type} 偏低",
-                        "detail": f"{key}: {val} {bounds['unit']}（正常范围 {bounds['low']}-{bounds['high']}）",
-                        "suggestion": f"建议关注 {metric_type}，如持续偏低请就医",
+                        "title": f"{metric_name}偏低",
+                        "detail": f"{METRIC_VALUE_DISPLAY.get(key, key)}：{val} {bounds['unit']}（参考范围 {bounds['low']}-{bounds['high']}）",
+                        "suggestion": f"建议关注{metric_name}，如持续偏低请咨询医生",
                         "measured_at": latest["measured_at"],
                     })
 
@@ -209,7 +227,7 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_trend",
                         "severity": "alert",
                         "member_id": member_id,
-                        "title": f"{metric_type} 持续异常",
+                        "title": f"{metric_name}持续异常",
                         "detail": f"最近 {len(rows[:3])} 次测量均不在正常范围内",
                         "suggestion": "建议尽快就医复查",
                     })
@@ -225,6 +243,7 @@ def check_metric_gaps(member_id: str) -> list[dict]:
     gaps = []
     try:
         for metric_type, interval_days in METRIC_MEASURE_INTERVALS.items():
+            metric_name = METRIC_DISPLAY.get(metric_type, metric_type)
             row = conn.execute(
                 """SELECT measured_at FROM health_metrics
                    WHERE member_id=? AND metric_type=? AND is_deleted=0
@@ -243,9 +262,9 @@ def check_metric_gaps(member_id: str) -> list[dict]:
                         "type": "metric_gap",
                         "severity": "info",
                         "member_id": member_id,
-                        "title": f"从未记录 {metric_type}",
-                        "detail": f"建议定期测量 {metric_type}",
-                        "suggestion": f"建议每 {interval_days} 天测量一次",
+                        "title": f"尚未记录{metric_name}",
+                        "detail": f"如有管理需要，可以定期测量{metric_name}",
+                        "suggestion": f"如需持续管理，可按每 {interval_days} 天一次的计划测量",
                     })
             else:
                 last_date = datetime.strptime(row["measured_at"][:10], "%Y-%m-%d").date()
@@ -255,9 +274,9 @@ def check_metric_gaps(member_id: str) -> list[dict]:
                         "type": "metric_gap",
                         "severity": "warning" if days_since > interval_days * 2 else "info",
                         "member_id": member_id,
-                        "title": f"{metric_type} 已 {days_since} 天未测量",
+                        "title": f"{metric_name}已 {days_since} 天未测量",
                         "detail": f"上次测量: {row['measured_at'][:10]}，建议间隔 {interval_days} 天",
-                        "suggestion": f"请尽快测量 {metric_type}",
+                        "suggestion": f"如在持续管理该指标，请安排测量{metric_name}",
                     })
         return gaps
     finally:

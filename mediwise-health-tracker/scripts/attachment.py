@@ -1,4 +1,4 @@
-"""Attachment management for MediWise Health Tracker.
+"""Attachment management for MediWise Health Suite.
 
 Handles file storage, metadata tracking, and record linking for
 uploaded files (photos, lab reports, prescriptions, etc.).

@@ -1,4 +1,4 @@
-"""Vector semantic search for MediWise Health Tracker.
+"""Vector semantic search for MediWise Health Suite.
 
 Usage:
   python3 scripts/vector_search.py search --query "胸口不舒服" [--member-id X] [--limit 10]
@@ -207,7 +207,7 @@ def cmd_index(args):
         output_json({
             "status": "warning",
             "message": "无可用的 Embedding 模型。请安装 sentence-transformers 或配置硅基智能 API。",
-            "hint": "pip install sentence-transformers 或 python3 setup.py set-embedding --provider siliconflow --api-key <key>"
+            "hint": "请让具备本机权限的配置 Agent 选择本地 Embedding 或远程服务，并通过安全的本地方式配置；不要在聊天中发送 API Key。"
         })
         return
 

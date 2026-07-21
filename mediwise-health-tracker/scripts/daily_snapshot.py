@@ -1,6 +1,6 @@
 """每日健康状态快照 — 存储与查询。
 
-每日简报生成后调用 save，将当日健康状态持久化到 daily_health_snapshots 表，
+健康记录卡片生成后调用 save，将当日健康状态持久化到 daily_health_snapshots 表，
 供后续对话中回顾（"昨天状态怎么样"、"这周血压趋势"等）。
 
 Commands:

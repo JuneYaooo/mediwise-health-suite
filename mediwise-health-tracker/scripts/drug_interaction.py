@@ -1,4 +1,4 @@
-"""Drug interaction query via DDInter database for MediWise Health Tracker.
+"""Drug interaction query via DDInter database for MediWise Health Suite.
 
 Uses urllib.request (no extra dependencies) to query the DDInter drug-drug
 interaction database (https://ddinter.scbdd.com).

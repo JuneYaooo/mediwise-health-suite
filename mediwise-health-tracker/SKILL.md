@@ -1,13 +1,13 @@
 ---
 name: mediwise-health-tracker
-description: Family health and medical record management. Tracks members, visits, medications, lab results, daily metrics, reminders, briefings, and pre-visit summaries.
+description: Family health and medical record management. Tracks members, visits, medications, lab results, daily metrics, reminders, health cards, and pre-visit summaries.
 ---
 
-# MediWise Health Tracker
+# MediWise Health Suite · 健康档案 Skill
 
-家庭健康与病程记录管理技能。所有操作通过 `{baseDir}/scripts/` 下的 Python 脚本完成，默认输出 JSON，再转成自然语言回复给用户。
+健康档案与病程记录 Skill。所有操作通过 `{baseDir}/scripts/` 下的 Python 脚本完成，默认输出 JSON，再转成自然语言回复给用户。
 
-当用户问”你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、简报外，还可以根据最近的描述和历史记录先整理一段”就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
+当用户问”你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、健康记录卡片外，还可以根据最近的描述和历史记录先整理一段”就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
 
 ## 适用场景
 
@@ -16,42 +16,27 @@ description: Family health and medical record management. Tracks members, visits
 - 记录日常健康指标（血压/血糖/心率/体温等）
 - 查询病程历史或用药记录、生成健康时间线或摘要、查看全家健康概况
 - 发送体检报告图片或化验单需要识别录入
-- 设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、每日健康简报、就医前摘要图
+- 设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、健康记录卡片、就医前摘要图
 - 规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）
 - 随口提到健康问题（如”最近膝盖有点疼”）需要记录并定期跟进
 
 ## 核心工作流
 
-### 0. 确定 owner_id（每次必做）
+### 0. 确认个人本地模式
 
-从会话上下文获取当前发送者 ID，格式为 `<channel>:<user_id>`，用于所有脚本的 `--owner-id` 参数。例如：
-- 飞书用户：`feishu:ou_707461a1baa7790213d30230b88fb575`
-- QQ 用户：`qqbot:12345678`
+当前公开版本只面向一个本地用户管理自己和多位家人的档案。安装 Agent 已负责配置个人模式；不要再让普通用户配置共享身份、群聊路由或 `owner_id`。
 
-后续所有脚本调用均以此 ID 作为 `--owner-id`，不得省略。
+### 1. 按姓名与身份解析成员
 
-### 1. 先确认成员（必须等用户回复）
+写入或查询前调用 `resolve-member`：
 
-```bash
-python3 {baseDir}/scripts/member.py list --owner-id "<sender_id>"
-```
+- 没有任何成员：询问用户姓名，确认后调用 `add-member` 创建“姓名（本人）”。
+- 只有一个且身份为“本人”：用户没说姓名时可以默认选择本人。
+- 已有两位及以上成员：写入时必须有姓名；用户没说姓名就先询问，不能猜。
+- 用户说了“爸爸”“妈妈”等关系：只有该关系唯一时才可解析，并在写入前复述最终的“姓名（身份）”。
+- 同名或同身份出现多个匹配：同时询问姓名和身份进行消歧。
 
-每次增删改查前先调用 `list` 查询现有成员，**将结果展示给用户，明确询问"是为哪位成员操作？"，等待用户明确回复后再继续。**
-
-**禁止以下行为：**
-- 未经询问自动创建新成员（包括"本人"）
-- 在用户未确认目标成员的情况下继续写入数据
-- 假设"只有一个成员所以自动选择"
-
-**成员不存在时的处理：**
-```
-列表为空或未找到目标成员 → 告知用户 → 询问是否新建成员 → 等待用户确认姓名和关系 → 再调用 member.py add
-```
-
-```bash
-# 用户确认后才执行创建
-python3 {baseDir}/scripts/member.py add --name "张三" --relation "本人" --owner-id "<sender_id>"
-```
+成员列表和确认回复始终显示“姓名（身份）”，例如“张建国（父亲）”“王丽（母亲）”。不得只展示内部 ID。
 
 ### 2. 选择录入路径
 
@@ -79,6 +64,8 @@ python3 {baseDir}/scripts/query.py family-overview
 
 | 动作 | 说明 | 关键参数 |
 |------|------|----------|
+| `add-member` | 创建家庭成员档案 | name、relation；本人默认 relation=本人 |
+| `resolve-member` | 按姓名/身份解析目标成员 | 可选 name、relation；多成员时用于消歧 |
 | `add-visit` | 添加就诊记录 | member_id, visit_type, visit_date；可选 hospital/department/diagnosis |
 | `add-symptom` | 添加症状记录 | member_id, symptom；可选 severity/visit_id/onset_date |
 | `add-medication` | 添加用药记录 | member_id, name；可选 dosage/frequency/visit_id/purpose |
@@ -89,8 +76,8 @@ python3 {baseDir}/scripts/query.py family-overview
 ### 快速录入指标
 
 ```bash
-python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
-python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
+python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id>
+python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id>
 ```
 
 ### 录入后发现异常，记录并跟进
@@ -160,7 +147,7 @@ python3 {baseDir}/scripts/health_memory.py list --member-id <id>
 python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-note “医生建议减少咖啡因摄入，已执行”
 ```
 
-待跟进的健康备注会自动出现在每日简报（`health_advisor.py briefing`）中，确保不遗漏。
+待跟进的健康备注会自动出现在下一张健康记录卡片（`health_advisor.py briefing`）中，确保不遗漏。
 
 ## 初始配置引导
 
@@ -170,39 +157,28 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 python3 {baseDir}/scripts/setup.py check
 ```
 
-若输出中 `vision_configured` 为 `false`，**不要在聊天中索要 API Key**，而是引导用户在终端完成配置：
+先检查 `pdf_tools.paddleocr`。PaddleOCR 是图片和扫描 PDF 的首选本地文字识别能力，不需要把原图上传到云端；由具备本机权限的配置 Agent 安装、设置并运行 `test-paddleocr`，不得要求普通用户运行命令。
+
+若用户需要复杂版面、图表理解或自动结构化，再检查 `vision_configured`。**不要在聊天中索要 API Key**，也不要把安装或配置命令转交给普通用户。
 
 ### 配置流程
 
 **第一步：询问地区/偏好**
 
-> 检测到图片和 PDF 识别功能还没配置，需要接入一个视觉模型才能用。
+> 本地 PaddleOCR 可以先处理图片和扫描 PDF 的文字。如果你还需要理解复杂表格或图表，我可以继续配置视觉模型。
 >
 > 你用的是国内网络还是海外网络？或者想完全在本地离线运行？
 
 根据回答推荐方案，并给出对应的注册链接：
-- 国内 → **硅基流动**（免费注册有额度，在 https://cloud.siliconflow.cn 获取 API Key）
+- 国内 → **硅基流动**；示例模型 `Qwen/Qwen3.6-35B-A3B` 或 `zai-org/GLM-4.5V`，配置前确认当前支持图片输入
 - 海外 → **Google Gemini**（免费，在 https://aistudio.google.com/apikey 获取）
 - 离线 → **本地 Ollama**（需提前安装 Ollama 并下载模型）
 
-**第二步：引导在终端配置（不在聊天中收集密钥）**
+**第二步：由配置 Agent 完成设置**
 
-告知用户在终端执行以下命令（`sk-xxx` 替换为实际 Key）：
+使用客户端提供的安全本地凭据输入或系统 keyring。当前客户端没有安全输入能力时停止配置；不得要求用户在聊天中粘贴 Key，也不得让普通用户复制配置命令。
 
-```
-# 示例：硅基流动
-python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --api-key sk-xxx
-
-# 示例：Google Gemini
-python3 {baseDir}/scripts/setup.py set-vision --provider gemini --api-key AIza-xxx
-
-# 示例：本地 Ollama
-python3 {baseDir}/scripts/setup.py set-vision --provider ollama
-```
-
-> ⚠️ **API Key 请在终端输入，不要通过聊天发送。** 在终端执行完成后告诉我一声，我来帮你验证是否配置成功。
-
-**第三步：用户告知完成后，验证配置**
+**第三步：配置 Agent 验证能力**
 
 ```bash
 python3 {baseDir}/scripts/setup.py test-vision
@@ -213,21 +189,21 @@ python3 {baseDir}/scripts/setup.py test-vision
 
 ### 原则
 
-- **不在聊天中收集凭据**：API Key 属于敏感信息，必须由用户在本机终端直接输入，不得经过对话传递。
+- **不在聊天中收集凭据**：API Key 属于敏感信息，只能通过客户端安全本地输入或系统 keyring，不得经过对话传递。
 - **后台静默执行**：`setup.py test-vision` 等验证命令在后台完成，不要把 JSON 输出贴给用户。
 - **配置失败友好提示**：失败时给出具体原因和可操作的修复建议，不要直接贴报错。
 
 ## 不可跳过的规则
 
 1. **不要直接展示 JSON**：查询结果必须转成自然中文。
-2. **不要用自身视觉能力读医疗图片**：图片/PDF 只能走外部视觉模型。
-   - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；调用前应确认用户已选择并信任该提供商。敏感材料优先使用本地 Ollama。
+2. **医疗图片走受控识别链路**：优先本地 PaddleOCR；复杂版面再使用用户明确启用的视觉模型。PaddleOCR 返回的文字仍需展示给用户确认后才能写库。
+   - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；调用前应确认用户已选择并信任该提供商。敏感材料优先使用本地能力。
 3. **药物安全问题必须先搜**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答。
-4. **发简报默认发图片版**：优先 `briefing_report.py screenshot`，不是纯文本。
+4. **近期健康记录默认发图片卡片**：优先调用 `generate-report`，传入用户要求的 `days`（默认 7），不是把 JSON 或 HTML 发给用户。
 5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
-6. **每次调用脚本必须携带 `--owner-id`（强制）**：从当前会话上下文获取发送者 ID，格式为 `<channel>:<user_id>`（如 `feishu:ou_707461a1baa7790213d30230b88fb575` 或 `qqbot:12345`），作为所有脚本的 `--owner-id` 参数。这是多用户数据隔离的核心机制，任何脚本调用都不得省略。不知道 owner_id 时，先停下来确认，不要在没有 owner_id 的情况下写入数据。
+6. **只用于个人本地档案**：不要引导群聊或多人共享部署；安装配置异常时交给具备本机权限的 Agent 修复，不让普通用户处理身份参数。
 7. **就医前摘要默认先短文版**：先用 `doctor_visit_report.py text` 生成；用户需要时，再导出图片或 PDF。
-8. **成员确认必须等用户明确回复**：先调用 `member.py list` 展示已有成员，问清楚"是为哪位成员操作"，等待用户回复后再继续。不得自动创建成员（包括"本人"），不得在成员未确认的情况下写入任何数据。
+8. **成员按姓名和身份解析**：只有唯一“本人”档案时允许默认本人；出现多位家庭成员后，写入必须明确姓名。每次写入前复述“姓名（身份）”，同名时必须进一步消歧。
 9. **记录饮食前必须先查食物数据库**：通过 diet-tracker 的 `food_lookup.py search` 查每种食物的营养数据，用查询结果填写 `--items`。禁止凭 AI 自身知识估算营养值后直接写入。
 10. **对话中的健康提及必须实时记录（强制）**：用户在对话中随口提到任何健康相关内容（症状、不适、用药感受、睡眠、情绪等），**必须在当次对话结束前**调用 `health_memory.py log` 将其写入健康备注。这是夜间做梦机制的原始素材来源——`dream.py gather` 会专门读取当日记录的对话提及，未被记录的提及将永久丢失。
 
@@ -238,7 +214,7 @@ python3 {baseDir}/scripts/setup.py test-vision
     - 情绪/精力：累、乏力、焦虑、情绪低落、提不起劲
     - 用药感受：吃了药之后…、副作用、效果不明显
 
-## 每日健康简报推送规范（OpenClaw 定时任务）
+## 健康记录卡片定时推送规范（OpenClaw 定时任务）
 
 **触发时机：每日早晨 8:00，由 OpenClaw agent 自动执行。**
 
@@ -247,8 +223,8 @@ python3 {baseDir}/scripts/setup.py test-vision
 ```
 1. wearable-sync: sync-all          → 同步手表数据（若有绑定设备）
 2. health-monitor: check-all        → 检测异常指标，写入 alerts 表
-3. health_advisor.py briefing       → 获取全家简报数据（提醒 + 建议 + 风险等级）
-4. briefing_report.py screenshot    → 生成图片版简报（PNG），同时自动保存当日快照
+3. health_advisor.py briefing       → 获取卡片数据（提醒 + 建议 + 风险等级）
+4. briefing_report.py screenshot    → 生成健康记录卡片（PNG），同时自动保存当日快照
 5. 推送给用户（见下方推送规则）
 ```
 
@@ -256,7 +232,7 @@ python3 {baseDir}/scripts/setup.py test-vision
 
 **触发时机：每晚 22:00，由 OpenClaw agent 自动执行，调用 DREAM skill。**
 
-做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日简报展示。详见 `mediwise-health-tracker/DREAM.md`。
+做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日健康记录卡片展示。详见 `mediwise-health-tracker/DREAM.md`。
 
 ```
 dream.py status   → 检查是否满足触发条件（≥20h 间隔）
@@ -271,24 +247,29 @@ dream.py unlock   → 释放锁，标记完成
 
 | 情况 | 推送什么 |
 |---|---|
-| 有 alert 级告警 | 图片简报 + 文字摘要，文字中明确点出告警项 |
-| 只有 warning 或 info | 图片简报，文字一句话概括（"今日整体正常，有 N 项提醒"）|
-| 完全正常 | 只发一句"今日健康状况良好，无待处理事项" + 可选图片简报 |
+| 有 alert 级告警 | 健康记录卡片 + 文字摘要，文字中明确点出告警项 |
+| 只有 warning 或 info | 健康记录卡片，文字一句话概括（"今日整体正常，有 N 项提醒"）|
+| 完全正常 | 只发一句"今日健康状况良好，无待处理事项" + 可选健康记录卡片 |
 | 同步失败（无手表数据） | 注明"今日手表数据未能同步，以下数据基于上次同步结果" |
 
 ### 推送格式
 
-- **默认发图片版**：`briefing_report.py screenshot` 生成 PNG，作为图片消息发送
+- **默认发卡片图片**：`briefing_report.py screenshot` 生成 PNG，作为图片消息发送
 - **文字摘要**：在图片前附一段不超过 100 字的中文摘要，点出最重要的 1-2 件事
 - **禁止**：直接把 JSON 或 HTML 内容粘贴到聊天里
 
 ### 用户手动请求时
 
-当用户说"给我看今天的健康简报"、"健康小报"、"今天身体怎么样"等时，立即执行步骤 3-5（不重复同步），发送图片简报。
+当用户说“帮我生成最近 7 天的健康记录卡片”“给我看近期健康简报”“今天身体怎么样”等口语表达时，统一按“健康记录卡片”能力处理：
+
+1. 先按姓名与身份规则调用 `resolve-member`。只有唯一“本人”档案时可以默认本人；有多位成员且用户未说明姓名时必须先询问。
+2. 调用 `generate-report`，传入已确认的 `member_id` 和用户要求的 `days`；未指定时默认 7 天。
+3. 将生成的 PNG 作为图片消息发送，并用一句自然语言概括最重要的提醒。
+4. 多成员请求需要分别确认目标；不要默认生成全家卡片，也不要猜测成员。
 
 ## 每日健康快照记忆（daily_snapshot.py）
 
-每次生成简报时自动保存当日快照，agent 可在对话中直接引用历史状态，无需每次重新计算。
+每次生成健康记录卡片时自动保存当日快照，agent 可在对话中直接引用历史状态，无需每次重新计算。
 
 ### 支持的查询场景
 
@@ -307,13 +288,13 @@ dream.py unlock   → 释放锁，标记完成
 
 ```bash
 # 查昨天快照
-python3 {baseDir}/scripts/daily_snapshot.py get --member-id <id> --date 2026-04-05 --owner-id <oid>
+python3 {baseDir}/scripts/daily_snapshot.py get --member-id <id> --date 2026-04-05
 
 # 查最近7天
-python3 {baseDir}/scripts/daily_snapshot.py history --member-id <id> --days 7 --owner-id <oid>
+python3 {baseDir}/scripts/daily_snapshot.py history --member-id <id> --days 7
 
 # 查30天趋势（用于描述"这个月整体状况"）
-python3 {baseDir}/scripts/daily_snapshot.py trend --member-id <id> --days 30 --owner-id <oid>
+python3 {baseDir}/scripts/daily_snapshot.py trend --member-id <id> --days 30
 ```
 
 ## 能力介绍模板
@@ -324,7 +305,7 @@ python3 {baseDir}/scripts/daily_snapshot.py trend --member-id <id> --days 30 --o
 我可以帮你做这些和健康相关的事情：
 - 记录和整理健康档案：症状、诊断、用药、检验、影像、血压血糖等
 - 查询和总结病程：帮你把最近变化、既往史、在用药整理清楚
-- 做提醒和健康简报：比如用药提醒、复查提醒、每日简报
+- 做提醒和健康记录卡片：比如用药提醒、复查提醒、最近 7 天健康记录卡片
 - 识别报告图片或化验单：把图片/PDF里的信息提取出来录入
 - 在你准备去看医生前，先生成一段”就医前摘要”：自动整理最近的关键情况、相关病史、过敏史、在用药和需要注意的事项；如果你需要，我再继续整理成图片或 PDF
 - 就诊全程管理：提前规划预约 → 就诊前智能汇总症状/指标/用药 → 就诊后记录诊断和处方 → 自动追踪复诊提醒
@@ -364,8 +345,8 @@ python3 {baseDir}/scripts/setup.py restore --input mediwise-backup.tar.gz
 按需读取，不要一次全读：
 
 - 录入、查询自然语言化、视觉处理：`mediwise-health-tracker/references/intake-query-vision.md:1`
-- 药物安全、健康建议、图片版简报：`mediwise-health-tracker/references/drug-briefing.md:1`
-- 周期追踪、附件管理、多租户隔离：`mediwise-health-tracker/references/cycle-attachments-multitenancy.md:1`
+- 药物安全、健康建议、健康记录卡片：`mediwise-health-tracker/references/drug-safety-health-card.md:1`
+- 周期追踪、附件与个人本地边界：`mediwise-health-tracker/references/cycle-attachments-local-scope.md:1`
 - 就医前摘要图：`mediwise-health-tracker/references/visit-prep.md:1`
 
 ## 反模式

@@ -1,4 +1,4 @@
-"""Health memory and proactive tracking for MediWise Health Tracker.
+"""Health memory and proactive tracking for MediWise Health Suite.
 
 Commands:
   log      --member-id --content --category [--follow-up-days 5]

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -83,8 +84,12 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
     viewport_height = 5000
 
     # Chrome headless screenshot
+    chrome_binary = _find_chrome()
+    if not chrome_binary:
+        return {"status": "error", "error": "Chrome/Chromium not found"}
+
     chrome_cmd = [
-        "google-chrome",
+        chrome_binary,
         "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
@@ -105,10 +110,12 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
             timeout=20,
         )
     except FileNotFoundError:
-        return {"status": "error", "error": "google-chrome not found"}
+        return {"status": "error", "error": "Chrome/Chromium not found"}
     except subprocess.TimeoutExpired:
         # Kill any lingering chrome processes from this run
-        subprocess.run(["pkill", "-f", "chrome.*headless"], capture_output=True)
+        pkill = shutil.which("pkill")
+        if pkill:
+            subprocess.run([pkill, "-f", "chrome.*headless"], capture_output=True)
         return {"status": "error", "error": "Chrome screenshot timed out"}
 
     if not os.path.isfile(output_path):
@@ -123,11 +130,11 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
 
         # Find the bottom boundary of actual content.
         # Scan from the bottom up, looking for rows that aren't the
-        # background color (the page bg is #F0F4F8 ≈ rgb(240,244,248)).
+        # background color (the page bg is #F4F8F7 ≈ rgb(244,248,247)).
         pixels = img.load()
         w, h = img.size
         bg_threshold = 10  # tolerance for "close to background color"
-        bg_r, bg_g, bg_b = 240, 244, 248
+        bg_r, bg_g, bg_b = 244, 248, 247
 
         bottom = h
         for y in range(h - 1, 0, -1):
@@ -182,6 +189,26 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
             "file_size": file_size,
             "note": f"Auto-crop failed: {e}",
         }
+
+
+def _find_chrome() -> str | None:
+    """Locate Chrome/Chromium on Linux, macOS, or Windows."""
+    for command in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"):
+        resolved = shutil.which(command)
+        if resolved:
+            return resolved
+
+    candidates = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+        os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    return None
 
 
 def main():

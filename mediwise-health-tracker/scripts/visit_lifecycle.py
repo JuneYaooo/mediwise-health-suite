@@ -1,4 +1,4 @@
-"""Visit lifecycle management for MediWise Health Tracker.
+"""Visit lifecycle management for MediWise Health Suite.
 
 Commands:
   plan     --member-id --visit-date --hospital [--department] [--chief-complaint]

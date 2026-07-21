@@ -1,4 +1,4 @@
-"""FHIR R4 export and statistics export for MediWise Health Tracker.
+"""FHIR R4 export and statistics export for MediWise Health Suite.
 
 Usage:
   python3 scripts/export.py fhir --member-id <id> [--privacy-level full|anonymized|statistical] [--output <file>]

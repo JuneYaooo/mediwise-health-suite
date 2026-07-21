@@ -1,4 +1,4 @@
-"""Privacy filtering module for MediWise Health Tracker.
+"""Privacy filtering module for MediWise Health Suite.
 
 Three privacy levels:
 - full: all data including PII (self-use, family doctor)

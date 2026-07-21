@@ -1,10 +1,10 @@
-"""Setup and configuration check for MediWise Health Tracker.
+"""Setup and configuration check for MediWise Health Suite.
 
 Usage:
   python3 scripts/setup.py check          # Check current config status
   python3 scripts/setup.py init           # Initialize with defaults
   python3 scripts/setup.py set-db-path --path /path/to/health.db
-  python3 scripts/setup.py set-vision --provider siliconflow --model Qwen/Qwen2.5-VL-72B-Instruct --api-key sk-xxx --base-url https://api.siliconflow.cn/v1
+  python3 scripts/setup.py set-vision --provider siliconflow --model Qwen/Qwen3.6-35B-A3B --api-key sk-xxx --base-url https://api.siliconflow.cn/v1
   python3 scripts/setup.py disable-vision
   python3 scripts/setup.py set-privacy --level anonymized
   python3 scripts/setup.py show           # Show current config
@@ -47,10 +47,18 @@ VISION_PROVIDER_PRESETS = {
     "siliconflow": {
         "label": "硅基流动（国内推荐）",
         "provider": "siliconflow",
-        "model": "Qwen/Qwen2.5-VL-72B-Instruct",
+        "model": "Qwen/Qwen3.6-35B-A3B",
         "base_url": "https://api.siliconflow.cn/v1",
         "api_key_hint": "在 https://cloud.siliconflow.cn 注册获取，有免费额度",
-        "notes": "国内访问速度快，Qwen2.5-VL 中文医疗报告识别效果佳",
+        "notes": "国内访问速度快；配置前确认当前模型条目支持图片输入",
+    },
+    "siliconflow-glm": {
+        "label": "硅基流动 GLM-4.5V（国内备选）",
+        "provider": "siliconflow",
+        "model": "zai-org/GLM-4.5V",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "api_key_hint": "在 https://cloud.siliconflow.cn 注册获取，有免费额度",
+        "notes": "视觉理解备选；配置前确认服务商仍提供该模型并支持图片输入",
     },
     "gemini": {
         "label": "Google Gemini（海外推荐）",
@@ -79,10 +87,10 @@ VISION_PROVIDER_PRESETS = {
     "ollama": {
         "label": "本地 Ollama（完全离线）",
         "provider": "ollama",
-        "model": "qwen2-vl:7b",
+        "model": "qwen3-vl:8b",
         "base_url": "http://localhost:11434/v1",
         "api_key_hint": "本地运行无需 API Key，填任意字符（如 ollama）即可",
-        "notes": "需本地安装 Ollama 并 `ollama pull qwen2-vl:7b`，完全私有化",
+        "notes": "需本地安装 Ollama 和对应视觉模型；模型标签以本机 Ollama 库为准",
     },
 }
 
@@ -518,7 +526,7 @@ def cmd_test_vision(args):
             "message": f"视觉模型识别能力不足：仅识别 {len(matched)}/{len(expected_keywords)} 个关键指标。",
             "matched_keywords": matched,
             "missing_keywords": missing,
-            "hint": "建议更换为更强的多模态模型（如 Qwen2.5-VL-72B、GPT-4o 等）。",
+            "hint": "建议更换为已确认支持图片输入的多模态模型（如 Qwen/Qwen3.6-35B-A3B、zai-org/GLM-4.5V 等）。",
             "response_preview": text[:500]
         })
 
@@ -623,8 +631,47 @@ def cmd_set_pdf_engine(args):
     }
     output_json({
         "status": "ok",
-        "message": f"PDF OCR 引擎已设置为: {args.engine}（{engine_desc[args.engine]}）",
+        "message": f"图片/PDF OCR 引擎已设置为: {args.engine}（{engine_desc[args.engine]}）",
         "config": cfg.get("pdf"),
+    })
+
+
+def cmd_test_paddleocr(args):
+    """Run PaddleOCR against a local reference image."""
+    tools = check_pdf_tools()
+    if not tools.get("paddleocr"):
+        output_json({
+            "status": "error",
+            "message": "PaddleOCR 尚未安装。请让安装 Agent 按当前操作系统安装兼容的 paddlepaddle、paddleocr 和图像依赖。",
+        })
+        return
+
+    image_path = args.image
+    if not image_path:
+        image_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "references", "test-vision.jpg"
+        ))
+    if not os.path.isfile(image_path):
+        output_json({"status": "error", "message": f"测试图片不存在: {image_path}"})
+        return
+
+    from smart_intake import _extract_text_from_image_with_paddleocr
+    text = _extract_text_from_image_with_paddleocr(image_path)
+    if not text:
+        output_json({
+            "status": "error",
+            "message": "PaddleOCR 已启动，但没有从测试图片中识别到文字。",
+            "image": image_path,
+        })
+        return
+
+    output_json({
+        "status": "ok",
+        "message": "PaddleOCR 图片文字识别测试通过。",
+        "image": image_path,
+        "character_count": len(text),
+        "line_count": len([line for line in text.splitlines() if line.strip()]),
+        "text_preview": text[:500],
     })
 
 
@@ -1214,7 +1261,7 @@ def cmd_restore(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MediWise Health Tracker 配置管理")
+    parser = argparse.ArgumentParser(description="MediWise Health Suite 配置管理")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("check", help="检查配置状态")
@@ -1225,7 +1272,7 @@ def main():
 
     p = sub.add_parser("set-vision", help="配置多模态视觉模型（--model/--base-url 对内置预设可省略）")
     p.add_argument("--provider", required=True,
-                   help="提供商预设名或自定义名: siliconflow / gemini / openai / stepfun / ollama，"
+                   help="提供商预设名或自定义名: siliconflow / siliconflow-glm / gemini / openai / stepfun / ollama，"
                         "或任意自定义值（需同时指定 --model 和 --base-url）")
     p.add_argument("--model", default="", help="模型名称（内置预设会自动填入，可省略）")
     p.add_argument("--api-key", required=True, help="API Key")
@@ -1251,6 +1298,9 @@ def main():
     p = sub.add_parser("set-pdf-engine", help="设置 PDF OCR 引擎偏好")
     p.add_argument("--engine", required=True, choices=["auto", "mineru", "paddleocr", "vision"],
                    help="OCR 引擎: auto（自动选择）/ mineru / paddleocr / vision（视觉大模型）")
+
+    p = sub.add_parser("test-paddleocr", help="测试 PaddleOCR 是否能识别本地图片文字")
+    p.add_argument("--image", default="", help="自定义测试图片路径（可选，默认使用内置测试图片）")
 
     p = sub.add_parser("set-backend", help="启用后端 API 模式")
     p.add_argument("--url", required=True, help="后端 API 地址，如 http://localhost:8000/api")
@@ -1280,6 +1330,7 @@ def main():
         "show": cmd_show, "set-embedding": cmd_set_embedding,
         "test-embedding": cmd_test_embedding,
         "check-pdf": cmd_check_pdf, "set-pdf-engine": cmd_set_pdf_engine,
+        "test-paddleocr": cmd_test_paddleocr,
         "set-backend": cmd_set_backend, "disable-backend": cmd_disable_backend,
         "set-privacy": cmd_set_privacy,
         "migrate-split-db": cmd_migrate_split_db,

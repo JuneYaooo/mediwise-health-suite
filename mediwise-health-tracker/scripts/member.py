@@ -1,4 +1,4 @@
-"""Family member management for MediWise Health Tracker."""
+"""Family member management for MediWise Health Suite."""
 
 from __future__ import annotations
 
@@ -193,6 +193,106 @@ def delete_member(args):
         output_json({"status": "ok", "message": f"已删除成员: {row['name']}"})
 
 
+_RELATION_ALIASES = {
+    "我": "本人", "自己": "本人", "本人": "本人",
+    "爸爸": "父亲", "爸": "父亲", "父亲": "父亲",
+    "妈妈": "母亲", "妈": "母亲", "母亲": "母亲",
+    "老公": "配偶", "老婆": "配偶", "丈夫": "配偶", "妻子": "配偶", "配偶": "配偶",
+    "儿子": "子女", "女儿": "子女", "孩子": "子女", "子女": "子女",
+}
+
+
+def _member_option(row):
+    member = row_to_dict(row)
+    relation = member.get("relation") or "家庭成员"
+    member["display_name"] = f"{member.get('name', '未命名')}（{relation}）"
+    return member
+
+
+def resolve_member(args):
+    """Resolve a natural-language name/relation to one unambiguous member.
+
+    Defaulting is intentionally narrow: only a sole member whose relation is
+    本人 can be selected without an explicit name. Once multiple profiles exist,
+    the caller must provide a name (and relation as a disambiguator if needed).
+    """
+    ensure_db()
+    owner_id = getattr(args, "owner_id", None)
+    conn = get_medical_connection()
+    try:
+        if owner_id:
+            rows = conn.execute(
+                """SELECT * FROM members WHERE is_deleted=0 AND owner_id=?
+                   ORDER BY CASE WHEN relation='本人' THEN 0 ELSE 1 END, created_at""",
+                (owner_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM members WHERE is_deleted=0
+                   ORDER BY CASE WHEN relation='本人' THEN 0 ELSE 1 END, created_at"""
+            ).fetchall()
+
+        options = [_member_option(row) for row in rows]
+        if not options:
+            output_json({
+                "status": "needs_creation",
+                "message": "还没有家庭成员档案。请先确认用户姓名，并创建关系为“本人”的档案。",
+                "members": [],
+            })
+            return
+
+        requested_name = (getattr(args, "name", None) or "").strip()
+        requested_relation = (getattr(args, "relation", None) or "").strip()
+        normalized_relation = _RELATION_ALIASES.get(requested_relation, requested_relation)
+
+        matches = options
+        if requested_name:
+            folded = requested_name.casefold()
+            matches = [m for m in matches if str(m.get("name", "")).strip().casefold() == folded]
+        if normalized_relation:
+            matches = [m for m in matches if (m.get("relation") or "") == normalized_relation]
+
+        if requested_name or normalized_relation:
+            if len(matches) == 1:
+                output_json({
+                    "status": "ok",
+                    "resolution": "resolved",
+                    "message": f"已匹配成员：{matches[0]['display_name']}",
+                    "member": matches[0],
+                })
+                return
+            if not matches:
+                output_json({
+                    "status": "not_found",
+                    "message": "没有找到对应的家庭成员，请核对姓名和身份。",
+                    "members": options,
+                })
+                return
+            output_json({
+                "status": "needs_selection",
+                "message": "找到多位同名或同身份成员，请同时指定姓名和身份。",
+                "members": matches,
+            })
+            return
+
+        if len(options) == 1 and options[0].get("relation") == "本人":
+            output_json({
+                "status": "ok",
+                "resolution": "default_self",
+                "message": f"默认使用本人档案：{options[0]['display_name']}",
+                "member": options[0],
+            })
+            return
+
+        output_json({
+            "status": "needs_selection",
+            "message": "当前有多位家庭成员，请明确说出要记录的姓名。",
+            "members": options,
+        })
+    finally:
+        conn.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="家庭成员管理")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -244,9 +344,15 @@ def main():
     p_del.add_argument("--id", required=True)
     p_del.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
+    p_resolve = sub.add_parser("resolve", help="按姓名/身份解析目标成员")
+    p_resolve.add_argument("--name", default=None)
+    p_resolve.add_argument("--relation", default=None)
+    p_resolve.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
+
     args = parser.parse_args()
     commands = {"add": add_member, "list": list_members, "get": get_member,
-                "update": update_member, "delete": delete_member}
+                "update": update_member, "delete": delete_member,
+                "resolve": resolve_member}
     commands[args.command](args)
 
 

@@ -1,5 +1,5 @@
 /**
- * MediWise Health Tracker - OpenClaw Skill
+ * MediWise Health Suite - OpenClaw Skill
  *
  * ESM entry point that routes actions to shared Python scripts.
  */
@@ -18,10 +18,24 @@ const SCRIPTS_DIR = resolve(__dirname, 'scripts');
  * Each entry maps an action name to { script, args(inputs) }.
  */
 const ROUTES = {
+  'add-member': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['add', '--name', p.name ?? '', '--relation', p.relation ?? '本人'];
+    if (p.gender) args.push('--gender', p.gender);
+    if (p.birth_date) args.push('--birth-date', p.birth_date);
+    return { script: 'member.py', args };
+  },
   'list-members': (inputs) => ({
     script: 'member.py',
     args: ['list'],
   }),
+  'resolve-member': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['resolve'];
+    if (p.name) args.push('--name', p.name);
+    if (p.relation) args.push('--relation', p.relation);
+    return { script: 'member.py', args };
+  },
   'get-summary': (inputs) => ({
     script: 'query.py',
     args: ['summary', '--member-id', inputs.member_id],
@@ -128,6 +142,9 @@ const ROUTES = {
     const args = ['screenshot'];
     if (inputs.member_id) {
       args.push('--member-id', inputs.member_id);
+    }
+    if (inputs.params?.days) {
+      args.push('--days', String(inputs.params.days));
     }
     return { script: 'briefing_report.py', args };
   },

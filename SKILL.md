@@ -22,9 +22,9 @@ requires:
     - node
 ---
 
-# MediWise Health Suite - 家庭健康管理套件
+# MediWise Health Suite
 
-家庭健康管理助手：记录健康数据，追踪饮食和体重，为家庭健康保驾护航。
+面向 OpenClaw 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。
 
 ## 核心能力
 
@@ -56,10 +56,11 @@ requires:
 - 趋势分析与异常检测
 - 自动提醒：用药提醒、复查提醒、指标测量提醒
 
-### ⚠ 5. 可穿戴设备同步 (wearable-sync) - 待完善
-- 支持 Gadgetbridge（小米手环、华为手表等）
-- 自动同步：心率、步数、血氧、睡眠
-- 可插拔 Provider 架构
+### ✅ 5. 可穿戴数据导入 (wearable-sync)
+- Apple Health `export.zip` / `export.xml`：已验证本地导入与去重
+- Gadgetbridge SQLite：已验证本地导入与去重，实际指标取决于设备和表结构
+- Garmin Connect：实验性，不作为普通用户默认流程
+- Huawei、Zepp 云账号、OpenWearables：暂不可用
 
 ### ✅ 6. 睡眠追踪 (sleep-tracker)
 - 睡眠时长与深睡、浅睡、REM、清醒分期记录
@@ -69,30 +70,13 @@ requires:
 
 ### 安装
 
-> **重要**：OpenClaw 沙箱要求 skills 必须位于插件/agent 工作区目录内。
-> `clawhub install` 会安装到**当前目录**的 `skills/` 子目录，
-> 因此务必先 `cd` 进入正确的工作区目录再执行安装命令。
+不要求普通用户手动安装或运行代码。让具备终端权限的 AI 助手读取下面的安装文档并完成依赖、路径、个人本地模式与验收检查：
 
-**通过 ClawdHub（推荐）：**
-```bash
-# 先进入 OpenClaw agent 工作区目录（路径以实际配置为准）
-cd ~/.openclaw/workspace-health   # 或你的插件根目录
+<https://github.com/JuneYaooo/mediwise-health-suite>
 
-# 再安装，skill 会被放到 ./skills/mediwise-health-suite/
-clawdhub install JuneYaooo/mediwise-health-suite
-```
+安装 Agent 进入仓库后必须先读取 `docs/INSTALL_AGENT.md`。
 
-**手动安装（路径最明确）：**
-```bash
-# 直接克隆到正确路径，不受工作目录影响
-git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
-  ~/.openclaw/workspace-health/skills/mediwise-health-suite
-```
-
-**路径检测工具（装完后验证）：**
-```bash
-bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
-```
+当前公开安装流程只支持个人本地 OpenClaw：一个用户可以管理自己和多位家人的档案，不部署到群聊或多人共享服务。
 
 ### 基本使用
 
@@ -138,15 +122,15 @@ bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
 - **默认本地存储**：所有数据存储在本地 SQLite 数据库，不上传云端
 - **可选后端模式**：支持可选的后端 API 模式（需用户主动配置，默认关闭）
 - **可选向量搜索**：支持智能查询功能（本地模型优先，可选 API，默认关闭）
-- **多租户隔离**：支持共享实例场景的数据隔离
+- **个人本地使用**：一个用户管理自己和多位家人的独立档案
 
 **重要**：所有云端功能均为可选，需用户主动配置启用。默认配置下，所有数据仅存储在本地。
 
 ## 可选环境变量
 
-底层 Python CLI 可直接本地使用；通过 Node action 路由调用时必须传入 `owner_id`。仅确认是个人本地实例时，才可显式设置 `MEDIWISE_SINGLE_USER=1`。详细配置模板见根目录 `.env.example`。
+这些变量由具备本机权限的安装或配置 Agent 管理，不要求普通用户运行命令。公开流程固定使用个人本地模式；详细配置模板见根目录 `.env.example`。
 
-### 多模态视觉模型（强烈推荐配置）
+### 多模态视觉模型（可选，用于复杂版面与图表理解）
 
 用于识别体检报告图片、化验单、病历 PDF。不配置则无法处理图片输入。
 
@@ -161,20 +145,14 @@ bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
 
 | 方案 | 适用场景 | PROVIDER | MODEL | BASE_URL |
 |------|---------|----------|-------|----------|
-| 硅基流动 Qwen2.5-VL（**国内首选**） | 国内部署，价格低，[注册链接](https://cloud.siliconflow.cn/i/MOlLXTYM) | `siliconflow` | `Qwen/Qwen2.5-VL-72B-Instruct` | `https://api.siliconflow.cn/v1` |
+| 硅基流动 Qwen3.6（**国内首选**） | 国内部署；配置时确认模型支持图片输入，[注册链接](https://cloud.siliconflow.cn/i/MOlLXTYM) | `siliconflow` | `Qwen/Qwen3.6-35B-A3B` | `https://api.siliconflow.cn/v1` |
+| 硅基流动 GLM-4.5V | 国内视觉理解备选；配置时确认服务商仍提供该模型 | `siliconflow` | `zai-org/GLM-4.5V` | `https://api.siliconflow.cn/v1` |
 | Google Gemini 3.1 Pro（**海外首选**） | 多模态效果强 | `openai` | `gemini-3.1-pro-preview` | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | OpenAI GPT-4o | 通用，效果稳定 | `openai` | `gpt-4o` | `https://api.openai.com/v1` |
 | 阶跃星辰 Step-1V | 国内备选 | `openai` | `step-1v-32k` | `https://api.stepfun.com/v1` |
-| 本地 Ollama | 完全离线 | `ollama` | `qwen2-vl:7b` | `http://localhost:11434/v1` |
+| 本地 Ollama | 完全离线，模型标签以本机模型库为准 | `ollama` | `qwen3-vl:8b` | `http://localhost:11434/v1` |
 
-也可以用 `setup.py` 命令配置（保存到 `config.json`，环境变量优先级更高）：
-```bash
-python3 scripts/setup.py set-vision \
-  --provider siliconflow \
-  --model Qwen/Qwen2.5-VL-72B-Instruct \
-  --api-key sk-xxx \
-  --base-url https://api.siliconflow.cn/v1
-```
+配置 Agent 应使用项目的 setup 能力保存到 `config.json`，并通过安全的本地凭据输入机制接收 API Key；不得让用户把 Key 发送到聊天中，也不得要求普通用户复制配置命令。
 
 ### 纯文本 LLM（可选）
 
@@ -191,8 +169,7 @@ python3 scripts/setup.py set-vision \
 
 | 变量名 | 用途 | 默认行为 |
 |--------|------|----------|
-| `MEDIWISE_OWNER_ID` | Python CLI 的默认 owner；共享服务仍应按请求传入对应 `owner_id` | 未设置时 CLI 不限定 owner |
-| `MEDIWISE_SINGLE_USER` | 允许 Node action 在缺少 `owner_id` 时运行；只适用于可信的个人本地实例 | 默认关闭；设为 `1` 才启用 |
+| `MEDIWISE_SINGLE_USER` | 个人本地 OpenClaw 运行模式，由安装 Agent 配置 | 公开安装流程设为 `1` |
 | `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材查询。免费注册：https://api.data.gov/signup/ | 未设置且未安装获授权的本地数据包时，食物查询会明确返回数据源不可用 |
 | `OPENFOODFACTS_ENABLED` | 启用 Open Food Facts 包装/品牌食品搜索（ODbL 1.0） | 默认关闭；设为 `1` 才启用 |
 | `OPENFOODFACTS_SEARCH_URL` | Open Food Facts 官方 Search-a-licious 查询地址 | `https://search.openfoodfacts.org/search` |
@@ -209,29 +186,30 @@ python3 scripts/setup.py set-vision \
 
 本 skill 同时使用 **Python 3.8+**（业务脚本）和 **Node.js 18+**（action 路由层），两者均需已安装。
 
-### 数据隔离（多用户部署）
+### 个人本地使用
 
-- **个人/家庭单机使用**：所有数据保存在本机 SQLite 文件中；若通过 Node action 调用，显式设置 `MEDIWISE_SINGLE_USER=1`。
-- **多用户共享部署**（如群聊机器人）：必须为每个请求传入不同的 `owner_id`（格式 `<channel>:<user_id>`）。缺少 `owner_id` 时 action 会直接拒绝执行，不再静默退化为共享视图。
+- 当前公开版本只面向个人/家庭单机使用，所有成员档案由同一个本地用户管理。
+- 安装 Agent 负责启用并验证个人模式，普通用户不需要配置身份参数。
+- 不把同一数据目录部署到群聊机器人或多人共享服务。
 
 ### 第三方凭据处理
 
-- **凭据绝不经过聊天传递**：所有 API Key、密码等敏感信息必须由用户在本机终端直接输入，agent 不会在对话中索要、接收或代为保存凭据。
-- **Garmin Connect 密码**：首次绑定通过终端交互输入（`--prompt-password`，不回显），密码不经过模型或日志。认证成功后自动保存 OAuth token，后续同步无需密码。
-- **视觉/LLM API Key**：用户在终端执行 `setup.py set-vision --api-key <key>` 完成配置。系统优先写入操作系统 keyring；keyring 不可用时才以 `0600` 权限保存到本机 `config.json` 并输出警告。
+- **凭据绝不经过聊天传递**：API Key、密码等敏感信息只能通过客户端提供的安全本地输入机制进入配置；如果当前客户端没有这种能力，就停止配置。
+- **Garmin Connect 密码**：Garmin 当前为实验性接入，不要求普通用户运行认证命令，也不允许在聊天中粘贴密码。
+- **视觉/LLM API Key**：配置 Agent 优先写入操作系统 keyring；keyring 不可用时才以 `0600` 权限保存到本机 `config.json` 并输出警告。
 - **所有凭据**均保存在本机，不上传到任何远程服务器。
 
 ### 可选外部访问（默认关闭）
 
-默认完全离线，以下网络请求**仅在用户主动在终端执行配置命令后**才会发生：
+默认完全离线，以下网络请求仅在用户明确要求、且配置 Agent 完成对应设置后才会发生：
 
-| 触发操作（需用户在终端执行） | 外部主机 | 发送内容 |
-|------------------------------|----------|----------|
-| `setup.py set-vision` 启用视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 完整图片/PDF 页面内容（base64）+ 提示词；原文件中可能包含姓名、身份证号等 PII |
-| `USDA_API_KEY` 环境变量 | `api.nal.usda.gov` | 食物名称搜索词 |
-| `OPENFOODFACTS_ENABLED=1` | `search.openfoodfacts.org` | 食物名称搜索词、语言和分页参数；不发送成员、餐次或健康数据 |
-| `setup.py set-embedding` 启用向量搜索 | `api.siliconflow.cn` | 匿名文本片段 |
-| `setup.py set-backend` 启用后端 API | 用户自配置的端点 | **完整健康记录** — 仅在自托管可信端点使用，不建议指向第三方服务 |
+| 显式启用的能力 | 外部主机 | 发送内容 |
+|---|---|---|
+| 视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 完整图片/PDF 页面内容（base64）+ 提示词；原文件中可能包含姓名、身份证号等 PII |
+| USDA | `api.nal.usda.gov` | 食物名称搜索词 |
+| Open Food Facts | `search.openfoodfacts.org` | 食物名称搜索词、语言和分页参数；不发送成员、餐次或健康数据 |
+| 远程向量搜索 | 用户选择的 Embedding 端点 | 检索文本片段 |
+| 后端 API | 用户自配置的端点 | **完整健康记录** — 仅在自托管可信端点使用，不建议指向第三方服务 |
 
 > **set-backend 风险说明**：启用后端 API 后，所有健康记录（病历、指标、用药等）将发送至配置的端点。请仅在完全信任该端点的情况下启用，且优先使用本地或自托管服务。
 

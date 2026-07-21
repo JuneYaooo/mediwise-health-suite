@@ -1,4 +1,4 @@
-"""Health metrics tracking for MediWise Health Tracker."""
+"""Health metrics tracking for MediWise Health Suite."""
 
 from __future__ import annotations
 

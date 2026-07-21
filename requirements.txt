@@ -11,3 +11,12 @@ backports.zoneinfo>=0.2.1; python_version < "3.9"
 
 # Garmin Connect provider (wearable-sync)
 # garminconnect>=0.2.0  # pip install garminconnect
+
+# Local image/scanned-PDF OCR (optional; the installation Agent should select
+# versions compatible with the current OS/Python instead of asking the user to
+# run these commands manually):
+# paddlepaddle>=3.0.0
+# paddleocr>=3.0.0
+# Pillow>=9.0.0
+# numpy>=1.23.0
+# PyMuPDF>=1.23.0

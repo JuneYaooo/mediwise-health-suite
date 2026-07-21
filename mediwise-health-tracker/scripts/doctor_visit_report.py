@@ -906,7 +906,7 @@ li { margin-bottom: 8px; font-size: 14px; }
     </div>
 
     <div class="footer">
-        <div>MediWise Health Tracker · Doctor Visit Summary</div>
+        <div>MediWise Health Suite · 就医前摘要</div>
         <div>本摘要基于本人描述与历史记录自动整理，仅供辅助沟通，不替代正式病历和医生判断。</div>
     </div>
 </div>

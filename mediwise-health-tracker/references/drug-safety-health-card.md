@@ -1,11 +1,11 @@
-# Drug Safety and Briefing
+# Drug Safety and Health Card
 
 ## 目录
 
 - 药物安全查询规则
 - DDInter / openFDA / 网页搜索
 - 结果呈现
-- 健康建议与简报
+- 健康建议与健康记录卡片
 - 数据导出与在线计算器
 
 ## 药物安全查询规则
@@ -65,29 +65,29 @@ python3 {baseDir}/scripts/openfda_query.py search --name "metformin"
 
 查不到时，直接说“未查到标准交互数据，建议咨询药师确认”。
 
-## 健康建议与简报
+## 健康建议与健康记录卡片
 
 ```bash
 python3 {baseDir}/scripts/health_advisor.py tips --member-id <id>
 python3 {baseDir}/scripts/health_advisor.py briefing
 ```
 
-### 强制：简报默认发图片版
+### 强制：健康记录卡片默认发送 PNG
 
-当用户要“简报”“报告”“健康报告”时，默认用截图 PNG：
+当用户要“健康记录卡片”，或使用“健康简报”“健康小报”等口语表达时，统一生成 PNG 健康记录卡片：
 
 ```bash
 python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 ```
 
-拿到 `image_path` 后，用 `<qqimg>` 发送：
+拿到 `image_path` 后，使用当前 OpenClaw 客户端的图片消息能力发送：
 
 ```text
-这是你的健康简报：
-<qqimg>/path/to/briefing.png</qqimg>
+这是你的健康记录卡片：
+[发送 image_path 指向的 PNG]
 ```
 
-不要说“无法发送图片”或“QQ 不支持”。
+发送失败时说明当前客户端的具体限制，并保留本地图片路径；不要伪造已发送状态。
 
 ### 通用 HTML 截图
 

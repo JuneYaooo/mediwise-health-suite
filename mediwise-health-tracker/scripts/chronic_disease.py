@@ -1,4 +1,4 @@
-"""Chronic disease management for MediWise Health Tracker.
+"""Chronic disease management for MediWise Health Suite.
 
 Supports diabetes and hypertension profiling and analysis.
 """

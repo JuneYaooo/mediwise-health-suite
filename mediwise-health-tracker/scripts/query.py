@@ -1,4 +1,4 @@
-"""Query and report generation for MediWise Health Tracker."""
+"""Query and report generation for MediWise Health Suite."""
 from __future__ import annotations
 
 import argparse

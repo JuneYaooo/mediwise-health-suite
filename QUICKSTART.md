@@ -1,357 +1,112 @@
-# 快速开始指南 - Quick Start Guide
+# MediWise 快速开始
 
-## 中文
+MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手。一个本地用户可以管理自己的档案，也可以代管多位家人的档案；它不是群聊机器人或多人共享健康服务。
 
-### 1. 安装
+## 1. 让 AI 完成安装
 
-```bash
-# 通过 ClawdHub 安装（推荐）
-clawdhub install mediwise-health-suite
+把下面这段话发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备本机终端与网络权限的 AI 助手：
 
-# 或手动安装
-git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
-  ~/.openclaw/skills/mediwise-health-suite
+```text
+请帮我安装 MediWise Health Suite：
+https://github.com/JuneYaooo/mediwise-health-suite
+
+请先阅读仓库里的 docs/INSTALL_AGENT.md，再按文档检查依赖、选择当前 OpenClaw workspace 的 skills 目录、完成安装并运行 install-check.sh。
+这是个人本地健康助手，只配置个人模式，不要部署为群聊机器人或多人共享服务。
+不要覆盖已有本地改动，不要向我索要 API Key、密码或真实健康数据。完成后告诉我安装路径、检查结果和是否需要重启 OpenClaw。
 ```
 
-### 2. 基本使用
+AI 会负责选择正确目录、安装依赖、启用个人模式并执行验收。普通用户不需要复制终端命令，也不需要自己修改配置文件。
 
-#### 添加家庭成员
-```
-用户："帮我添加一个家庭成员，叫张三，是我爸爸，65岁"
-助手：好的，我来帮您添加...
-```
+## 2. 创建第一个档案
 
-#### 记录健康指标
-```
-用户："帮我记录今天血压 130/85，心率 72"
-助手：已为您记录今天的健康指标...
+安装并重载 OpenClaw 后，直接说：
+
+```text
+帮我创建本人档案，我叫林安。
 ```
 
-#### 记录用药
-```
-用户："我今天开始吃氨氯地平，每天一次，5mg"
-助手：已为您记录用药信息...
-```
+也可以补充生日、性别、过敏史等信息。敏感信息只提供健康管理所必需的最少内容。
 
-#### 查看健康摘要
-```
-用户："帮我看看最近的健康情况"
-助手：根据最近的记录，您的血压...
-```
+成员规则：
 
-#### 饮食记录
-```
-用户："帮我记录今天早餐：牛奶一杯、面包两片、鸡蛋一个"
-助手：已为您记录早餐...
+- 只有一个“本人”档案时，未指定姓名的记录默认属于本人。
+- 添加第二位成员后，写入健康数据必须明确姓名。
+- 助手会用“姓名（身份）”确认目标，例如“林安（本人）”“张建国（父亲）”。
+- 同名成员必须同时说明身份，助手不能猜。
+
+添加家人可以说：
+
+```text
+帮我添加一位家庭成员：张建国，是我的父亲，65 岁。
 ```
 
-#### 体重管理
-```
-用户："帮我设定一个减重目标，从 70kg 减到 65kg"
-助手：好的，我来帮您设定减重目标...
-```
+## 3. 开始记录
 
-#### 就医前准备
-```
-用户："我准备去看医生，帮我整理一下最近的情况"
-助手：好的，我先为您生成一份就医前摘要...
+```text
+记录我今天早上血压 124/79，心率 71。
+帮张建国记录今天晚饭后血糖 7.2 mmol/L。
+我今天开始服用维生素 D，每日一次，每次 1 粒。
+记录今天体重 62.8 kg。
+记录今天午餐：米饭 150g、鸡胸肉 120g、青菜 200g。
 ```
 
-### 3. 家庭群组使用
+涉及多人时，助手应先复述最终目标成员；图片识别出的内容、异常单位或不确定数据，也必须经确认后才写入。
 
-在 QQ 群或飞书群中，一家人可以共同使用健康助手，数据自动按发送者隔离：
+## 4. 查看健康记录卡片
 
-```
-张三: @健康 帮我添加家庭成员"妈妈"，68岁
-助手: 已为您添加家庭成员"妈妈"
-
-李四: @健康 帮我记录血压 125/80
-助手: 已为您记录血压...
-
-张三: @健康 帮我看看全家的健康情况
-助手: [只显示张三的数据，看不到李四的记录]
+```text
+帮我生成最近 7 天的健康记录卡片。
 ```
 
-每个用户还可以为家人代管健康档案：
+只有一个本人档案时会默认本人。存在多位成员时请明确姓名：
 
-```
-张三: @健康 帮妈妈记录今天血糖 6.8
-助手: 已为"妈妈"记录空腹血糖 6.8 mmol/L
-```
-
-### 4. 高级功能
-
-#### 图片识别
-
-> **前提条件**：需先配置多模态视觉模型，否则图片识别功能不可用。
-> 快速配置方法（以硅基流动为例）：
-> ```bash
-> export MEDIWISE_VISION_PROVIDER=siliconflow
-> export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
-> export MEDIWISE_VISION_API_KEY=sk-xxx
-> export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
-> ```
-> 详细配置见 `.env.example` 或 [INSTALLATION.md](docs/INSTALLATION.md)。
-
-```
-用户：[发送化验单图片]
-用户："帮我识别这张化验单"
-助手：我来帮您识别化验单内容...
+```text
+帮我生成张建国最近 30 天的健康记录卡片。
 ```
 
-#### 体检报告解读
+卡片包含实际已有的指标、记录次数、趋势、来源、提醒和在用药。没有记录的项目会显示暂无数据，不会为了补全卡片而编造内容。
 
-```
-用户："帮我解读这张体检报告"
-助手：为您解读体检报告，空腹血糖 5.8 mmol/L（正常），甘油三酯 2.1 mmol/L（偏高）...
-```
+## 5. 图片和 PDF 识别
 
-#### 可穿戴设备同步
-```
-用户："帮我同步小米手环的数据"
-助手：好的，我来同步您的手环数据...
+普通图片与扫描 PDF 可以优先使用本地 PaddleOCR；复杂版面、图表和结构化理解可以选择视觉模型。让配置 Agent 完成设置：
+
+```text
+请帮我配置 MediWise 的图片/PDF 识别。优先检查并配置本地 PaddleOCR；如果还需要复杂图表理解，再说明本地视觉模型和云端视觉模型的隐私差异。配置完成后分别执行 OCR 和视觉能力测试。不要让我在聊天中发送 API Key，也不要把凭据写入仓库。
 ```
 
-### 5. 常用命令
+云端视觉模型会收到完整图片或 PDF 页面。体检报告可能包含姓名、证件号和病历号，使用前应脱敏，并只选择自己信任的服务商。
 
-| 功能 | 示例对话 |
-|------|---------|
-| 添加成员 | "添加家庭成员" |
-| 记录指标 | "记录血压 130/85" |
-| 查看摘要 | "最近健康情况" |
-| 饮食记录 | "记录早餐" |
-| 体重管理 | "设定减重目标" |
-| 就医准备 | "整理就医摘要" |
-| 数据备份 | "帮我备份健康数据" |
+## 6. 导入可穿戴数据
 
-### 6. 数据备份与迁移
+当前已验证的文件导入来源：
 
-换设备或换 OpenClaw 实例时，可以把全部数据打包带走：
+- Apple Health 导出的 `export.zip` 或 `export.xml`。
+- Gadgetbridge 导出的本地 SQLite 数据库。
 
-```bash
-# 旧环境打包
-python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
-  backup --output ~/mediwise-backup.tar.gz
+上传文件后直接说：
 
-# 新环境恢复（Schema 自动升级）
-python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
-  restore --input ~/mediwise-backup.tar.gz
+```text
+请把这个 Apple 健康导出包导入我的 MediWise 档案。导入前先检查格式，完成后告诉我新增、跳过了多少条记录，以及覆盖了哪些指标和时间范围。
 ```
 
-新备份使用 SQLite 一致性快照和 SHA-256 manifest；恢复前会校验归档与数据库完整性。两个 restore 不能对同一数据目录并发执行；替换、Schema 升级或完整性检查失败会自动回滚。执行恢复前仍须停止服务、同步任务和其他 SQLite 客户端。备份包含完整健康档案且权限为 `0600`，请勿发送给未授权人员。旧版无 manifest 的官方备份仍可恢复，但无法进行哈希校验；manifest 未签名，不提供来源真实性保证。
+Garmin Connect 目前是实验性接入；Huawei Health Kit、Zepp 云账号和 OpenWearables 暂不作为可用功能。详见 [可穿戴数据导入指南](docs/WEARABLES.md)。
 
-详细说明见 [INSTALLATION.md](docs/INSTALLATION.md)。
+## 7. 常用对话
 
-### 7. 配置（可选）
-
-**视觉模型配置**（图片/PDF 识别必填）：
-
-复制并编辑环境变量文件：
-
-```bash
-cp .env.example .env
-# 填入 MEDIWISE_VISION_API_KEY 等变量
+```text
+帮我看最近 30 天的血压趋势。
+我上传一张脱敏化验单，请提取内容，先让我确认再记录。
+我下周要看医生，帮我整理近期指标、症状和在用药。
+每天晚上 9 点提醒我测量血压。
+请为 MediWise 创建完整本地备份，并告诉我保存位置和校验结果。
 ```
 
-共享实例必须为每次 action 传入唯一的 `owner_id`；只有个人本地实例才可设置 `MEDIWISE_SINGLE_USER=1`。云端视觉模型会收到完整图片/PDF 页面，其中可能包含 PII；敏感材料请使用可信端点或本地模型。
+## 8. 安全边界
 
-食物查询默认使用已安装的本地数据包。基础食材可配置 `USDA_API_KEY`，包装/品牌食品可显式设置 `OPENFOODFACTS_ENABLED=1`；在线接口只收到食物搜索词。完整变量、来源网址和总离线开关见 `.env.example`。
+- 默认使用本地 SQLite 保存健康数据。
+- 不要把同一数据目录用于群聊或多人共享服务。
+- 不要在聊天中发送 API Key、账号密码或 token。
+- 可选云端视觉、在线食物查询和远程 Embedding 只有显式配置后才会访问外部服务。
+- MediWise 用于记录、整理和趋势参考，不提供诊断，也不能替代医生。
 
-详细配置方案见 [INSTALLATION.md](docs/INSTALLATION.md) 或 `.env.example`。
-
-**OpenClaw 插件配置**（可选）：
-
-编辑 `~/.openclaw/config.json`：
-
-```json
-{
-  "plugins": {
-    "mediwise-health-suite": {
-      "enableDailyBriefing": true,
-      "reminderCheckInterval": 60000
-    }
-  }
-}
-```
-
----
-
-## English
-
-### 1. Installation
-
-```bash
-# Install via ClawdHub (recommended)
-clawdhub install mediwise-health-suite
-
-# Or manual installation
-git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
-  ~/.openclaw/skills/mediwise-health-suite
-```
-
-### 2. Basic Usage
-
-#### Add Family Member
-```
-User: "Add a family member named John, he's my father, 65 years old"
-Assistant: Okay, let me add that for you...
-```
-
-#### Record Health Metrics
-```
-User: "Record today's blood pressure 130/85, heart rate 72"
-Assistant: I've recorded your health metrics for today...
-```
-
-#### Record Medication
-```
-User: "I started taking Amlodipine today, once daily, 5mg"
-Assistant: I've recorded your medication information...
-```
-
-#### View Health Summary
-```
-User: "Show me my recent health status"
-Assistant: Based on recent records, your blood pressure...
-```
-
-#### Diet Tracking
-```
-User: "Record today's breakfast: a glass of milk, two slices of bread, one egg"
-Assistant: I've recorded your breakfast...
-```
-
-#### Weight Management
-```
-User: "Set a weight loss goal from 70kg to 65kg"
-Assistant: Okay, let me set up your weight loss goal...
-```
-
-#### Doctor Visit Preparation
-```
-User: "I'm preparing to see a doctor, help me organize my recent condition"
-Assistant: Okay, let me generate a doctor visit summary for you...
-```
-
-### 3. Family Group Usage
-
-In a QQ group or Feishu group, family members can share the same health assistant. Data is automatically isolated by sender identity:
-
-```
-Alice: @Health Add a family member "Mom", 68 years old
-Assistant: Added family member "Mom" for you.
-
-Bob: @Health Record my blood pressure 125/80
-Assistant: Recorded blood pressure for you...
-
-Alice: @Health Show me my family's health overview
-Assistant: [Only shows Alice's data, cannot see Bob's records]
-```
-
-Each user can also manage health records for their family members:
-
-```
-Alice: @Health Record Mom's blood sugar today: 6.8
-Assistant: Recorded fasting blood sugar 6.8 mmol/L for "Mom"
-```
-
-### 4. Advanced Features
-
-#### Image Recognition
-
-> **Prerequisite**: A multimodal vision model must be configured first. Without it, image recognition is unavailable.
-> Quick setup example (SiliconFlow):
-> ```bash
-> export MEDIWISE_VISION_PROVIDER=siliconflow
-> export MEDIWISE_VISION_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
-> export MEDIWISE_VISION_API_KEY=sk-xxx
-> export MEDIWISE_VISION_BASE_URL=https://api.siliconflow.cn/v1
-> ```
-> See `.env.example` or [INSTALLATION.md](docs/INSTALLATION.md) for all options.
-
-```
-User: [Send lab report image]
-User: "Help me recognize this lab report"
-Assistant: Let me help you recognize the lab report content...
-```
-
-#### Checkup Report Interpretation
-
-```
-User: "Help me interpret this health checkup report"
-Assistant: Interpreting your checkup report: fasting glucose 5.8 mmol/L (normal), triglycerides 2.1 mmol/L (elevated)...
-```
-
-#### Wearable Device Sync
-```
-User: "Sync my Xiaomi Band data"
-Assistant: Okay, let me sync your band data...
-```
-
-### 5. Common Commands
-
-| Feature | Example Dialogue |
-|---------|-----------------|
-| Add Member | "Add family member" |
-| Record Metrics | "Record blood pressure 130/85" |
-| View Summary | "Recent health status" |
-| Diet Tracking | "Record breakfast" |
-| Weight Management | "Set weight loss goal" |
-| Doctor Visit Prep | "Organize medical summary" |
-| Backup Data | "Back up my health data" |
-
-### 6. Data Backup and Migration
-
-When switching devices or OpenClaw instances, you can pack all your data and take it with you:
-
-```bash
-# Old environment: create backup
-python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
-  backup --output ~/mediwise-backup.tar.gz
-
-# New environment: restore data (schema auto-upgrades)
-python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts/setup.py \
-  restore --input ~/mediwise-backup.tar.gz
-```
-
-New backups contain consistent SQLite snapshots and a SHA-256 manifest; restore validates the archive and database integrity first. Two restore processes cannot operate on the same data directory concurrently, and replacement, schema migration, or post-migration validation failure rolls back the prior config, databases, and SQLite sidecars. Stop the service, scheduled sync jobs, and other SQLite clients before restoring. The mode-`0600` archive contains complete health records, so keep it away from unauthorized recipients. Official legacy backups without a manifest remain restorable but cannot be hash-checked. The manifest is not signed and does not prove archive authenticity.
-
-See [INSTALLATION.md](docs/INSTALLATION.md) for full details.
-
-### 7. Configuration (Optional)
-
-**Vision model configuration** (required for image/PDF recognition):
-
-Copy and edit the environment variables file:
-
-```bash
-cp .env.example .env
-# Fill in MEDIWISE_VISION_API_KEY and related variables
-```
-
-Shared deployments must pass a unique `owner_id` with every action. Set `MEDIWISE_SINGLE_USER=1` only for a trusted personal instance. A cloud vision provider receives complete image/PDF pages, which may contain PII; use a trusted endpoint or local model for sensitive documents.
-
-See [INSTALLATION.md](docs/INSTALLATION.md) or `.env.example` for all configuration options.
-
-**OpenClaw plugin configuration** (optional):
-
-Edit `~/.openclaw/config.json`:
-
-```json
-{
-  "plugins": {
-    "mediwise-health-suite": {
-      "enableDailyBriefing": true,
-      "reminderCheckInterval": 60000
-    }
-  }
-}
-```
-
----
-
-## 需要帮助？
-
-- 📖 查看完整文档：[docs/](docs/)
-- 🐛 报告问题：[GitHub Issues](https://github.com/JuneYaooo/mediwise-health-suite/issues)
-- 💬 加入讨论：[GitHub Discussions](https://github.com/JuneYaooo/mediwise-health-suite/discussions)
+遇到安装或识别问题时，把错误摘要交给具备本机权限的配置 Agent 处理；普通用户不需要自己运行修复命令。完整说明见 [安装指南](docs/INSTALLATION.md)。

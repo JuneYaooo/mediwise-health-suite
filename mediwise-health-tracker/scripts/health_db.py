@@ -1,4 +1,4 @@
-"""SQLite database initialization and management for MediWise Health Tracker."""
+"""SQLite database initialization and management for MediWise Health Suite."""
 
 from __future__ import annotations
 

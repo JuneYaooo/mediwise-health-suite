@@ -1,318 +1,83 @@
-# 健康管理 Agent 配置指南
+# OpenClaw Agent 配置说明
 
-## 为什么需要独立的健康管理 Agent？
+本文说明 MediWise 在 OpenClaw 中的运行边界。安装执行细节见 [INSTALL_AGENT.md](INSTALL_AGENT.md)，普通用户入口见 [INSTALLATION.md](INSTALLATION.md)。
 
-1. **上下文隔离** - 健康数据与日常工作/聊天分开，避免混淆
-2. **隐私保护** - 敏感健康信息不会泄露到其他对话
-3. **专注体验** - 专门的健康助手，更专业的交互
-4. **独立工作区** - 健康档案、Skills 和配置独立管理
+## 支持的部署方式
 
-## 快速开始
+当前公开版本只支持个人本地 OpenClaw 实例：一个本地用户管理本人及多位家人的档案。
 
-### 方法 1：使用向导（推荐）
+必须满足：
 
-```bash
-openclaw agents add health
-```
+- Skill 位于当前 OpenClaw workspace 实际加载的 `skills` 目录内。
+- 运行环境持久化设置 `MEDIWISE_SINGLE_USER=1`。
+- 当前实例不服务群聊，也不允许多人共同访问同一 MediWise 数据目录。
+- 健康数据库、配置、附件和备份不提交到 Git。
 
-向导会引导你完成配置。
+虽然代码保留 `owner_id` 隔离能力用于内部兼容和后续演进，但它不是当前公开的多人部署承诺。不要根据这些内部参数向用户宣传群聊或多人共享能力。
 
-### 方法 2：手动配置
+## 成员解析
 
-编辑 `~/.openclaw/openclaw.json`：
+成员是当前本地用户代管的健康对象，不是登录账号。
 
-```json5
-{
-  agents: {
-    list: [
-      {
-        id: "main",
-        name: "Main Assistant",
-        workspace: "~/.openclaw/workspace",
-        default: true,
-      },
-      {
-        id: "health",
-        name: "Health Manager",
-        workspace: "~/.openclaw/workspace-health",
-        agentDir: "~/.openclaw/agents/health/agent",
-        identity: {
-          name: "健康助手",
-          description: "专注于家庭健康管理的 AI 助手"
-        },
-        model: "anthropic/claude-sonnet-4-5",
-        sandbox: {
-          mode: "all",   // 隔离健康工作区，不与其他 agent 共享文件系统
-          scope: "agent",
-        },
-        tools: {
-          // 最小权限配置（推荐起点，见下方"权限说明"）
-          allow: ["exec", "read", "write"],
-          deny: ["browser", "sessions_list", "sessions_history"],
-        },
-      },
-    ],
-  },
-  // ... bindings 见下方方案 A/B/C
-}
-```
+1. 无档案时先询问姓名，再创建“姓名（本人）”。
+2. 只有一个“本人”档案时，无姓名请求可以默认本人。
+3. 添加第二位成员后，所有写入必须先解析姓名。
+4. 返回和确认统一显示“姓名（身份）”。
+5. “爸爸”“妈妈”等关系只有在档案中唯一时才能匹配。
+6. 同名或同身份多人时必须进一步询问，不能猜测。
 
-### 权限说明
+## 所需能力
 
-下表说明每个工具的用途和风险等级，请按需开启：
+安装 Agent 需要具备：
 
-| 工具 | 是否必需 | 用途 | 风险说明 |
-|------|----------|------|----------|
-| `exec` | **必需** | 运行健康管理 Python 脚本 | Agent 可执行脚本命令；sandbox 模式可限制影响范围 |
-| `read` | **必需** | 读取导出报告、化验单图片 | 限于 workspace 目录内 |
-| `write` | 推荐 | 保存就医摘要、导出报告 | 限于 workspace 目录内 |
-| `sessions_list` | 可选 | health_memory 功能：检索历史会话 | 可访问该 agent 的历史会话列表 |
-| `sessions_history` | 可选 | health_memory 功能：读取历史会话内容 | 可读取该 agent 历史对话全文 |
+| 能力 | 用途 | 边界 |
+|---|---|---|
+| 文件读取 | 检查仓库、文档和脱敏导入文件 | 只访问用户授权的本机路径 |
+| 文件写入 | 安装 Skill、保存配置和报告 | 不覆盖已有本地改动 |
+| 进程执行 | 安装依赖、运行验收和本地脚本 | 不使用未经说明的管理员权限 |
+| 网络访问 | 克隆 GitHub 仓库和显式启用的在线服务 | 不默认上传健康数据 |
 
-**推荐做法**：从最小权限（`exec` + `read` + `write`）开始，只在需要 health_memory 功能时才添加 `sessions_list` 和 `sessions_history`。
+## 安装后检查
 
-## 推荐配置方案
+配置 Agent 必须确认：
 
-### 方案 A：家庭健康群组（推荐）
+- 仓库根 `SKILL.md` 和六个领域 Skill 可以被读取。
+- Python、Node.js、SQLite 和项目依赖满足要求。
+- `install-check.sh` 返回成功。
+- 个人本地模式在 OpenClaw 重载后仍然生效。
+- PaddleOCR 的状态来自实际本地图像测试；失败时如实报告。
+- 视觉模型只有经过脱敏图片测试后才标记可用。
 
-创建专门的群组用于健康管理（支持 QQ、飞书、企业微信、钉钉、WhatsApp、Telegram 等）：
+## 图片与 PDF
 
-```json5
-{
-  agents: {
-    list: [
-      {
-        id: "health",
-        name: "Family Health",
-        workspace: "~/.openclaw/workspace-health",
-        identity: { name: "家庭健康助手" },
-        groupChat: {
-          mentionPatterns: ["@health", "@健康", "@健康助手"],
-        },
-      },
-    ],
-  },
-  bindings: [
-    // QQ 群组示例
-    {
-      agentId: "health",
-      match: {
-        channel: "qq",
-        peer: { kind: "group", id: "123456789" },
-      },
-    },
-    // 或飞书群组
-    {
-      agentId: "health",
-      match: {
-        channel: "feishu",
-        peer: { kind: "group", id: "oc_xxx" },
-      },
-    },
-    // 或企业微信群组
-    {
-      agentId: "health",
-      match: {
-        channel: "wecom",
-        peer: { kind: "group", id: "wrXXXXXXXX" },
-      },
-    },
-  ],
-}
-```
+默认优先本地 PaddleOCR。识别出的文字仍需用户确认后才能写入健康档案。
 
-**优点**：家人都能访问、上下文完全隔离、可设置提及模式
+复杂版面如果使用云端视觉模型，配置 Agent 必须先说明：完整图片或 PDF 页面会发送到所选端点，文件可能包含个人身份信息。API Key 只能通过安全本地输入、系统凭据存储或受保护的运行环境配置，不能在聊天中收集。
 
-### 方案 B：个人健康私信
+模型示例可以使用 `Qwen/Qwen3.6-35B-A3B` 或 `zai-org/GLM-4.5V`，但必须现场确认对应服务条目当前支持图片输入，并执行脱敏测试。
 
-将特定联系人的私信路由到健康 agent：
+## 可穿戴来源
 
-```json5
-{
-  bindings: [
-    // QQ 私信示例
-    {
-      agentId: "health",
-      match: {
-        channel: "qq",
-        peer: { kind: "dm", id: "987654321" },
-      },
-    },
-    // 或飞书私信
-    {
-      agentId: "health",
-      match: {
-        channel: "feishu",
-        peer: { kind: "dm", id: "ou_xxx" },
-      },
-    },
-  ],
-}
-```
+- Apple Health：正式支持导出的 XML 或 ZIP。
+- Gadgetbridge：正式支持导出的本地 SQLite 数据库。
+- Garmin Connect：实验性，不作为默认安装步骤。
+- Huawei Health Kit、Zepp 云账号、OpenWearables：当前不作为可用来源。
 
-**优点**：完全私密、一对一交互
+导入时先解析成员，再检查文件格式；返回新增数、重复跳过数、指标类型和时间范围。不要要求普通用户运行导入脚本，也不要索取设备账号密码。
 
-### 方案 C：多渠道隔离
+## 健康记录卡片
 
-使用不同渠道分离日常和健康（例如：QQ 用于日常，飞书用于健康管理）：
+用户请求“最近 N 天健康记录卡片”时：
 
-```json5
-{
-  agents: {
-    list: [
-      {
-        id: "main",
-        workspace: "~/.openclaw/workspace",
-        model: "anthropic/claude-sonnet-4-5",
-      },
-      {
-        id: "health",
-        workspace: "~/.openclaw/workspace-health",
-        model: "anthropic/claude-opus-4-5",
-      },
-    ],
-  },
-  bindings: [
-    { agentId: "main", match: { channel: "qq" } },
-    { agentId: "health", match: { channel: "feishu" } },
-  ],
-}
-```
+1. 按成员规则解析目标；多成员时要求姓名。
+2. 调用健康档案 Skill 的 `generate-report`，传入 `member_id` 和 `days`，未指定时使用 7 天。
+3. 把生成的 PNG 作为图片发送，不粘贴 JSON 或 HTML。
+4. 没有数据的项目显示暂无数据，不推测或补造指标。
 
-**优点**：渠道级隔离、可为健康管理使用更强大的模型
+## 安全要求
 
-## 安装 MediWise Skills
-
-**推荐：直接 git clone 到正确路径（最稳妥）**
-
-```bash
-mkdir -p ~/.openclaw/workspace-health/skills
-git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
-  ~/.openclaw/workspace-health/skills/mediwise-health-suite
-```
-
-**或使用 ClawdHub（务必先 cd 进工作区目录）：**
-
-```bash
-# 先进入 agent 工作区，再安装
-cd ~/.openclaw/workspace-health
-clawdhub install JuneYaooo/mediwise-health-suite
-```
-
-> **为什么要先 cd？**
-> `clawhub install` 会把文件装到当前目录的 `skills/` 下。如果在项目根目录运行，
-> skill 会被放到插件根目录之外，触发 OpenClaw 的 "escapes plugin root" 沙箱保护，
-> 导致 SKILL.md 无法加载，脚本无法被 agent 调用。
-
-安装后验证路径：
-
-```bash
-bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
-```
-
-## 配置视觉模型（图片/PDF 识别必填）
-
-化验单图片、体检报告等识别功能需要配置外部多模态视觉模型：
-
-```bash
-cd ~/.openclaw/workspace-health/skills/mediwise-health-suite
-cp .env.example .env
-# 编辑 .env，填入视觉模型 API Key
-```
-
-或通过 setup.py 交互配置：
-
-```bash
-cd ~/.openclaw/workspace-health/skills/mediwise-health-suite/mediwise-health-tracker/scripts
-python3 setup.py set-vision \
-  --provider siliconflow \
-  --model Qwen/Qwen2.5-VL-72B-Instruct \
-  --api-key sk-xxx \
-  --base-url https://api.siliconflow.cn/v1
-python3 setup.py test-vision
-```
-
-详细配置方案（含 Gemini、GPT-4o 等选项）见 `.env.example` 或 [INSTALLATION.md](INSTALLATION.md)。
-
-## 验证配置
-
-```bash
-# 列出所有 agents
-openclaw agents list --bindings
-
-# 测试健康 agent
-openclaw chat --agent health "帮我添加一个家庭成员"
-```
-
-## 数据隔离
-
-系统提供两个层级的数据隔离：
-
-### Agent 级隔离
-
-每个 agent 有独立的：
-- **工作区**：`~/.openclaw/workspace-health`
-- **会话存储**：`~/.openclaw/agents/health/sessions`
-- **认证配置**：`~/.openclaw/agents/health/agent/auth-profiles.json`
-- **数据库**：默认存储在 OS 用户数据目录的 `medical.db` / `lifestyle.db`（可用 `MEDIWISE_DATA_DIR` 覆盖），不放在 skill 或工作区源码目录中
-
-### 用户级隔离（群聊场景）
-
-在家庭群组中，系统通过 `owner_id`（发送者的平台 ID）自动隔离不同用户的数据：
-
-```
-家庭健康群（QQ 群 123456789）
-├── 张三（QQ: 111）→ owner_id="qq_111"
-│   ├── 自己的健康档案
-│   ├── 爸爸的健康档案
-│   └── 妈妈的健康档案
-│
-├── 李四（QQ: 222）→ owner_id="qq_222"
-│   ├── 自己的健康档案
-│   └── 老婆的健康档案
-│
-└── 张三和李四的数据完全隔离，互不可见
-```
-
-**工作原理**：
-- 群聊中每条消息的发送者 ID 由平台自动提供
-- 宿主集成必须把发送者 ID 作为 `owner_id` 传给路由层；`index.js` 再注入脚本
-- 所有查询和写入操作都按 `owner_id` 过滤
-- 缺少 `owner_id` 时 action 会拒绝执行；仅个人本地实例可显式设置 `MEDIWISE_SINGLE_USER=1`
-
-## 安全建议
-
-1. **启用沙箱**：`sandbox.mode: "all"` 隔离健康数据
-2. **最小权限**：从 `exec + read + write` 开始，按需添加其他权限（见上方"权限说明"表格）
-3. **设置提及模式**：避免在群组中误触发
-4. **定期备份**：使用 `mediwise-health-tracker/scripts/setup.py backup`；它会跟随自定义数据库路径并生成带 SHA-256 manifest 的一致性快照
-5. **可选功能谨慎开启**：
-   - **在线食物库**：设置 `USDA_API_KEY` 后才会请求 USDA；设置 `OPENFOODFACTS_ENABLED=1` 后才会请求 Open Food Facts（包装/品牌食品，ODbL）。两者只接收食物搜索词，不接收成员、餐次或健康数据；`MEDIWISE_FOOD_ONLINE_ENABLED=0` 可强制离线
-   - **向量搜索**：需手动执行 `setup.py set-embedding` 启用，默认关闭
-   - **后端 API**：需手动执行 `setup.py set-backend` 启用，默认关闭
-
-## 使用示例
-
-在健康群组中（QQ、飞书、企微、钉钉等）：
-
-```
-用户: @健康 帮我添加一个家庭成员，叫张三，是我爸爸，65岁
-助手: 好的，我来帮您添加...
-
-用户: @健康 记录今天血压 130/85，心率 72
-助手: 已为您记录今天的健康指标...
-
-用户: @健康 我准备去看医生，帮我整理一下最近的情况
-助手: 好的，我先为您生成一份就医前摘要...
-```
-
-## 总结
-
-使用独立的健康管理 agent 可以：
-- ✅ 完全隔离健康数据和日常对话
-- ✅ 提供更专业的健康管理体验
-- ✅ 保护隐私，避免数据泄露
-- ✅ 灵活配置权限和工具
-- ✅ 支持多人共享（家庭群组）
-
-推荐使用**方案 A（家庭健康群组）**，既能保证隔离，又方便家人共同使用。支持 QQ、飞书、企业微信、钉钉等常用渠道。
+- 不在日志中打印完整 action 参数、健康内容或凭据。
+- 不把同一数据目录绑定到群聊或多个用户。
+- 不自动启用云端视觉、远程 Embedding 或在线食物查询。
+- 不上传真实数据库、附件或备份用于测试。
+- 不对健康数据作诊断性结论；异常提示应建议咨询专业医生。
