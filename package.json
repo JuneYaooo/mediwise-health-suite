@@ -1,7 +1,7 @@
 {
   "name": "mediwise-health-suite",
-  "version": "2.0.8",
-  "description": "Family health management suite for OpenClaw AI. Implemented: health records, diet tracking, weight management. Partial: health monitoring, wearable sync.",
+  "version": "2.0.9",
+  "description": "Family health management suite for OpenClaw AI: health records, diet, weight, sleep, monitoring, and wearable sync.",
   "main": "SKILL.md",
   "scripts": {
     "test": "echo \"No tests specified yet\" && exit 0"

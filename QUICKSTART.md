@@ -138,6 +138,8 @@ python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
   restore --input ~/mediwise-backup.tar.gz
 ```
 
+新备份使用 SQLite 一致性快照和 SHA-256 manifest；恢复前会校验归档与数据库完整性。两个 restore 不能对同一数据目录并发执行；替换、Schema 升级或完整性检查失败会自动回滚。执行恢复前仍须停止服务、同步任务和其他 SQLite 客户端。备份包含完整健康档案且权限为 `0600`，请勿发送给未授权人员。旧版无 manifest 的官方备份仍可恢复，但无法进行哈希校验；manifest 未签名，不提供来源真实性保证。
+
 详细说明见 [INSTALLATION.md](docs/INSTALLATION.md)。
 
 ### 7. 配置（可选）
@@ -150,6 +152,10 @@ python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 cp .env.example .env
 # 填入 MEDIWISE_VISION_API_KEY 等变量
 ```
+
+共享实例必须为每次 action 传入唯一的 `owner_id`；只有个人本地实例才可设置 `MEDIWISE_SINGLE_USER=1`。云端视觉模型会收到完整图片/PDF 页面，其中可能包含 PII；敏感材料请使用可信端点或本地模型。
+
+食物查询默认使用已安装的本地数据包。基础食材可配置 `USDA_API_KEY`，包装/品牌食品可显式设置 `OPENFOODFACTS_ENABLED=1`；在线接口只收到食物搜索词。完整变量、来源网址和总离线开关见 `.env.example`。
 
 详细配置方案见 [INSTALLATION.md](docs/INSTALLATION.md) 或 `.env.example`。
 
@@ -308,6 +314,8 @@ python3 ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
   restore --input ~/mediwise-backup.tar.gz
 ```
 
+New backups contain consistent SQLite snapshots and a SHA-256 manifest; restore validates the archive and database integrity first. Two restore processes cannot operate on the same data directory concurrently, and replacement, schema migration, or post-migration validation failure rolls back the prior config, databases, and SQLite sidecars. Stop the service, scheduled sync jobs, and other SQLite clients before restoring. The mode-`0600` archive contains complete health records, so keep it away from unauthorized recipients. Official legacy backups without a manifest remain restorable but cannot be hash-checked. The manifest is not signed and does not prove archive authenticity.
+
 See [INSTALLATION.md](docs/INSTALLATION.md) for full details.
 
 ### 7. Configuration (Optional)
@@ -320,6 +328,8 @@ Copy and edit the environment variables file:
 cp .env.example .env
 # Fill in MEDIWISE_VISION_API_KEY and related variables
 ```
+
+Shared deployments must pass a unique `owner_id` with every action. Set `MEDIWISE_SINGLE_USER=1` only for a trusted personal instance. A cloud vision provider receives complete image/PDF pages, which may contain PII; use a trusted endpoint or local model for sensitive documents.
 
 See [INSTALLATION.md](docs/INSTALLATION.md) or `.env.example` for all configuration options.
 

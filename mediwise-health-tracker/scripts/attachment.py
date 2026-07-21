@@ -168,13 +168,22 @@ def cmd_add(args):
         stored = f"{att_id}_{sanitized}{ext}"
 
         dest_dir = _attachments_dir(args.member_id)
-        os.makedirs(dest_dir, exist_ok=True)
+        os.makedirs(dest_dir, mode=0o700, exist_ok=True)
+        try:
+            os.chmod(os.path.join(DATA_DIR, "attachments"), 0o700)
+            os.chmod(dest_dir, 0o700)
+        except OSError:
+            pass
         dest = os.path.join(dest_dir, stored)
 
         if args.move:
             shutil.move(src, dest)
         else:
             shutil.copy2(src, dest)
+        try:
+            os.chmod(dest, 0o600)
+        except OSError:
+            pass
 
         rel_path = os.path.relpath(dest, DATA_DIR)
         mime = _guess_mime(dest)

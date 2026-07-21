@@ -235,3 +235,5 @@ logs/
 # Mediwise - local config may contain API keys (default stored outside repo, but guard anyway)
 config.json
 **/config.json
+.restore.lock
+**/.restore.lock

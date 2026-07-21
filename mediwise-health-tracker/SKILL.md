@@ -221,6 +221,7 @@ python3 {baseDir}/scripts/setup.py test-vision
 
 1. **不要直接展示 JSON**：查询结果必须转成自然中文。
 2. **不要用自身视觉能力读医疗图片**：图片/PDF 只能走外部视觉模型。
+   - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；调用前应确认用户已选择并信任该提供商。敏感材料优先使用本地 Ollama。
 3. **药物安全问题必须先搜**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答。
 4. **发简报默认发图片版**：优先 `briefing_report.py screenshot`，不是纯文本。
 5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
@@ -351,7 +352,7 @@ python3 {baseDir}/scripts/setup.py backup --output mediwise-backup.tar.gz
 python3 {baseDir}/scripts/setup.py restore --input mediwise-backup.tar.gz
 ```
 
-备份文件包含：`medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）。
+备份文件包含：`medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）和 SHA-256 `manifest.json`。备份使用 SQLite 一致性快照，支持配置在自定义路径中的数据库；恢复会先校验白名单、哈希和数据库完整性。旧版无 manifest 的官方备份仍兼容恢复，但无法进行哈希校验。manifest 未签名，不提供来源真实性保证。
 
 **迁移流程**：
 1. 旧环境：`setup.py backup --output xxx.tar.gz`，将文件发给用户

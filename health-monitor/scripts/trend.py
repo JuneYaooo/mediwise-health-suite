@@ -129,7 +129,8 @@ def _check_sustained_abnormality(member_id: str, threshold_key: str, rows: list[
     return False
 
 
-def analyze_trend(member_id: str, metric_type: str, days: int = 7) -> dict:
+def analyze_trend(member_id: str, metric_type: str, days: int = 7,
+                  owner_id: str | None = None) -> dict:
     """Analyze trend for a specific metric type over a period.
 
     Returns:
@@ -141,6 +142,8 @@ def analyze_trend(member_id: str, metric_type: str, days: int = 7) -> dict:
     query_type = "blood_pressure" if metric_type in _BP_COMPONENTS else metric_type
     conn = health_db.get_connection()
     try:
+        if not health_db.verify_member_ownership(conn, member_id, owner_id):
+            return {"status": "error", "message": f"无权访问成员: {member_id}"}
         rows = health_db.rows_to_list(conn.execute(
             """SELECT value, measured_at FROM health_metrics
                WHERE member_id=? AND metric_type=? AND is_deleted=0 AND measured_at>=?
@@ -265,7 +268,7 @@ def analyze_trend(member_id: str, metric_type: str, days: int = 7) -> dict:
     }
 
 
-def generate_report(member_id: str) -> dict:
+def generate_report(member_id: str, owner_id: str | None = None) -> dict:
     """Generate a full trend report across all metric types."""
     health_db.ensure_db()
     from config import load_config
@@ -274,6 +277,8 @@ def generate_report(member_id: str) -> dict:
 
     conn = health_db.get_connection()
     try:
+        if not health_db.verify_member_ownership(conn, member_id, owner_id):
+            return {"status": "error", "message": f"无权访问成员: {member_id}"}
         member = conn.execute(
             "SELECT name FROM members WHERE id=? AND is_deleted=0",
             (member_id,)
@@ -293,7 +298,7 @@ def generate_report(member_id: str) -> dict:
     trends = []
     warnings = []
     for mt in metric_types:
-        result = analyze_trend(member_id, mt, days)
+        result = analyze_trend(member_id, mt, days, owner_id)
         if result.get("data_points", 0) > 0:
             trends.append(result)
             if result.get("sustained_abnormal"):
@@ -316,13 +321,13 @@ def generate_report(member_id: str) -> dict:
 
 def cmd_analyze(args):
     """Analyze trend for a single metric type."""
-    result = analyze_trend(args.member_id, args.type, int(args.days))
+    result = analyze_trend(args.member_id, args.type, int(args.days), getattr(args, "owner_id", None))
     health_db.output_json({"status": "ok", **result})
 
 
 def cmd_report(args):
     """Generate full trend report."""
-    result = generate_report(args.member_id)
+    result = generate_report(args.member_id, getattr(args, "owner_id", None))
     health_db.output_json(result)
 
 
@@ -334,9 +339,11 @@ def main():
     p_analyze.add_argument("--member-id", required=True)
     p_analyze.add_argument("--type", required=True, help="指标类型")
     p_analyze.add_argument("--days", default="7", help="分析天数")
+    p_analyze.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_report = sub.add_parser("report", help="全指标趋势报告")
     p_report.add_argument("--member-id", required=True)
+    p_report.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {"analyze": cmd_analyze, "report": cmd_report}

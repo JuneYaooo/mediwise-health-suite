@@ -17,7 +17,14 @@ import urllib.error
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(__file__))
-from health_db import ensure_db, get_connection, rows_to_list, output_json, is_api_mode
+from health_db import (
+    ensure_db,
+    get_connection,
+    rows_to_list,
+    output_json,
+    is_api_mode,
+    verify_member_ownership,
+)
 import api_client
 
 _logger = logging.getLogger(__name__)
@@ -456,8 +463,20 @@ def cmd_check(args):
     member_id = args.member_id
     drug_name = args.drug_name.strip()
 
+    if not is_api_mode():
+        ensure_db()
+        access_conn = get_connection()
+        try:
+            if not verify_member_ownership(
+                access_conn, member_id, getattr(args, "owner_id", None)
+            ):
+                output_json({"status": "error", "message": f"无权访问成员: {member_id}"})
+                return
+        finally:
+            access_conn.close()
+
     # 1. Get member's active medications
-    active_meds = _get_active_medications(member_id)
+    active_meds = _get_active_medications(member_id, getattr(args, "owner_id", None))
     if active_meds is None:
         output_json({"status": "error", "message": f"未找到成员: {member_id}"})
         return
@@ -670,7 +689,7 @@ def cmd_lookup(args):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_active_medications(member_id: str) -> list[dict] | None:
+def _get_active_medications(member_id: str, owner_id: str | None = None) -> list[dict] | None:
     """Fetch active medications for a member.  Returns None if member not found."""
     if is_api_mode():
         try:
@@ -684,6 +703,8 @@ def _get_active_medications(member_id: str) -> list[dict] | None:
     ensure_db()
     conn = get_connection()
     try:
+        if not verify_member_ownership(conn, member_id, owner_id):
+            return None
         row = conn.execute(
             "SELECT id FROM members WHERE id=? AND is_deleted=0", (member_id,)
         ).fetchone()
@@ -721,6 +742,7 @@ def main():
     p = sub.add_parser("check", help="检查新药与成员在用药物的交互")
     p.add_argument("--member-id", required=True, help="成员 ID")
     p.add_argument("--drug-name", required=True, help="新药名称")
+    p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p = sub.add_parser("check-pair", help="检查两个药物之间的交互")
     p.add_argument("--drug-a", required=True, help="药品 A 名称")

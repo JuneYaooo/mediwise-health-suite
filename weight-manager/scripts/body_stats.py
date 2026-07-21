@@ -22,6 +22,7 @@ from health_db import (
     rows_to_list,
     output_json,
     transaction,
+    verify_member_ownership,
 )
 from metric_utils import calculate_age, calculate_bmr, calculate_tdee
 
@@ -93,6 +94,13 @@ def _get_member_info(conn, member_id):
     ).fetchone()
 
 
+def _verify_member_access(conn, args):
+    if not verify_member_ownership(conn, args.member_id, getattr(args, "owner_id", None)):
+        output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})
+        return False
+    return True
+
+
 def _classify_bmi(bmi):
     """Classify BMI using Chinese standard."""
     for threshold, label in BMI_CATEGORIES:
@@ -106,6 +114,8 @@ def bmi(args):
     ensure_db()
     conn = get_medical_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         m = _get_member_info(conn, args.member_id)
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -147,6 +157,8 @@ def bmr_tdee(args):
     ensure_db()
     conn = get_medical_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         m = _get_member_info(conn, args.member_id)
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -212,6 +224,8 @@ def suggest_calories(args):
     ensure_db()
     conn = get_medical_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         m = _get_member_info(conn, args.member_id)
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -310,6 +324,8 @@ def add_measurement(args):
         return
 
     with transaction(domain="medical") as conn:
+        if not _verify_member_access(conn, args):
+            return
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -347,6 +363,8 @@ def list_measurements(args):
     ensure_db()
     conn = get_medical_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -388,6 +406,8 @@ def body_summary(args):
     ensure_db()
     conn = get_medical_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         m = _get_member_info(conn, args.member_id)
         if not m:
             output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
@@ -479,18 +499,21 @@ def main():
     # bmi
     p_bmi = sub.add_parser("bmi")
     p_bmi.add_argument("--member-id", required=True)
+    p_bmi.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # bmr-tdee
     p_bmr = sub.add_parser("bmr-tdee")
     p_bmr.add_argument("--member-id", required=True)
     p_bmr.add_argument("--activity-level", default="sedentary",
                         help="活动水平: sedentary/light/moderate/active/very_active")
+    p_bmr.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # suggest-calories
     p_sc = sub.add_parser("suggest-calories")
     p_sc.add_argument("--member-id", required=True)
     p_sc.add_argument("--activity-level", default="sedentary")
     p_sc.add_argument("--goal-type", default=None, help="目标类型: lose/gain/maintain（默认从活跃目标读取）")
+    p_sc.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # add-measurement
     p_am = sub.add_parser("add-measurement")
@@ -499,16 +522,19 @@ def main():
     p_am.add_argument("--value", required=True, help="数值")
     p_am.add_argument("--measured-at", default=None, help="测量时间 YYYY-MM-DD HH:MM")
     p_am.add_argument("--note", default=None)
+    p_am.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # list-measurements
     p_lm = sub.add_parser("list-measurements")
     p_lm.add_argument("--member-id", required=True)
     p_lm.add_argument("--type", default=None, help="围度类型（可选筛选）")
     p_lm.add_argument("--limit", default=None, type=int, help="最多返回条数")
+    p_lm.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     # body-summary
     p_bs = sub.add_parser("body-summary")
     p_bs.add_argument("--member-id", required=True)
+    p_bs.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

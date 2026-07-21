@@ -95,12 +95,22 @@ def get_lifestyle_db_path():
 def _open_connection(db_path):
     db_dir = os.path.dirname(db_path)
     if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
+        os.makedirs(db_dir, mode=0o700, exist_ok=True)
+        try:
+            os.chmod(db_dir, 0o700)
+        except OSError:
+            pass
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    for path in (db_path, f"{db_path}-wal", f"{db_path}-shm"):
+        if os.path.exists(path):
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
     return conn
 
 

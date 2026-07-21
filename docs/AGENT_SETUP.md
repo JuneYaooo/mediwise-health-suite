@@ -254,7 +254,7 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 - **工作区**：`~/.openclaw/workspace-health`
 - **会话存储**：`~/.openclaw/agents/health/sessions`
 - **认证配置**：`~/.openclaw/agents/health/agent/auth-profiles.json`
-- **数据库**：`health.db` 存储在工作区（新版拆分为 `medical.db` / `lifestyle.db`）
+- **数据库**：默认存储在 OS 用户数据目录的 `medical.db` / `lifestyle.db`（可用 `MEDIWISE_DATA_DIR` 覆盖），不放在 skill 或工作区源码目录中
 
 ### 用户级隔离（群聊场景）
 
@@ -276,18 +276,18 @@ openclaw chat --agent health "帮我添加一个家庭成员"
 
 **工作原理**：
 - 群聊中每条消息的发送者 ID 由平台自动提供
-- 路由层（`index.js`）自动将发送者 ID 作为 `owner_id` 传给脚本
+- 宿主集成必须把发送者 ID 作为 `owner_id` 传给路由层；`index.js` 再注入脚本
 - 所有查询和写入操作都按 `owner_id` 过滤
-- 无需用户手动指定，全程自动
+- 缺少 `owner_id` 时 action 会拒绝执行；仅个人本地实例可显式设置 `MEDIWISE_SINGLE_USER=1`
 
 ## 安全建议
 
 1. **启用沙箱**：`sandbox.mode: "all"` 隔离健康数据
 2. **最小权限**：从 `exec + read + write` 开始，按需添加其他权限（见上方"权限说明"表格）
 3. **设置提及模式**：避免在群组中误触发
-4. **定期备份**：备份 `~/.openclaw/workspace-health/medical.db` 与 `~/.openclaw/workspace-health/lifestyle.db`
+4. **定期备份**：使用 `mediwise-health-tracker/scripts/setup.py backup`；它会跟随自定义数据库路径并生成带 SHA-256 manifest 的一致性快照
 5. **可选功能谨慎开启**：
-   - **USDA 食物库**：设置 `USDA_API_KEY` 后才会请求 `api.nal.usda.gov`，否则默认离线
+   - **在线食物库**：设置 `USDA_API_KEY` 后才会请求 USDA；设置 `OPENFOODFACTS_ENABLED=1` 后才会请求 Open Food Facts（包装/品牌食品，ODbL）。两者只接收食物搜索词，不接收成员、餐次或健康数据；`MEDIWISE_FOOD_ONLINE_ENABLED=0` 可强制离线
    - **向量搜索**：需手动执行 `setup.py set-embedding` 启用，默认关闭
    - **后端 API**：需手动执行 `setup.py set-backend` 启用，默认关闭
 

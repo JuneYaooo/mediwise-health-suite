@@ -1,7 +1,9 @@
 # MediWise Health Suite - Python Dependencies
 
-# No external Python packages required for basic functionality
-# All skills use Python standard library and SQLite3 (built-in)
+# Python 3.8 compatibility for reminder time-zone handling.
+backports.zoneinfo>=0.2.1; python_version < "3.9"
+
+# Python 3.9+ requires no external package for basic functionality.
 
 # Optional dependencies for enhanced features:
 # requests>=2.28.0  # For medical search API calls (if needed)

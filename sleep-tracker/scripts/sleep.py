@@ -110,6 +110,14 @@ def _format_duration(minutes: int) -> str:
 # Commands
 # ---------------------------------------------------------------------------
 
+def _verify_member_access(conn, args) -> bool:
+    """Verify the requested member belongs to the caller's owner context."""
+    owner_id = getattr(args, "owner_id", None)
+    if not health_db.verify_member_ownership(conn, args.member_id, owner_id):
+        health_db.output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})
+        return False
+    return True
+
 def cmd_log(args):
     """Manually log a sleep record."""
     health_db.ensure_db()
@@ -150,7 +158,8 @@ def cmd_log(args):
         measured_at = f"{yesterday} 07:00:00"
 
     with health_db.transaction() as conn:
-        # Verify member
+        if not _verify_member_access(conn, args):
+            return
         m = conn.execute(
             "SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)
         ).fetchone()
@@ -190,6 +199,8 @@ def cmd_daily(args):
 
     conn = health_db.get_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         rows = health_db.rows_to_list(conn.execute(
             """SELECT id, value, measured_at, source FROM health_metrics
                WHERE member_id=? AND metric_type='sleep' AND is_deleted=0
@@ -246,6 +257,8 @@ def cmd_weekly(args):
 
     conn = health_db.get_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         member = conn.execute(
             "SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)
         ).fetchone()
@@ -347,6 +360,8 @@ def cmd_list(args):
 
     conn = health_db.get_connection()
     try:
+        if not _verify_member_access(conn, args):
+            return
         rows = health_db.rows_to_list(conn.execute(
             """SELECT id, value, measured_at, source FROM health_metrics
                WHERE member_id=? AND metric_type='sleep' AND is_deleted=0
@@ -393,18 +408,22 @@ def main():
     p_log.add_argument("--rem", default="0", help="REM 时长（分钟）")
     p_log.add_argument("--awake", default="0", help="清醒时长（分钟）")
     p_log.add_argument("--date", default=None, help="日期 YYYY-MM-DD（默认昨天）")
+    p_log.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_daily = sub.add_parser("daily", help="查看某天睡眠")
     p_daily.add_argument("--member-id", required=True)
     p_daily.add_argument("--date", default=None, help="日期 YYYY-MM-DD（默认昨天）")
+    p_daily.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_weekly = sub.add_parser("weekly", help="每周睡眠趋势")
     p_weekly.add_argument("--member-id", required=True)
     p_weekly.add_argument("--days", default="7", help="分析天数（默认7）")
+    p_weekly.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_list = sub.add_parser("list", help="查看历史睡眠记录")
     p_list.add_argument("--member-id", required=True)
     p_list.add_argument("--limit", default="14", help="条数限制（默认14）")
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

@@ -45,6 +45,19 @@ def _get_provider(name):
     return cls()
 
 
+def _can_access_member(member_id, owner_id):
+    """Verify member ownership using the medical-domain database."""
+    conn = health_db.get_medical_connection()
+    try:
+        return health_db.verify_member_ownership(conn, member_id, owner_id)
+    finally:
+        conn.close()
+
+
+def _deny_member(member_id):
+    health_db.output_json({"status": "error", "message": f"无权访问成员: {member_id}"})
+
+
 def add_device(args):
     """Register a new wearable device for a member."""
     health_db.ensure_db()
@@ -59,6 +72,9 @@ def add_device(args):
     provider = _get_provider(args.provider)
 
     with health_db.transaction(domain="medical") as conn:
+        if not health_db.verify_member_ownership(conn, args.member_id, getattr(args, "owner_id", None)):
+            _deny_member(args.member_id)
+            return
         # Verify member exists
         m = conn.execute("SELECT name FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
@@ -90,6 +106,9 @@ def add_device(args):
 def list_devices(args):
     """List registered wearable devices for a member."""
     health_db.ensure_db()
+    if not _can_access_member(args.member_id, getattr(args, "owner_id", None)):
+        _deny_member(args.member_id)
+        return
     conn = health_db.get_lifestyle_connection()
     try:
         rows = conn.execute(
@@ -130,6 +149,9 @@ def remove_device(args):
         if not row:
             health_db.output_json({"status": "error", "message": f"未找到设备: {args.device_id}"})
             return
+        if not _can_access_member(row["member_id"], getattr(args, "owner_id", None)):
+            health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+            return
         conn.execute(
             "UPDATE wearable_devices SET is_deleted=1, is_active=0, updated_at=? WHERE id=?",
             (health_db.now_iso(), args.device_id)
@@ -157,6 +179,10 @@ def auth_device(args):
         device = dict(row)
     finally:
         conn.close()
+
+    if not _can_access_member(device["member_id"], getattr(args, "owner_id", None)):
+        health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+        return
 
     # Build config based on provider type
     try:
@@ -307,6 +333,10 @@ def auth_callback(args):
     finally:
         conn.close()
 
+    if not _can_access_member(device["member_id"], getattr(args, "owner_id", None)):
+        health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+        return
+
     provider_name = device["provider"]
     if provider_name == "gadgetbridge":
         health_db.output_json({"status": "error", "message": "Gadgetbridge 不需要 OAuth 回调"})
@@ -334,6 +364,10 @@ def test_device(args):
         device = dict(row)
     finally:
         conn.close()
+
+    if not _can_access_member(device["member_id"], getattr(args, "owner_id", None)):
+        health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+        return
 
     try:
         config = json.loads(device.get("config") or "{}")
@@ -363,12 +397,15 @@ def main():
     p_add.add_argument("--member-id", required=True)
     p_add.add_argument("--provider", required=True, choices=list(PROVIDERS.keys()))
     p_add.add_argument("--device-name", default=None, help="设备名称")
+    p_add.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_list = sub.add_parser("list", help="查看设备")
     p_list.add_argument("--member-id", required=True)
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_remove = sub.add_parser("remove", help="移除设备")
     p_remove.add_argument("--device-id", required=True)
+    p_remove.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_auth = sub.add_parser("auth", help="配置设备认证")
     p_auth.add_argument("--device-id", required=True)
@@ -381,13 +418,16 @@ def main():
     p_auth.add_argument("--client-id", default=None, help="OAuth Client ID")
     p_auth.add_argument("--client-secret", default=None, help="OAuth Client Secret")
     p_auth.add_argument("--redirect-uri", default=None, help="OAuth Redirect URI")
+    p_auth.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_callback = sub.add_parser("auth-callback", help="OAuth 回调")
     p_callback.add_argument("--device-id", required=True)
     p_callback.add_argument("--code", required=True, help="Authorization code")
+    p_callback.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_test = sub.add_parser("test", help="测试设备连接")
     p_test.add_argument("--device-id", required=True)
+    p_test.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

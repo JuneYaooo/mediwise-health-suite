@@ -35,7 +35,7 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 │                 Node.js 技能路由层（各 skill 的 index.js）                  │
 │  - 路由 action -> script(args)                                               │
 │  - 统一 subprocess 调 python3                                                │
-│  - 注入 MEDIWISE_OWNER_ID 做多用户隔离                                       │
+│  - 强制 owner_id 并注入 MEDIWISE_OWNER_ID 做多用户隔离                        │
 └───────────────┬───────────────────────────────────────────────┬──────────────┘
                 │                                               │
                 ▼                                               ▼
@@ -43,6 +43,7 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
    │  Health Tracker (Python)    │                 │  其他领域技能 (Python)      │
    │  - member / medical_record  │                 │  - diet-tracker             │
    │  - health_metric / reminder │                 │  - weight-manager           │
+   │  - sleep records / reports  │                 │  - sleep-tracker            │
    │  - visit_lifecycle / notes  │                 │  - wearable-sync            │
    │  - checkup/doctor report    │                 │  - health-monitor           │
    └───────────────┬─────────────┘                 └───────────────┬─────────────┘
@@ -135,6 +136,10 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 - BMI/BMR/TDEE 计算
 - 目标设定与进度追踪
 
+#### 😴 睡眠追踪
+- 手动记录睡眠时长和深睡/浅睡/REM/清醒分期
+- 每日分析、周趋势与历史查询
+
 ### ⚠ 部分实现功能（待完善）
 
 #### 📊 智能监测与提醒（待完善）
@@ -158,6 +163,10 @@ MediWise Health Suite 是一个为 OpenClaw AI 设计的家庭健康管理助手
 ```bash
 git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/.openclaw/skills/mediwise-health-suite
+
+cd ~/.openclaw/skills/mediwise-health-suite
+python3 -m pip install -r requirements.txt
+bash install-check.sh
 ```
 
 **方式 2：通过 ClawdHub 安装**
@@ -168,6 +177,8 @@ clawdhub install JuneYaooo/mediwise-health-suite
 # 或从市场安装（审核通过后）
 clawdhub install mediwise-health-suite
 ```
+
+共享实例必须让宿主在每次 action 调用中传入稳定且唯一的 `owner_id`（建议格式 `<channel>:<user_id>`）。仅个人本地实例可设置 `MEDIWISE_SINGLE_USER=1`；否则缺少 owner 的调用会被拒绝。
 
 ### 基本使用
 
@@ -221,9 +232,10 @@ clawdhub install mediwise-health-suite
 用户："帮我绑定佳明手表"
 助手：好的，请问您的手表型号是？（如 Fenix 7、Forerunner 965 等）
 用户："Fenix 7"
-助手：需要您的 Garmin Connect 登录邮箱和密码，凭据仅保存在本地...
-用户："邮箱 xxx@gmail.com 密码 xxx"
-助手：正在连接 Garmin Connect，验证成功！正在同步近 7 天数据...
+助手：请不要在聊天里发送密码。我会生成一条带 `--prompt-password` 的命令，
+      请在你自己的终端中交互输入（不回显，也不经过模型或日志）。
+用户：[在本机终端完成认证]
+助手：验证成功！正在同步近 7 天数据...
        已同步：心率 1240 条、睡眠 7 条、身体电量 2016 条、HRV 7 条
 ```
 
@@ -274,6 +286,7 @@ clawdhub install mediwise-health-suite
 | 健康档案 | ✅ 已实现 | 成员管理、病程记录、用药追踪、健康指标 |
 | 饮食追踪 | ✅ 已实现 | 饮食记录、营养分析、热量计算 |
 | 体重管理 | ✅ 已实现 | 体重记录、BMI/BMR/TDEE 计算、趋势分析 |
+| 睡眠追踪 | ✅ 已实现 | 睡眠记录、每日分析、周趋势与历史查询 |
 | 健康监测 | ⚠ 待完善 | 智能告警、趋势分析 |
 | 可穿戴设备 | ✅ 已实现 | 佳明/Apple Watch/Gadgetbridge 数据同步；HRV、身体电量、睡眠分期 |
 
@@ -282,12 +295,26 @@ clawdhub install mediwise-health-suite
 ## 🔒 数据隐私
 
 - ✅ **默认本地存储**：所有数据存储在本地 SQLite 数据库（`medical.db` 与 `lifestyle.db`）
-- ✅ **不上传云端**：默认配置下，不上传任何个人健康信息
+- ✅ **私有文件权限**：数据目录默认 `0700`，数据库、配置、附件与备份默认 `0600`
+- ✅ **默认不上传云端**：未启用视觉模型、远程 LLM、Embedding、后端 API 或在线食物来源时，不发送数据到第三方
 - ✅ **可选功能**：后端 API、向量搜索等高级功能需用户主动配置启用
-- ✅ **多租户隔离**：支持共享实例场景的数据隔离
+- ✅ **多租户隔离**：共享 action 强制要求 `owner_id`，跨 owner 读写会被拒绝
 - ✅ **发布安全**：数据库、附件、导出文件默认被 `.gitignore` / `.clawdhubignore` 排除
 
-**重要**：项目包含可选的后端 API 和向量搜索功能，但默认关闭。所有云端功能需用户主动配置才会启用。
+**重要**：启用云端视觉模型后，完整图片/PDF 页面会发送给所选提供商；原文件可能包含姓名、身份证号、病历号等 PII。敏感材料请使用可信端点或本地 Ollama。食物数据包不随仓库分发：可配置 USDA API Key、显式启用免 Key 的 Open Food Facts，或自行安装来源与授权明确的兼容本地数据包。在线食物 API 只收到搜索词，不会收到成员、餐次或健康记录；设置 `MEDIWISE_FOOD_ONLINE_ENABLED=0` 可强制离线。
+
+### 数据位置与备份
+
+默认数据目录取决于操作系统：macOS 为 `~/Library/Application Support/mediwise`；Linux 在设置 `XDG_DATA_HOME` 时为 `$XDG_DATA_HOME/mediwise`，否则为 `~/.local/share/mediwise`；Windows 为 `%LOCALAPPDATA%\mediwise`。可通过 `MEDIWISE_DATA_DIR` 或两个数据库路径变量覆盖。
+
+```bash
+python3 mediwise-health-tracker/scripts/setup.py backup --output ~/mediwise-backup.tar.gz
+python3 mediwise-health-tracker/scripts/setup.py restore --input ~/mediwise-backup.tar.gz
+```
+
+备份输出不能与数据库或配置文件使用同一路径。恢复时归档内的数据库路径不会被信任，而会统一落到当前 `MEDIWISE_DATA_DIR`，因此迁移到新设备后不会意外写回旧机器上的绝对路径。同一数据目录不允许并发执行两个 restore；文件替换、Schema 升级或升级后完整性检查失败时，会自动恢复原有配置、数据库和 SQLite sidecar。执行 restore 前仍应停止服务、定时同步及其他 SQLite 客户端。
+
+新备份包含 SQLite 一致性快照与 SHA-256 `manifest.json`，恢复前会验证白名单、哈希和数据库完整性；2.0.8 及更早的官方无 manifest 备份仍可恢复，但无法进行哈希校验。manifest 未签名，可发现损坏或未同步修改，但不能抵御攻击者同时重写数据和 manifest。备份含完整健康档案，请按敏感文件保管。
 
 ---
 

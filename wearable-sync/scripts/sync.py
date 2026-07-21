@@ -57,6 +57,32 @@ def _load_device(conn, device_id):
     return dict(row) if row else None
 
 
+def _verify_device_access(device, owner_id):
+    if owner_id is None:
+        return True
+    conn = health_db.get_medical_connection()
+    try:
+        return health_db.verify_member_ownership(conn, device["member_id"], owner_id)
+    finally:
+        conn.close()
+
+
+def _safe_device(device):
+    """Return device metadata with provider credentials redacted."""
+    result = health_db.row_to_dict(device)
+    if not result:
+        return result
+    try:
+        config = json.loads(result.get("config") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        config = {}
+    for key in ("password", "client_secret", "access_token", "refresh_token", "app_token"):
+        if key in config:
+            config[key] = "***"
+    result["config"] = config
+    return result
+
+
 def _check_duplicate(conn, member_id, metric_type, measured_at, source):
     """Check if a metric with the same key already exists."""
     row = conn.execute(
@@ -85,13 +111,8 @@ def sync_device(device_id, owner_id=None):
         conn.close()
 
     # Verify that the caller has access to the member this device belongs to
-    if owner_id is not None:
-        med_conn = health_db.get_medical_connection()
-        try:
-            if not health_db.verify_member_ownership(med_conn, device["member_id"], owner_id):
-                return {"status": "error", "message": f"无权访问设备: {device_id}"}
-        finally:
-            med_conn.close()
+    if not _verify_device_access(device, owner_id):
+        return {"status": "error", "message": f"无权访问设备: {device_id}"}
 
     provider_name = device["provider"]
     provider = _get_provider(provider_name)
@@ -188,7 +209,7 @@ def sync_device(device_id, owner_id=None):
     _update_sync_log(sync_id, status, synced, skipped, None)
 
     # Auto-check after sync if configured
-    _auto_check_after_sync(member_id)
+    _auto_check_after_sync(member_id, owner_id)
 
     return {
         "status": "ok",
@@ -212,7 +233,7 @@ def _update_sync_log(sync_id, status, synced, skipped, error_msg):
         conn.commit()
 
 
-def _auto_check_after_sync(member_id):
+def _auto_check_after_sync(member_id, owner_id=None):
     """Call health-monitor check.py after sync if configured."""
     try:
         # Load config to check auto_check setting
@@ -225,8 +246,11 @@ def _auto_check_after_sync(member_id):
             os.path.dirname(__file__), "..", "..", "health-monitor", "scripts", "check.py"
         )
         if os.path.isfile(monitor_check):
+            command = [sys.executable, monitor_check, "run", "--member-id", member_id, "--window", "1h"]
+            if owner_id:
+                command.extend(["--owner-id", owner_id])
             subprocess.run(
-                [sys.executable, monitor_check, "run", "--member-id", member_id, "--window", "1h"],
+                command,
                 timeout=30, capture_output=True
             )
     except Exception as e:
@@ -285,6 +309,7 @@ def cmd_run(args):
 def cmd_run_all(args):
     """Run sync for all active devices."""
     health_db.ensure_db()
+    owner_id = getattr(args, "owner_id", None)
     conn = health_db.get_lifestyle_connection()
     try:
         rows = conn.execute(
@@ -297,9 +322,12 @@ def cmd_run_all(args):
         health_db.output_json({"status": "ok", "message": "没有活跃设备"})
         return
 
+    if owner_id:
+        rows = [row for row in rows if _verify_device_access(row, owner_id)]
+
     results = []
     for row in rows:
-        results.append(sync_device(row["id"]))
+        results.append(sync_device(row["id"], owner_id=owner_id))
 
     total_synced = sum(r.get("synced", 0) for r in results)
     total_skipped = sum(r.get("skipped", 0) for r in results)
@@ -326,6 +354,10 @@ def cmd_status(args):
             health_db.output_json({"status": "error", "message": f"未找到设备: {args.device_id}"})
             return
 
+        if not _verify_device_access(device, getattr(args, "owner_id", None)):
+            health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+            return
+
         last_sync = conn.execute(
             """SELECT * FROM wearable_sync_log WHERE device_id=?
                ORDER BY created_at DESC LIMIT 1""",
@@ -334,7 +366,7 @@ def cmd_status(args):
 
         health_db.output_json({
             "status": "ok",
-            "device": health_db.row_to_dict(device),
+            "device": _safe_device(device),
             "last_sync": health_db.row_to_dict(last_sync),
         })
     finally:
@@ -346,6 +378,16 @@ def cmd_history(args):
     health_db.ensure_db()
     conn = health_db.get_lifestyle_connection()
     try:
+        device = conn.execute(
+            "SELECT * FROM wearable_devices WHERE id=? AND is_deleted=0",
+            (args.device_id,),
+        ).fetchone()
+        if not device:
+            health_db.output_json({"status": "error", "message": f"未找到设备: {args.device_id}"})
+            return
+        if not _verify_device_access(device, getattr(args, "owner_id", None)):
+            health_db.output_json({"status": "error", "message": f"无权访问设备: {args.device_id}"})
+            return
         limit = int(args.limit) if args.limit else 10
         rows = conn.execute(
             """SELECT * FROM wearable_sync_log WHERE device_id=?
@@ -370,14 +412,17 @@ def main():
     p_run.add_argument("--member-id", default=None)
     p_run.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="调用方的 owner_id，用于归属校验")
 
-    sub.add_parser("run-all", help="同步所有活跃设备")
+    p_all = sub.add_parser("run-all", help="同步当前 owner 的所有活跃设备")
+    p_all.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_status = sub.add_parser("status", help="查看同步状态")
     p_status.add_argument("--device-id", required=True)
+    p_status.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_history = sub.add_parser("history", help="同步历史")
     p_history.add_argument("--device-id", required=True)
     p_history.add_argument("--limit", default="10")
+    p_history.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {

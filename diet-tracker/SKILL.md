@@ -65,13 +65,15 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 | 动作 | 子命令 | 必要参数 | 可选参数 | 说明 |
 |------|--------|----------|----------|------|
-| food-lookup | search | params.query | params.limit (默认5), params.source (auto/cfcd/brands/usda) | 三层数据源搜索食物营养（CFCD6 → 中国品牌外食 → USDA） |
+| food-lookup | search | params.query | params.limit (默认5), params.source (auto/cfcd/brands/usda/openfoodfacts/off/all) | 按可用数据源搜索食物营养（本地数据包 → USDA → Open Food Facts） |
 | food-stats | stats | — | — | 查看食物数据库概况（各数据源条目数） |
 
 数据来源（按优先级）：
-1. **CFCD6**（离线）：《中国食物成分表标准版第6版》1657 条，覆盖粮谷、肉蛋奶、蔬果、水产等
-2. **cn-brands**（离线）：339 条，奶茶、外卖、便利店、火锅等外食场景
-3. **USDA FoodData Central**（在线）：国际食材兜底，需配置 `USDA_API_KEY` 环境变量
+1. **CFCD6 / cn-brands 本地数据包**（可选）：仓库不捆绑这些数据；只有在确认来源授权后，将兼容格式的数据安装到 `diet-tracker/data/` 才会启用
+2. **USDA FoodData Central**（在线）：需配置 `USDA_API_KEY` 环境变量
+3. **Open Food Facts**（在线，包装/品牌食品）：免 Key，但需显式设置 `OPENFOODFACTS_ENABLED=1`；数据采用 ODbL 1.0，结果会返回产品页和许可证。正式使用应按官方文档填写 API usage form、设置可联系的 User-Agent，并避免搜索即输入等高频调用
+
+`food-stats` 会返回每个数据源的可用状态、来源网址、许可证和本地数据目录。所有在线来源都可用 `MEDIWISE_FOOD_ONLINE_ENABLED=0` 强制关闭。远程 API 只收到食物查询词及语言/分页参数，不得发送 `owner_id`、`member_id`、餐次记录或健康数据。没有任何来源可用时，查询返回 `status: unavailable`，不得把“数据源不可用”当成“该食物不存在”。
 
 ## 使用流程
 
@@ -88,7 +90,7 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 **禁止用 AI 自身知识直接估算营养数值写入数据库。** 记录每种食物之前，必须先调用 `food-lookup search` 查询，用数据库返回的数据填充 `--items`。
 
-> **自动填充说明**：若 `--items` 中某条目未提供热量数据，`diet.py` 会自动调用内部 food_lookup 数据库补全营养值，并在 `note` 字段标注 `[自动填充]` 及数据来源。此行为仅查询本地数据库（不调用外部 API），补全结果与显式 `food-lookup search` 一致。agent 仍应优先显式查询以便向用户展示候选项，但自动填充是兜底保障而非绕过规则。
+> **自动填充说明**：若 `--items` 中某条目未提供热量数据，`diet.py` 会尝试调用本地 food_lookup 数据包补全营养值，并在 `note` 字段标注 `[自动填充]` 及数据来源。仓库默认不捆绑本地数据包；数据源不可用时必须请用户补充营养标签或显式配置在线来源，不能凭模型知识写入估算值。
 
 ```bash
 # 步骤 1：先查每种食物
@@ -103,7 +105,8 @@ python3 {baseDir}/scripts/diet.py add-meal \
 ```
 
 **查询未命中时的处理：**
-- 三层数据源（CFCD6 → 中国品牌外食 → USDA）都未找到时，告知用户"未查到该食物的营养数据"，**询问用户是否手动输入营养值，或跳过该条目**，不得自行估算后直接写入。
+- 结构化来源（本地数据包 → USDA → Open Food Facts）都未找到时，如运行环境具备网页检索能力，只能查询品牌官网、政府/高校数据库或可核验的官方营养标签页，并在 `note` 保留页面 URL、每 100g/每份基准和访问日期。不得采用博客、营销软文、搜索摘要或模型记忆中的数值。
+- 仍无可核验来源时，告知用户“未查到该食物的营养数据”，**询问用户是否按包装标签手动输入，或跳过该条目**，不得自行估算后直接写入。
 - 查到多个候选项时，展示给用户确认，选择最贴近的后再录入。
 - 记录时在 `note` 字段写明数据来源（如"来源：CFCD6"、"来源：用户手动输入"）。
 
@@ -117,7 +120,7 @@ python3 {baseDir}/scripts/diet.py add-meal \
 ]
 ```
 
-自动换算规则：CFCD6/USDA 数据按 `amount`（克）换算；中国品牌/外食数据按每份直接使用。
+自动换算规则：CFCD6/USDA/Open Food Facts 数据按 `amount`（克）换算；中国品牌/外食本地数据按每份直接使用。使用 Open Food Facts 时应向用户提示其为社区维护数据，并优先核对具体条码对应的产品页。
 
 ## 注意事项
 

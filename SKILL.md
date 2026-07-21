@@ -1,7 +1,7 @@
 ---
 name: mediwise-health-suite
-description: "Family health management suite: health records, diet tracking, weight management, wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 2.0.8
+description: "Family health management suite: health records, diet, weight, sleep, monitoring, and wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
+version: 2.0.9
 author: MediWise Team
 license: MIT
 homepage: https://github.com/JuneYaooo/mediwise-health-suite
@@ -60,6 +60,10 @@ requires:
 - 支持 Gadgetbridge（小米手环、华为手表等）
 - 自动同步：心率、步数、血氧、睡眠
 - 可插拔 Provider 架构
+
+### ✅ 6. 睡眠追踪 (sleep-tracker)
+- 睡眠时长与深睡、浅睡、REM、清醒分期记录
+- 每日分析、周趋势与历史查询
 
 ## 快速开始
 
@@ -140,7 +144,7 @@ bash ~/.openclaw/workspace-health/skills/mediwise-health-suite/install-check.sh
 
 ## 可选环境变量
 
-所有功能在不设置任何环境变量的情况下均可正常使用。详细配置模板见根目录 `.env.example`。
+底层 Python CLI 可直接本地使用；通过 Node action 路由调用时必须传入 `owner_id`。仅确认是个人本地实例时，才可显式设置 `MEDIWISE_SINGLE_USER=1`。详细配置模板见根目录 `.env.example`。
 
 ### 多模态视觉模型（强烈推荐配置）
 
@@ -187,8 +191,12 @@ python3 scripts/setup.py set-vision \
 
 | 变量名 | 用途 | 默认行为 |
 |--------|------|----------|
-| `MEDIWISE_OWNER_ID` | 多租户隔离：限定当前进程只能访问该 owner 的数据。**个人/单用户使用时无需设置**；仅在将本工具部署为多人共享服务（如群聊机器人）时才需要为每个用户设置不同值以实现数据隔离 | 未设置时为单用户模式（访问本机全部数据），适合个人或家庭独立部署 |
-| `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材兜底查询。免费注册：https://api.data.gov/signup/ | 未设置时跳过 USDA 查询，使用内置离线数据库 |
+| `MEDIWISE_OWNER_ID` | Python CLI 的默认 owner；共享服务仍应按请求传入对应 `owner_id` | 未设置时 CLI 不限定 owner |
+| `MEDIWISE_SINGLE_USER` | 允许 Node action 在缺少 `owner_id` 时运行；只适用于可信的个人本地实例 | 默认关闭；设为 `1` 才启用 |
+| `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材查询。免费注册：https://api.data.gov/signup/ | 未设置且未安装获授权的本地数据包时，食物查询会明确返回数据源不可用 |
+| `OPENFOODFACTS_ENABLED` | 启用 Open Food Facts 包装/品牌食品搜索（ODbL 1.0） | 默认关闭；设为 `1` 才启用 |
+| `OPENFOODFACTS_SEARCH_URL` | Open Food Facts 官方 Search-a-licious 查询地址 | `https://search.openfoodfacts.org/search` |
+| `MEDIWISE_FOOD_ONLINE_ENABLED` | 在线食物查询总开关 | 未设置时仅使用已显式配置的来源；设为 `0` 强制全部关闭 |
 | `MEDIWISE_DATA_DIR` | 覆盖 SQLite 数据库存储目录 | 默认 OS 用户数据目录（Linux: `~/.local/share/mediwise`） |
 | `MEDIWISE_MEDICAL_DB_PATH` | 覆盖医疗数据库（medical.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
 | `MEDIWISE_LIFESTYLE_DB_PATH` | 覆盖生活方式数据库（lifestyle.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
@@ -203,14 +211,14 @@ python3 scripts/setup.py set-vision \
 
 ### 数据隔离（多用户部署）
 
-- **个人/家庭单机使用**：无需任何配置，所有数据保存在本机 SQLite 文件中。
-- **多用户共享部署**（如群聊机器人）：必须为每个用户传入不同的 `owner_id`（格式 `<channel>:<user_id>`），否则所有用户共享同一份数据库视图。index.js 在 owner_id 缺失时会打印 WARNING 并进入单用户模式。
+- **个人/家庭单机使用**：所有数据保存在本机 SQLite 文件中；若通过 Node action 调用，显式设置 `MEDIWISE_SINGLE_USER=1`。
+- **多用户共享部署**（如群聊机器人）：必须为每个请求传入不同的 `owner_id`（格式 `<channel>:<user_id>`）。缺少 `owner_id` 时 action 会直接拒绝执行，不再静默退化为共享视图。
 
 ### 第三方凭据处理
 
 - **凭据绝不经过聊天传递**：所有 API Key、密码等敏感信息必须由用户在本机终端直接输入，agent 不会在对话中索要、接收或代为保存凭据。
 - **Garmin Connect 密码**：首次绑定通过终端交互输入（`--prompt-password`，不回显），密码不经过模型或日志。认证成功后自动保存 OAuth token，后续同步无需密码。
-- **视觉/LLM API Key**：用户在终端执行 `setup.py set-vision --api-key <key>` 完成配置，key 保存在本机 `config.json`，不会出现在聊天记录中。
+- **视觉/LLM API Key**：用户在终端执行 `setup.py set-vision --api-key <key>` 完成配置。系统优先写入操作系统 keyring；keyring 不可用时才以 `0600` 权限保存到本机 `config.json` 并输出警告。
 - **所有凭据**均保存在本机，不上传到任何远程服务器。
 
 ### 可选外部访问（默认关闭）
@@ -219,8 +227,9 @@ python3 scripts/setup.py set-vision \
 
 | 触发操作（需用户在终端执行） | 外部主机 | 发送内容 |
 |------------------------------|----------|----------|
-| `setup.py set-vision` 启用视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 图片 base64 + 提示词（不含姓名/身份证等 PII） |
+| `setup.py set-vision` 启用视觉模型 | `api.siliconflow.cn` / Google / OpenAI 等 | 完整图片/PDF 页面内容（base64）+ 提示词；原文件中可能包含姓名、身份证号等 PII |
 | `USDA_API_KEY` 环境变量 | `api.nal.usda.gov` | 食物名称搜索词 |
+| `OPENFOODFACTS_ENABLED=1` | `search.openfoodfacts.org` | 食物名称搜索词、语言和分页参数；不发送成员、餐次或健康数据 |
 | `setup.py set-embedding` 启用向量搜索 | `api.siliconflow.cn` | 匿名文本片段 |
 | `setup.py set-backend` 启用后端 API | 用户自配置的端点 | **完整健康记录** — 仅在自托管可信端点使用，不建议指向第三方服务 |
 
@@ -230,12 +239,14 @@ python3 scripts/setup.py set-vision \
 
 `setup.py backup` 会将所有数据库打包为 `.tar.gz`，**包含完整的健康档案**，请妥善保管，不要分享给未授权人员。
 
+新备份使用一致性 SQLite 快照和 SHA-256 manifest，归档权限为 `0600`；恢复前会校验成员白名单、哈希和数据库完整性。输出路径不得与任何源数据库/配置重合；恢复会把归档中的数据库路径规范化到当前数据目录。同一数据目录不允许两个恢复进程并发执行；文件替换、Schema 升级或升级后的完整性检查失败时，会恢复原有配置、数据库及 SQLite sidecar。恢复期间仍须停止服务、定时同步和其他 SQLite 客户端。旧版无 manifest 的官方备份仍可恢复，但无法进行哈希校验。manifest 未签名，能发现损坏或未同步修改，不能抵御攻击者同时重写数据和 manifest。
+
 ## 技术架构
 
-- **数据库**: SQLite（共享 health.db）
+- **数据库**: SQLite（`medical.db` 与 `lifestyle.db` 分域存储，兼容旧版 `health.db`）
 - **脚本语言**: Python 3.8+
 - **Skill 框架**: OpenClaw Agent Skills
-- **模块化设计**: 5 个 skills（3 个已实现，2 个待完善）
+- **模块化设计**: 6 个 skills（健康档案、饮食、体重、睡眠、监测、可穿戴）
 - **可选功能**: 后端 API、向量搜索（默认关闭）
 
 ## 许可证

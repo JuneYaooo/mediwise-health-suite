@@ -11,9 +11,12 @@ from __future__ import annotations
 import os
 import json
 import platform
+import tempfile
 
 _KEYRING_SERVICE = "mediwise-health-tracker"
 _KEYRING_SENTINEL = "__KEYRING__"
+_PRIVATE_DIR_MODE = 0o700
+_PRIVATE_FILE_MODE = 0o600
 
 # Secret fields: (section, key) pairs
 _SECRET_FIELDS = [
@@ -128,7 +131,38 @@ DEFAULT_CONFIG = {
 
 
 def ensure_data_dir():
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, mode=_PRIVATE_DIR_MODE, exist_ok=True)
+    try:
+        os.chmod(DATA_DIR, _PRIVATE_DIR_MODE)
+    except OSError:
+        pass
+
+
+def _secure_config_file():
+    try:
+        os.chmod(CONFIG_PATH, _PRIVATE_FILE_MODE)
+    except OSError:
+        pass
+
+
+def _write_config_file(config):
+    """Atomically write JSON without a world-readable creation window."""
+    ensure_data_dir()
+    fd, temp_path = tempfile.mkstemp(prefix=".config-", suffix=".tmp", dir=DATA_DIR)
+    os.chmod(temp_path, _PRIVATE_FILE_MODE)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file_obj:
+            json.dump(config, file_obj, ensure_ascii=False, indent=2)
+            file_obj.flush()
+            os.fsync(file_obj.fileno())
+        os.replace(temp_path, CONFIG_PATH)
+        _secure_config_file()
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
 
 
 def load_config():
@@ -167,9 +201,7 @@ def load_config():
 
         if migrated:
             # Persist the sentinel values back to config file
-            ensure_data_dir()
-            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, ensure_ascii=False, indent=2)
+            _write_config_file(cfg)
 
         return merged
     return {**DEFAULT_CONFIG}
@@ -195,8 +227,7 @@ def save_config(config):
                 has_plaintext_secrets = True
                 break
 
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(to_save, f, ensure_ascii=False, indent=2)
+    _write_config_file(to_save)
 
     if has_plaintext_secrets:
         import sys

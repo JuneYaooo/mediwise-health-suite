@@ -15,12 +15,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 import os
 import sqlite3
 import tarfile
 import datetime
+import hashlib
+import shutil
+import tempfile
 
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
@@ -85,6 +89,82 @@ VISION_PROVIDER_PRESETS = {
 
 def output_json(data):
     print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+class RestoreLockError(RuntimeError):
+    """Raised when another restore process already owns the data lock."""
+
+
+@contextlib.contextmanager
+def _exclusive_restore_lock(data_dir):
+    """Hold a non-blocking cross-process lock for the complete restore."""
+    lock_path = os.path.join(data_dir, ".restore.lock")
+    lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    lock_fd = os.open(lock_path, lock_flags, 0o600)
+    lock_file = os.fdopen(lock_fd, "r+b")
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(lock_file.fileno(), 0o600)
+        else:
+            os.chmod(lock_path, 0o600)
+        lock_file.seek(0, os.SEEK_END)
+        if lock_file.tell() == 0:
+            lock_file.write(b"\0")
+            lock_file.flush()
+        lock_file.seek(0)
+
+        unlock = None
+        try:
+            try:
+                import fcntl
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                unlock = lambda: fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except ImportError:
+                import msvcrt
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                unlock = lambda: msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        except (OSError, BlockingIOError) as error:
+            raise RestoreLockError(
+                "已有另一个恢复进程正在使用当前数据目录，请等待其完成后重试。"
+            ) from error
+
+        try:
+            yield lock_path
+        finally:
+            if unlock is not None:
+                lock_file.seek(0)
+                unlock()
+    finally:
+        lock_file.close()
+
+
+def _snapshot_live_restore_state(data_dir, rollback_dir):
+    """Snapshot every file that restore or schema migration may mutate."""
+    state = []
+    for name in ("config.json", "medical.db", "lifestyle.db", "health.db"):
+        candidates = [name]
+        if name.endswith(".db"):
+            candidates.extend((f"{name}-wal", f"{name}-shm", f"{name}-journal"))
+        for candidate in candidates:
+            destination = os.path.join(data_dir, candidate)
+            rollback_path = os.path.join(rollback_dir, candidate)
+            existed = os.path.isfile(destination)
+            if existed:
+                shutil.copyfile(destination, rollback_path)
+                os.chmod(rollback_path, 0o600)
+            state.append((destination, rollback_path, existed))
+    return state
+
+
+def _rollback_live_restore_state(state):
+    """Restore the exact pre-restore file set, including SQLite sidecars."""
+    for destination, _, _ in state:
+        if os.path.lexists(destination):
+            os.remove(destination)
+    for destination, rollback_path, existed in state:
+        if existed:
+            os.replace(rollback_path, destination)
+            os.chmod(destination, 0o600)
 
 
 def _mask_key(s: str) -> str:
@@ -820,7 +900,7 @@ def cmd_migration_status(args):
 
 
 def cmd_backup(args):
-    """Pack databases and config into a portable tar.gz archive."""
+    """Create a consistent, portable backup of databases and configuration."""
     from config import DATA_DIR, CONFIG_PATH
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -829,21 +909,35 @@ def cmd_backup(args):
     else:
         output_path = os.path.abspath(f"mediwise-backup-{timestamp}.tar.gz")
 
-    candidates = [
-        os.path.join(DATA_DIR, "medical.db"),
-        os.path.join(DATA_DIR, "lifestyle.db"),
-        os.path.join(DATA_DIR, "health.db"),  # legacy single-db
-        CONFIG_PATH,
+    cfg = load_config()
+    db_candidates = [
+        (os.path.abspath(get_medical_db_path()), "medical.db"),
+        (os.path.abspath(get_lifestyle_db_path()), "lifestyle.db"),
     ]
-    included = []
-    missing = []
-    for path in candidates:
-        if os.path.exists(path):
-            included.append(path)
-        else:
-            missing.append(path)
+    legacy_path = os.path.abspath(cfg.get("db_path", DEFAULT_CONFIG["db_path"]))
+    if legacy_path not in {path for path, _ in db_candidates}:
+        db_candidates.append((legacy_path, "health.db"))
 
-    if not included:
+    # Never let an archive replace a live database/configuration file.  Use
+    # realpath for symlinked parents and samefile for existing hard links.
+    input_paths = [path for path, _ in db_candidates] + [os.path.abspath(CONFIG_PATH)]
+    output_identity = os.path.normcase(os.path.realpath(output_path))
+    for input_path in input_paths:
+        paths_conflict = output_identity == os.path.normcase(os.path.realpath(input_path))
+        if not paths_conflict and os.path.exists(output_path) and os.path.exists(input_path):
+            try:
+                paths_conflict = os.path.samefile(output_path, input_path)
+            except OSError:
+                paths_conflict = False
+        if paths_conflict:
+            output_json({
+                "status": "error",
+                "message": "备份输出路径不能与数据库或配置文件相同。",
+                "output": output_path,
+            })
+            sys.exit(1)
+
+    if not any(os.path.isfile(path) for path, _ in db_candidates) and not os.path.isfile(CONFIG_PATH):
         output_json({
             "status": "error",
             "message": "数据目录中没有找到任何数据库或配置文件，请先初始化。",
@@ -851,24 +945,88 @@ def cmd_backup(args):
         })
         sys.exit(1)
 
-    with tarfile.open(output_path, "w:gz") as tar:
-        for path in included:
-            # Store files with path relative to DATA_DIR so restore is location-independent
-            arcname = os.path.relpath(path, DATA_DIR)
-            tar.add(path, arcname=arcname)
+    included = []
+    missing = []
+    manifest = {"format_version": 1, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "files": {}}
+
+    with tempfile.TemporaryDirectory(prefix="mediwise-backup-") as temp_dir:
+        for source_path, arcname in db_candidates:
+            if not os.path.isfile(source_path):
+                missing.append(source_path)
+                continue
+            snapshot_path = os.path.join(temp_dir, arcname)
+            source_conn = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
+            target_conn = sqlite3.connect(snapshot_path)
+            try:
+                source_conn.backup(target_conn)
+                integrity = target_conn.execute("PRAGMA integrity_check").fetchone()
+                if not integrity or integrity[0] != "ok":
+                    raise RuntimeError(f"数据库完整性检查失败: {source_path}")
+            finally:
+                target_conn.close()
+                source_conn.close()
+            os.chmod(snapshot_path, 0o600)
+            included.append((snapshot_path, arcname, source_path))
+
+        if os.path.isfile(CONFIG_PATH):
+            config_snapshot = os.path.join(temp_dir, "config.json")
+            shutil.copyfile(CONFIG_PATH, config_snapshot)
+            os.chmod(config_snapshot, 0o600)
+            included.append((config_snapshot, "config.json", CONFIG_PATH))
+        else:
+            missing.append(CONFIG_PATH)
+
+        for snapshot_path, arcname, _ in included:
+            digest = hashlib.sha256()
+            with open(snapshot_path, "rb") as file_obj:
+                for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            manifest["files"][arcname] = {
+                "sha256": digest.hexdigest(),
+                "size": os.path.getsize(snapshot_path),
+            }
+
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as file_obj:
+            json.dump(manifest, file_obj, ensure_ascii=False, indent=2)
+        os.chmod(manifest_path, 0o600)
+
+        # Write through the descriptor opened with O_NOFOLLOW. This keeps the
+        # private mode and avoids closing/reopening the path before tar writes.
+        output_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+        output_fd = os.open(output_path, output_flags, 0o600)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(output_fd, 0o600)
+            else:
+                os.chmod(output_path, 0o600)
+            with os.fdopen(output_fd, "wb") as output_file:
+                output_fd = -1
+                with tarfile.open(fileobj=output_file, mode="w:gz") as tar:
+                    for snapshot_path, arcname, _ in included:
+                        tar.add(snapshot_path, arcname=arcname, recursive=False)
+                    tar.add(manifest_path, arcname="manifest.json", recursive=False)
+        except Exception:
+            if output_fd >= 0:
+                os.close(output_fd)
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+            raise
 
     output_json({
         "status": "ok",
         "message": f"备份已保存到 {output_path}",
         "output": output_path,
-        "files": [os.path.relpath(p, DATA_DIR) for p in included],
-        "skipped": [os.path.relpath(p, DATA_DIR) for p in missing],
+        "files": [arcname for _, arcname, _ in included] + ["manifest.json"],
+        "skipped": missing,
     })
 
 
 def cmd_restore(args):
-    """Restore databases and config from a tar.gz archive created by backup."""
-    from config import DATA_DIR, CONFIG_PATH
+    """Validate and restore a backup created by :func:`cmd_backup`."""
+    from config import DATA_DIR
     from health_db import ensure_db
 
     input_path = os.path.abspath(args.input)
@@ -886,42 +1044,172 @@ def cmd_restore(args):
         })
         sys.exit(1)
 
-    os.makedirs(DATA_DIR, exist_ok=True)
-
+    ensure_data_dir()
+    allowed_names = {"medical.db", "lifestyle.db", "health.db", "config.json", "manifest.json"}
+    max_total_size = 2 * 1024 * 1024 * 1024
     restored = []
-    with tarfile.open(input_path, "r:gz") as tar:
-        for member in tar.getmembers():
-            # Security: strip any leading / or .. components
-            safe_name = os.path.normpath(member.name)
-            if safe_name.startswith(".."):
-                continue
-            dest = os.path.join(DATA_DIR, safe_name)
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            source = tar.extractfile(member)
-            if source is None:
-                continue
-            with open(dest, "wb") as f:
-                f.write(source.read())
-            restored.append(safe_name)
+    legacy_backup = False
 
-    # Apply any pending schema migrations automatically
     try:
-        ensure_db()
-        migration_ok = True
-        migration_error = None
-    except Exception as e:
-        migration_ok = False
-        migration_error = str(e)
+        with _exclusive_restore_lock(DATA_DIR), tempfile.TemporaryDirectory(
+            prefix="mediwise-restore-"
+        ) as temp_dir:
+            with tarfile.open(input_path, "r:gz") as tar:
+                members = tar.getmembers()
+                total_size = sum(member.size for member in members if member.isfile())
+                if total_size > max_total_size:
+                    raise ValueError("备份解包后超过 2 GiB 安全上限")
+                seen_names = set()
+                for member in members:
+                    if member.name not in allowed_names or not member.isfile():
+                        raise ValueError(f"备份包含不允许的成员: {member.name}")
+                    if member.name in seen_names:
+                        raise ValueError(f"备份包含重复成员: {member.name}")
+                    seen_names.add(member.name)
+                    source = tar.extractfile(member)
+                    if source is None:
+                        raise ValueError(f"无法读取备份成员: {member.name}")
+                    temp_path = os.path.join(temp_dir, member.name)
+                    with open(temp_path, "wb") as file_obj:
+                        shutil.copyfileobj(source, file_obj)
+                    os.chmod(temp_path, 0o600)
+
+            archive_files = seen_names - {"manifest.json"}
+            if not archive_files:
+                raise ValueError("备份中没有可恢复的数据文件")
+
+            manifest_path = os.path.join(temp_dir, "manifest.json")
+            if os.path.isfile(manifest_path):
+                with open(manifest_path, "r", encoding="utf-8") as file_obj:
+                    manifest = json.load(file_obj)
+                if not isinstance(manifest, dict) or manifest.get("format_version") != 1:
+                    raise ValueError("不支持的备份格式版本")
+                manifest_files = manifest.get("files")
+                if not isinstance(manifest_files, dict):
+                    raise ValueError("manifest.files 格式无效")
+                if set(manifest_files) != archive_files:
+                    raise ValueError("manifest 与归档中的数据文件不一致")
+
+                for name, metadata in manifest_files.items():
+                    if name not in allowed_names or name == "manifest.json":
+                        raise ValueError(f"manifest 包含非法文件名: {name}")
+                    if not isinstance(metadata, dict):
+                        raise ValueError(f"manifest 文件元数据无效: {name}")
+                    temp_path = os.path.join(temp_dir, name)
+                    if metadata.get("size") != os.path.getsize(temp_path):
+                        raise ValueError(f"文件大小校验失败: {name}")
+                    digest = hashlib.sha256()
+                    with open(temp_path, "rb") as file_obj:
+                        for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                    if digest.hexdigest() != metadata.get("sha256"):
+                        raise ValueError(f"文件校验失败: {name}")
+            else:
+                # Backups made before format_version=1 did not have a
+                # manifest. Keep them restorable, but still apply the strict
+                # filename, type, JSON and SQLite checks below.
+                legacy_backup = True
+
+            for name in sorted(archive_files):
+                temp_path = os.path.join(temp_dir, name)
+                if name.endswith(".db"):
+                    # A snapshot may retain WAL journal mode. SQLite can need
+                    # to create temporary sidecars when opening such a file,
+                    # so validate the isolated staging copy in normal mode.
+                    check_conn = sqlite3.connect(temp_path)
+                    try:
+                        integrity = check_conn.execute("PRAGMA integrity_check").fetchone()
+                    finally:
+                        check_conn.close()
+                    if not integrity or integrity[0] != "ok":
+                        raise ValueError(f"数据库完整性检查失败: {name}")
+
+            # Validate and rewrite paths before touching any live file. A
+            # database-only legacy backup uses the current/default config.
+            config_path = os.path.join(temp_dir, "config.json")
+            if os.path.isfile(config_path):
+                with open(config_path, "r", encoding="utf-8") as file_obj:
+                    restored_config = json.load(file_obj)
+                if not isinstance(restored_config, dict):
+                    raise ValueError("config.json 必须是 JSON 对象")
+            else:
+                restored_config = load_config()
+            # A backup is data, not authority to choose filesystem targets.
+            # Normalize every database path whenever configuration or a DB is
+            # restored, including config-only/incomplete archives.
+            if archive_files & {"config.json", "medical.db", "lifestyle.db", "health.db"}:
+                restored_config["db_path"] = os.path.join(DATA_DIR, "health.db")
+                restored_config["medical_db_path"] = os.path.join(DATA_DIR, "medical.db")
+                restored_config["lifestyle_db_path"] = os.path.join(DATA_DIR, "lifestyle.db")
+                with open(config_path, "w", encoding="utf-8") as file_obj:
+                    json.dump(restored_config, file_obj, ensure_ascii=False, indent=2)
+                os.chmod(config_path, 0o600)
+                archive_files.add("config.json")
+
+            # Snapshot every live file that either replacement or schema
+            # migration can mutate. Keep it until migration and integrity
+            # validation both succeed.
+            rollback_dir = os.path.join(temp_dir, "rollback")
+            os.makedirs(rollback_dir, mode=0o700)
+            live_state = _snapshot_live_restore_state(DATA_DIR, rollback_dir)
+            try:
+                for name in ("medical.db", "lifestyle.db", "health.db", "config.json"):
+                    if name not in archive_files:
+                        continue
+                    temp_path = os.path.join(temp_dir, name)
+                    destination = os.path.join(DATA_DIR, name)
+                    staged_path = f"{destination}.restore-tmp"
+                    shutil.copyfile(temp_path, staged_path)
+                    os.chmod(staged_path, 0o600)
+                    os.replace(staged_path, destination)
+                    if name.endswith(".db"):
+                        for suffix in ("-wal", "-shm", "-journal"):
+                            sidecar = f"{destination}{suffix}"
+                            if os.path.exists(sidecar):
+                                os.remove(sidecar)
+                    restored.append(name)
+
+                # Migrate while the restore lock and rollback snapshots are
+                # still held. A migration failure restores the complete prior
+                # config/DB/sidecar set.
+                ensure_db()
+                for name in ("medical.db", "lifestyle.db", "health.db"):
+                    db_path = os.path.join(DATA_DIR, name)
+                    if not os.path.isfile(db_path):
+                        continue
+                    check_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+                    try:
+                        integrity = check_conn.execute("PRAGMA integrity_check").fetchone()
+                    finally:
+                        check_conn.close()
+                    if not integrity or integrity[0] != "ok":
+                        raise RuntimeError(f"Schema 升级后数据库完整性检查失败: {name}")
+            except Exception as error:
+                for name in ("medical.db", "lifestyle.db", "health.db", "config.json"):
+                    staged_path = os.path.join(DATA_DIR, f"{name}.restore-tmp")
+                    if os.path.exists(staged_path):
+                        os.remove(staged_path)
+                try:
+                    _rollback_live_restore_state(live_state)
+                except Exception as rollback_error:
+                    raise RuntimeError(
+                        f"恢复失败且自动回滚未完成: {error}; 回滚错误: {rollback_error}"
+                    ) from rollback_error
+                raise RuntimeError(f"恢复或 Schema 升级失败，已恢复原有数据: {error}") from error
+    except (
+        OSError, ValueError, TypeError, RuntimeError, RestoreLockError,
+        json.JSONDecodeError, sqlite3.Error, tarfile.TarError,
+    ) as error:
+        output_json({"status": "error", "message": f"恢复失败: {error}"})
+        sys.exit(1)
 
     result = {
-        "status": "ok" if migration_ok else "warning",
-        "message": "数据恢复完成，Schema 已自动升级到最新版本。" if migration_ok
-                   else f"数据已恢复，但 Schema 自动升级失败: {migration_error}",
+        "status": "ok",
+        "message": "数据恢复完成，Schema 已自动升级并通过完整性检查。",
         "data_dir": DATA_DIR,
         "restored_files": restored,
+        "backup_format": "legacy" if legacy_backup else "manifest-v1",
     }
-    if migration_error:
-        result["migration_error"] = migration_error
     output_json(result)
 
 

@@ -12,6 +12,7 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_NAME="mediwise-health-suite"
+CHECK_FAILED=0
 
 # ── 颜色输出 ────────────────────────────────────────────────────
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
@@ -59,7 +60,8 @@ echo ""
 case "$SKILL_DIR" in
   "$AGENT_ROOT"/*)
     ok "路径检测通过：skill 位于 agent 工作区内部"
-    ok "  $AGENT_ROOT/…/$(realpath --relative-to="$AGENT_ROOT" "$SKILL_DIR")"
+    RELATIVE_PATH="$(python3 -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$SKILL_DIR" "$AGENT_ROOT")"
+    ok "  $AGENT_ROOT/…/$RELATIVE_PATH"
     PATH_OK=1
     ;;
   *)
@@ -68,6 +70,7 @@ case "$SKILL_DIR" in
     err "  期望在:   $AGENT_ROOT/skills/$SKILL_NAME/"
     err "  这会触发 OpenClaw 'escapes plugin root' 保护，导致 SKILL.md 无法加载"
     PATH_OK=0
+    CHECK_FAILED=1
     ;;
 esac
 
@@ -75,24 +78,29 @@ esac
 if [[ -f "$SKILL_DIR/SKILL.md" ]]; then
   ok "SKILL.md 存在"
 else
-  err "SKILL.md 不存在，OpenClaw 将无法识别此 skill"
+    err "SKILL.md 不存在，OpenClaw 将无法识别此 skill"
+    CHECK_FAILED=1
 fi
 
 # ── 4. 检查 Python 脚本是否可执行 ───────────────────────────────
 SCRIPTS_DIR="$SKILL_DIR/mediwise-health-tracker/scripts"
 if [[ -d "$SCRIPTS_DIR" ]]; then
   ok "脚本目录存在: $SCRIPTS_DIR"
-  if python3 - <<'EOF' 2>/dev/null
-import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+  if SCRIPTS_DIR="$SCRIPTS_DIR" python3 - <<'EOF' 2>/dev/null
+import os
+import sys
+sys.path.insert(0, os.environ["SCRIPTS_DIR"])
 import health_db
 EOF
   then
     ok "Python 脚本可正常导入"
   else
-    warn "Python 脚本导入测试跳过（需在脚本目录内执行 python3）"
+    err "Python 脚本无法导入"
+    CHECK_FAILED=1
   fi
 else
   err "脚本目录不存在: $SCRIPTS_DIR"
+  CHECK_FAILED=1
 fi
 
 # ── 5. 如果路径有问题，给出修复建议 ─────────────────────────────
@@ -117,6 +125,12 @@ if [[ "$PATH_OK" -eq 0 ]]; then
   echo ""
   echo "  修复后重新运行此脚本验证。"
   echo ""
+  exit 1
+fi
+
+if [[ "$CHECK_FAILED" -ne 0 ]]; then
+  echo ""
+  err "检测未通过，请修复上面的错误后重试。"
   exit 1
 fi
 

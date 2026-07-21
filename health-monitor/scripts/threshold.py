@@ -77,6 +77,13 @@ _VALUE_RANGES = {
 }
 
 
+def _verify_member_access(conn, member_id: str, owner_id: str | None) -> bool:
+    if not health_db.verify_member_ownership(conn, member_id, owner_id):
+        health_db.output_json({"status": "error", "message": f"无权访问成员: {member_id}"})
+        return False
+    return True
+
+
 def get_thresholds(member_id: str) -> dict:
     """Get effective thresholds for a member (defaults + age adjustments + custom overrides).
 
@@ -138,6 +145,13 @@ def _merge_thresholds(base: dict, override: dict):
 def cmd_list(args):
     """List effective thresholds for a member."""
     health_db.ensure_db()
+    conn = health_db.get_connection()
+    try:
+        if not _verify_member_access(conn, args.member_id, getattr(args, "owner_id", None)):
+            return
+    finally:
+        conn.close()
+
     thresholds = get_thresholds(args.member_id)
 
     # Also load custom overrides to mark them
@@ -215,6 +229,8 @@ def cmd_set(args):
         return
 
     with health_db.transaction() as conn:
+        if not _verify_member_access(conn, args.member_id, getattr(args, "owner_id", None)):
+            return
         # Verify member
         m = conn.execute("SELECT 1 FROM members WHERE id=? AND is_deleted=0", (args.member_id,)).fetchone()
         if not m:
@@ -258,6 +274,8 @@ def cmd_reset(args):
     health_db.ensure_db()
 
     with health_db.transaction() as conn:
+        if not _verify_member_access(conn, args.member_id, getattr(args, "owner_id", None)):
+            return
         conn.execute(
             """UPDATE monitor_thresholds
                SET is_deleted=1, is_active=0, updated_at=?
@@ -278,6 +296,7 @@ def main():
 
     p_list = sub.add_parser("list", help="查看阈值")
     p_list.add_argument("--member-id", required=True)
+    p_list.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_set = sub.add_parser("set", help="设置自定义阈值")
     p_set.add_argument("--member-id", required=True)
@@ -285,10 +304,12 @@ def main():
     p_set.add_argument("--level", required=True, choices=["warning", "urgent", "emergency"])
     p_set.add_argument("--direction", required=True, choices=["above", "below"])
     p_set.add_argument("--value", required=True, help="阈值")
+    p_set.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     p_reset = sub.add_parser("reset", help="恢复默认阈值")
     p_reset.add_argument("--member-id", required=True)
     p_reset.add_argument("--type", required=True, help="指标类型")
+    p_reset.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {"list": cmd_list, "set": cmd_set, "reset": cmd_reset}

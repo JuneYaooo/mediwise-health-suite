@@ -156,7 +156,7 @@ def generate_dashboard(owner_id: str | None = None) -> dict:
             conn.close()
 
         # trend_report 内部自己管理连接
-        trend_data = trend_report(mid)
+        trend_data = trend_report(mid, owner_id)
         trend_warnings = trend_data.get("warnings", [])
 
         risk = _member_risk_level(alerts, trend_warnings)

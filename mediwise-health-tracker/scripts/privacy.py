@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import re
+import hashlib
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -31,18 +32,14 @@ def get_default_privacy_level() -> str:
     return level
 
 
-# Deterministic pseudonym mapping based on member_id hash
-_PSEUDONYM_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-
 def _get_pseudonym(member_id: str) -> str:
     """Deterministic pseudonym mapping based on member_id hash.
 
     Same member_id always maps to the same pseudonym, regardless of
     process restarts or call order.
     """
-    idx = hash(member_id) % len(_PSEUDONYM_LABELS)
-    return f"成员{_PSEUDONYM_LABELS[idx]}"
+    digest = hashlib.sha256(f"mediwise-pseudonym:{member_id}".encode("utf-8")).hexdigest()
+    return f"成员-{digest[:8].upper()}"
 
 
 # Regex patterns for Chinese PII

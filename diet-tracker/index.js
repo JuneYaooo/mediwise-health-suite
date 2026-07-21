@@ -143,16 +143,23 @@ export async function execute(inputs, context) {
     const ownerId = inputs.owner_id;
     if (ownerId) {
       args.push('--owner-id', ownerId);
+    } else if (process.env.MEDIWISE_SINGLE_USER !== '1') {
+      return {
+        status: 'error',
+        error: '缺少 owner_id。共享调用必须提供 owner_id；仅个人本地使用时可显式设置 MEDIWISE_SINGLE_USER=1。',
+      };
     } else {
-      log('[diet-tracker] WARNING: owner_id not provided; operating in single-user mode (all local data accessible)');
+      log('[diet-tracker] single-user mode enabled');
     }
 
-    log(`[diet-tracker] script=${script} args=${args.join(' ')}`);
+    log(`[diet-tracker] script=${script}`);
     const result = await runScript(script, args);
     return { status: 'ok', result };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log(`[diet-tracker] error: ${message}`);
+    const stderr = typeof err?.stderr === 'string' ? err.stderr.trim() : '';
+    const exitCode = err?.code ?? 'unknown';
+    const message = stderr || `Python 脚本执行失败（exit=${exitCode}）`;
+    log(`[diet-tracker] script failed exit=${exitCode}`);
     return { status: 'error', error: message };
   }
 }

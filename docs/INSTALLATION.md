@@ -56,6 +56,8 @@ pip install -r requirements.txt
 
 **图片/PDF 识别（化验单、体检报告等）需要配置外部视觉模型**，否则图片类功能无法使用。
 
+> 隐私提示：使用云端视觉提供商时，完整图片/PDF 页面会发送到所选端点，原文件可能包含姓名、身份证号、病历号等 PII。敏感材料请优先使用可信端点或本地 Ollama。
+
 **推荐方式：通过环境变量配置（支持 .env 文件）**
 
 复制模板文件并填入你的 API Key：
@@ -65,6 +67,8 @@ cd ~/.openclaw/skills/mediwise-health-suite
 cp .env.example .env
 # 编辑 .env，填入 MEDIWISE_VISION_API_KEY 等变量
 ```
+
+可选的食物在线来源也在 `.env.example` 中配置：USDA 需要 API Key；Open Food Facts 免 Key，但必须显式设置 `OPENFOODFACTS_ENABLED=1`。在线食物查询仅发送食物关键词，设置 `MEDIWISE_FOOD_ONLINE_ENABLED=0` 可强制禁用全部远程食物请求。
 
 **方案 A（国内推荐）：硅基流动 Qwen2.5-VL**
 
@@ -148,19 +152,24 @@ pip install -r requirements.txt
 
 ### 数据库初始化
 
-首次使用时，系统会自动创建数据库（默认拆分为医疗与生活方式两库）：
+首次执行需要数据库的命令时，系统会自动创建数据库（默认拆分为医疗与生活方式两库）。默认位置是：
 
 ```
-~/.openclaw/skills/mediwise-health-suite/data/medical.db
-~/.openclaw/skills/mediwise-health-suite/data/lifestyle.db
+macOS:  ~/Library/Application Support/mediwise/{medical.db,lifestyle.db}
+Linux:  ${XDG_DATA_HOME:-$HOME/.local/share}/mediwise/{medical.db,lifestyle.db}
+Windows: %LOCALAPPDATA%\mediwise\{medical.db,lifestyle.db}
 ```
 
-如果需要手动初始化：
+可通过 `MEDIWISE_DATA_DIR`、`MEDIWISE_MEDICAL_DB_PATH` 和 `MEDIWISE_LIFESTYLE_DB_PATH` 覆盖。数据目录默认权限为 `0700`，数据库和配置文件为 `0600`。
+
+如果需要手动初始化配置文件：
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py init
 ```
+
+`setup.py init` 只创建配置；数据库仍会在第一次数据操作时自动初始化。
 
 如果从旧版本升级（单库 `health.db`），可执行迁移命令：
 
@@ -188,7 +197,7 @@ cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py restore --input ~/mediwise-backup.tar.gz
 ```
 
-备份文件包含：`medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）。恢复完成后，Schema 会自动升级到最新版本，无需手动干预。
+备份会读取配置中的自定义数据库路径，并使用 SQLite 一致性快照。归档包含 `medical.db`、`lifestyle.db`、`config.json`（以及旧版 `health.db`，如存在）和 SHA-256 `manifest.json`，文件权限为 `0600`。恢复会先校验成员白名单、大小、哈希及 SQLite 完整性，再自动升级 Schema。同一数据目录不允许两个恢复进程并发执行；替换、Schema 升级或升级后完整性检查失败时会恢复原有配置、数据库和 SQLite sidecar。运行 restore 前仍须停止 OpenClaw 服务、定时同步任务和其他 SQLite 客户端。2.0.8 及更早的官方无 manifest 备份仍可恢复，但无法进行哈希校验。manifest 未签名，不提供来源真实性保证。
 
 ### 故障排查
 
@@ -219,8 +228,10 @@ chmod +x ~/.openclaw/skills/mediwise-health-suite/*/scripts/*.py
 **解决方案**：
 ```bash
 # 检查数据库目录权限
-mkdir -p ~/.openclaw/skills/mediwise-health-suite/data
-chmod 755 ~/.openclaw/skills/mediwise-health-suite/data
+# Linux 默认；macOS 请改为 "$HOME/Library/Application Support/mediwise"
+DATA_DIR="${MEDIWISE_DATA_DIR:-$HOME/.local/share/mediwise}"
+chmod 700 "$DATA_DIR"
+find "$DATA_DIR" -maxdepth 1 -type f -exec chmod 600 {} +
 ```
 
 ---
@@ -280,6 +291,8 @@ pip install -r requirements.txt
 #### Step 3: Configure Multimodal Vision Model (Required for Image Recognition)
 
 **Image/PDF recognition (lab reports, checkup reports, etc.) requires configuring an external vision model.** Without this, image-based features will not work.
+
+> Privacy note: a cloud vision provider receives the complete image/PDF page. Source documents can contain names, government identifiers, record numbers, and other PII. Use a trusted endpoint or local Ollama for sensitive material.
 
 **Recommended: Configure via environment variables (supports .env file)**
 
@@ -371,19 +384,24 @@ Add to OpenClaw configuration file:
 
 ### Database Initialization
 
-On first use, the system will automatically create databases (split into medical and lifestyle by default):
+The first command that needs a database creates it automatically (split into medical and lifestyle by default). Default locations are:
 
 ```
-~/.openclaw/skills/mediwise-health-suite/data/medical.db
-~/.openclaw/skills/mediwise-health-suite/data/lifestyle.db
+macOS:  ~/Library/Application Support/mediwise/{medical.db,lifestyle.db}
+Linux:  ${XDG_DATA_HOME:-$HOME/.local/share}/mediwise/{medical.db,lifestyle.db}
+Windows: %LOCALAPPDATA%\mediwise\{medical.db,lifestyle.db}
 ```
 
-To manually initialize:
+Override these with `MEDIWISE_DATA_DIR`, `MEDIWISE_MEDICAL_DB_PATH`, or `MEDIWISE_LIFESTYLE_DB_PATH`. Directories default to mode `0700`; databases and config files default to `0600`.
+
+To initialize the config file manually:
 
 ```bash
 cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py init
 ```
+
+`setup.py init` creates configuration only. Databases are still initialized by the first data operation.
 
 If upgrading from the legacy single database (`health.db`), run the migration:
 
@@ -411,7 +429,7 @@ cd ~/.openclaw/skills/mediwise-health-suite/mediwise-health-tracker/scripts
 python3 setup.py restore --input ~/mediwise-backup.tar.gz
 ```
 
-The archive contains `medical.db`, `lifestyle.db`, `config.json` (and the legacy `health.db` if present). The database schema is automatically upgraded to the latest version after restore — no manual steps needed.
+Backup follows configured custom database paths and creates consistent SQLite snapshots. The archive contains `medical.db`, `lifestyle.db`, `config.json` (and legacy `health.db` when present), plus a SHA-256 `manifest.json`, and is written with mode `0600`. Restore validates the member allowlist, size, hashes, and SQLite integrity before upgrading the schema. Two restore processes cannot operate on the same data directory concurrently; replacement, schema migration, or post-migration validation failure restores the previous config, databases, and SQLite sidecars. Stop OpenClaw, scheduled sync jobs, and other SQLite clients before restoring. Official pre-2.0.9 backups without a manifest remain supported but cannot be hash-checked. The manifest is not signed and does not prove archive authenticity.
 
 ### Troubleshooting
 
@@ -442,6 +460,8 @@ chmod +x ~/.openclaw/skills/mediwise-health-suite/*/scripts/*.py
 **Solution**:
 ```bash
 # Check database directory permissions
-mkdir -p ~/.openclaw/skills/mediwise-health-suite/data
-chmod 755 ~/.openclaw/skills/mediwise-health-suite/data
+# Linux default; on macOS use "$HOME/Library/Application Support/mediwise"
+DATA_DIR="${MEDIWISE_DATA_DIR:-$HOME/.local/share/mediwise}"
+chmod 700 "$DATA_DIR"
+find "$DATA_DIR" -maxdepth 1 -type f -exec chmod 600 {} +
 ```

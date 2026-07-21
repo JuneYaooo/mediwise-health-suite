@@ -96,11 +96,16 @@ export async function execute(inputs, context) {
 
   if (inputs.owner_id) {
     args.push('--owner-id', inputs.owner_id);
+  } else if (process.env.MEDIWISE_SINGLE_USER !== '1') {
+    return {
+      status: 'error',
+      error: '缺少 owner_id。共享调用必须提供 owner_id；仅个人本地使用时可显式设置 MEDIWISE_SINGLE_USER=1。',
+    };
   } else {
-    log('[health-monitor] WARNING: owner_id not provided; operating in single-user mode (all local data accessible)');
+    log('[health-monitor] single-user mode enabled');
   }
 
-  log(`[health-monitor] script=${script} args=${args.join(' ')}`);
+  log(`[health-monitor] script=${script}`);
 
   try {
     const { stdout } = await execFileAsync('python3', [scriptPath, ...args], {
@@ -114,8 +119,10 @@ export async function execute(inputs, context) {
     try {
       return { status: 'ok', result: JSON.parse(stdout.trim()) };
     } catch {
-      const message = stderr || err.message;
-      log(`[health-monitor] error: ${message}`);
+      const exitCode = err?.code ?? 'unknown';
+      const message = (typeof stderr === 'string' ? stderr.trim() : '')
+        || `Python 脚本执行失败（exit=${exitCode}）`;
+      log(`[health-monitor] script=${script} failed exit=${exitCode}`);
       return { status: 'error', error: message };
     }
   }

@@ -109,7 +109,8 @@ def _create_alert(conn, member_id: str, metric_type: str, level: str,
     return alert_id
 
 
-def _create_reminder_for_alert(member_id: str, alert_id: str, level: str, title: str, detail: str):
+def _create_reminder_for_alert(member_id: str, alert_id: str, level: str, title: str,
+                               detail: str, owner_id: str | None = None):
     """Create a reminder based on alert level."""
     if level == "info":
         return None
@@ -134,6 +135,7 @@ def _create_reminder_for_alert(member_id: str, alert_id: str, level: str, title:
             related_record_id=alert_id,
             related_record_type="monitor_alert",
             priority=priority,
+            owner_id=owner_id,
         )
         return result.get("id") if isinstance(result, dict) else None
     except Exception as e:
@@ -180,7 +182,7 @@ def _check_metric_value(conn, member_id: str, member_name: str,
             })
 
 
-def check_member(member_id: str, window: str = "1h") -> dict:
+def check_member(member_id: str, window: str = "1h", owner_id: str | None = None) -> dict:
     """Run anomaly detection for a single member.
 
     Args:
@@ -191,6 +193,14 @@ def check_member(member_id: str, window: str = "1h") -> dict:
         Dict with alerts generated.
     """
     health_db.ensure_db()
+
+    access_conn = health_db.get_connection()
+    try:
+        if not health_db.verify_member_ownership(access_conn, member_id, owner_id):
+            return {"status": "error", "message": f"无权访问成员: {member_id}"}
+    finally:
+        access_conn.close()
+
     thresholds = get_thresholds(member_id)
 
     # Load cooldown config
@@ -263,6 +273,7 @@ def check_member(member_id: str, window: str = "1h") -> dict:
             reminder_payload["level"],
             reminder_payload["title"],
             reminder_payload["detail"],
+            owner_id,
         )
         if reminder_id:
             with health_db.transaction() as conn:
@@ -284,7 +295,7 @@ def check_member(member_id: str, window: str = "1h") -> dict:
 
 def cmd_run(args):
     """Run check for a member."""
-    result = check_member(args.member_id, args.window or "1h")
+    result = check_member(args.member_id, args.window or "1h", getattr(args, "owner_id", None))
     health_db.output_json(result)
 
 
@@ -293,9 +304,16 @@ def cmd_run_all(args):
     health_db.ensure_db()
     conn = health_db.get_connection()
     try:
-        members = conn.execute(
-            "SELECT id, name FROM members WHERE is_deleted=0"
-        ).fetchall()
+        owner_id = getattr(args, "owner_id", None)
+        if owner_id:
+            members = conn.execute(
+                "SELECT id, name FROM members WHERE is_deleted=0 AND owner_id=?",
+                (owner_id,),
+            ).fetchall()
+        else:
+            members = conn.execute(
+                "SELECT id, name FROM members WHERE is_deleted=0"
+            ).fetchall()
     finally:
         conn.close()
 
@@ -303,7 +321,7 @@ def cmd_run_all(args):
     results = []
     total_alerts = 0
     for m in members:
-        result = check_member(m["id"], window)
+        result = check_member(m["id"], window, getattr(args, "owner_id", None))
         total_alerts += result.get("alerts_generated", 0)
         results.append(result)
 
@@ -323,9 +341,11 @@ def main():
     p_run = sub.add_parser("run", help="检查单个成员")
     p_run.add_argument("--member-id", required=True)
     p_run.add_argument("--window", default="1h", help="检查时间窗口: 1h/24h/7d")
+    p_run.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
-    p_all = sub.add_parser("run-all", help="检查所有成员")
+    p_all = sub.add_parser("run-all", help="检查当前 owner 的所有成员")
     p_all.add_argument("--window", default="1h", help="检查时间窗口: 1h/24h/7d")
+    p_all.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
 
     args = parser.parse_args()
     commands = {"run": cmd_run, "run-all": cmd_run_all}
