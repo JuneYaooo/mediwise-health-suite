@@ -1,0 +1,322 @@
+# MediWise Health Suite
+
+[中文](README.md) | English
+
+<div align="center">
+
+**A private, local health assistant for OpenClaw**
+
+Keep personal and family health records in one place, including chat notes, medical reports, meals, body measurements, sleep, and wearable exports.
+
+[![Version](https://img.shields.io/badge/version-v2.0.9-2f6feb.svg)](https://github.com/JuneYaooo/mediwise-health-suite/releases/tag/v2.0.9)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
+[![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
+
+[Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation](#documentation)
+
+</div>
+
+---
+
+## What it does
+
+Health records tend to be scattered across messages, exported files, report images, and device apps. MediWise turns those fragments into a searchable local record.
+
+```text
+Create profiles → Record by chat or image → Track changes → Review alerts → Prepare for a visit → Back up locally
+```
+
+You can record blood pressure, blood glucose, medication, meals, weight, sleep, and exercise in natural language. MediWise can also import Apple Health and Gadgetbridge exports. Medical data and lifestyle data are stored in separate local SQLite databases.
+
+MediWise organizes health information and shows trends. It does not diagnose conditions, prescribe treatment, or replace a doctor or dietitian.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="33%" align="center"><img src="docs/images/install-in-chat.jpg" alt="Installing the MediWise skill through a chat conversation"></td>
+    <td width="33%" align="center"><img src="docs/images/skill-overview.jpg" alt="MediWise capabilities shown after installation"></td>
+    <td width="33%" align="center"><img src="docs/images/create-member.jpg" alt="Creating a family member profile with natural language"></td>
+  </tr>
+  <tr>
+    <td align="center">1. Ask the assistant to install the skill</td>
+    <td align="center">2. Review the available features</td>
+    <td align="center">3. Create a health profile</td>
+  </tr>
+</table>
+
+These screenshots show MediWise Health Suite running in OpenClaw through Feishu. They use the current Chinese interface. The layout may differ in other OpenClaw clients or releases.
+
+### Health record card
+
+Ask MediWise to create a health record card for a recent period:
+
+```text
+Create my health record card for the last 7 days.
+```
+
+The card uses data from the local record. It includes recent values, the number of readings, changes over the selected period, data sources, reminders, and active medication. Trend charts are inline SVG, so card generation does not depend on a chart service or CDN.
+
+<p align="center">
+  <img src="docs/images/health-card-example.png" width="720" alt="Example seven-day MediWise health record card with blood pressure, heart rate, weight, blood oxygen, and medication">
+</p>
+
+The example uses a fictional member and fictional health data. It was produced by the same card generation code used by the skill.
+
+If the local record contains only one self profile, MediWise can select it by default. Once you add another family member, include the person's name:
+
+```text
+Create Zhang Jianguo's health record card for the last 30 days.
+```
+
+Missing measurements are shown as missing. MediWise does not invent values to fill the card.
+
+## Features
+
+| Area | What is available | Status |
+|---|---|---|
+| Health records | Member profiles, visits, symptoms, diagnoses, medication, lab results, and imaging notes | Implemented |
+| Health metrics | Blood pressure, blood glucose, heart rate, temperature, weight, blood oxygen, and trends | Implemented |
+| Image and PDF intake | Local text extraction with PaddleOCR, plus optional vision models for complex layouts and charts | Implemented |
+| Medication and reminders | Active medication, medication logs, measurement reminders, follow-up reminders, and interaction lookup | Implemented |
+| Diet | Meal records, traceable nutrition sources, daily totals, and nutrition goals | Implemented |
+| Weight and exercise | Weight trends, BMI, BMR, TDEE, body measurements, activity, and goals | Implemented |
+| Sleep | Duration, deep sleep, light sleep, REM, awake periods, daily summaries, and weekly trends | Implemented |
+| Wearable imports | Apple Health and Gadgetbridge file imports with normalization and deduplication | Verified |
+| Monitoring | Custom thresholds, anomaly checks, alerts, dashboards, and trend review | In active development |
+| Visit preparation | Recent symptoms, measurements, medication, and history exported as text, image, or PDF | Implemented |
+
+### Wearable support
+
+A provider file in the repository does not necessarily mean that the provider is ready for users. The table below reflects the current implementation and test coverage.
+
+| Source | Current status | What the user provides |
+|---|---|---|
+| Apple Watch and iPhone | Verified | `export.zip` or `export.xml` exported from the iPhone Health app |
+| Gadgetbridge | Verified | A Gadgetbridge SQLite database from a supported, paired device |
+| Garmin Connect | Experimental | Uses an unofficial interface and still needs a safe account authorization flow |
+| Huawei Health Kit | Unavailable | The OAuth callback flow is incomplete |
+| Zepp and Xiaomi cloud accounts | Unavailable | Account compatibility and credential handling are not ready for release |
+| OpenWearables | Unavailable | The provider is still a stub |
+
+Apple Health and Gadgetbridge have been checked through the complete local path: add the source, validate the file, import records, normalize them, write them to the database, and skip duplicates on a repeated import. The measurements available to MediWise still depend on the device, app version, export format, and contents of the file.
+
+The user does not run import scripts. Upload the export and ask the assistant:
+
+```text
+Import this Apple Health export into my MediWise profile. Check the file before importing it. When you finish, tell me which metrics were imported, how many records were added, what date range they cover, and how many duplicates were skipped.
+```
+
+See [the wearable import guide](docs/WEARABLES.md) for the exact file and privacy rules.
+
+## Things you can say
+
+```text
+Create a profile for my father, Zhang Jianguo, age 65.
+Record Zhang Jianguo's blood pressure as 150/95 and heart rate as 78 today.
+Extract the important measurements from this medical report, then ask me to confirm them before saving.
+Record lunch: 150 g of rice, 120 g of chicken breast, and 200 g of vegetables.
+Record my weight as 65 kg and show the last 30 days.
+Import this Apple Health export and tell me how many records were added or skipped.
+I have a doctor's appointment next week. Summarize my recent symptoms, measurements, and active medication.
+Remind me to measure my blood pressure every evening at 9.
+Create my health record card for the last 7 days.
+```
+
+For a first trial, create a self profile, record one or two measurements for several days, view the trend, generate a health record card, and create a local backup. Image recognition and wearable imports can be added later.
+
+## Quick setup
+
+### Ask an AI assistant to install it
+
+This is the only setup method recommended for regular users. Send the following prompt to OpenClaw, Codex, Claude Code, Cursor, Trae, or another assistant that can use the terminal and network on your computer:
+
+```text
+Please install MediWise Health Suite from this repository:
+https://github.com/JuneYaooo/mediwise-health-suite
+
+Read docs/INSTALL_AGENT.md first. Check the dependencies, find the skills directory used by the current OpenClaw workspace, install the project, and run install-check.sh.
+Configure it as a private local assistant for one user. Do not deploy it to a group chat or as a shared multi-user service.
+Do not overwrite existing local changes. Do not ask me to send API keys, passwords, or real health data in chat. When you finish, report the installation path, the check results, and whether OpenClaw needs to be restarted.
+```
+
+The installation assistant chooses the correct directory, installs dependencies, enables personal local mode, and runs the checks. You do not need to copy terminal commands or edit configuration files.
+
+MediWise currently supports one local user who may maintain records for themselves and several family members. It is not intended to serve several people from the same data directory.
+
+### Start a conversation
+
+```text
+Create a profile for my father, Zhang Jianguo.
+Record Zhang Jianguo's blood pressure as 130/85 and heart rate as 72 today.
+Show Zhang Jianguo's health records from the last 7 days.
+```
+
+### Optional image and PDF recognition
+
+Image and PDF intake is optional. The installation assistant may try to set up local PaddleOCR, but the feature is available only if a real test image passes on that machine.
+
+Ask a configuration assistant to set it up:
+
+```text
+Configure image and PDF intake for MediWise. Check local PaddleOCR first. If I also need complex table or chart understanding, explain the privacy difference between a local vision model and a cloud vision model before configuring one. Test OCR and vision separately when setup is complete. Do not ask me to put an API key in chat, and do not store credentials in the repository.
+```
+
+PaddleOCR can extract Chinese text from ordinary images and scanned PDFs without uploading the source file. A text model may still be used to turn OCR text into structured records. Complex layouts and charts may require a vision model.
+
+A cloud vision provider receives the full image or PDF page. Medical documents often contain names, government identifiers, and record numbers. Remove identifying information first or use a local model.
+
+Current configuration examples use newer model names:
+
+| Option | Example | Notes |
+|---|---|---|
+| Local OCR | PaddleOCR | Extracts text locally and does not upload the source image |
+| SiliconFlow | `Qwen/Qwen3.6-35B-A3B` | Confirm that the current service entry accepts image input before saving the configuration |
+| SiliconFlow | `zai-org/GLM-4.5V` | An alternative that also requires a live image input check |
+| Local vision | A Qwen3-VL model available in the local Ollama library | The exact model tag and hardware requirements depend on the machine |
+
+Model availability changes. A configuration assistant must inspect the current provider listing and test with a redacted image. A model name alone is not evidence that image input works.
+
+See [the installation guide](docs/INSTALLATION.md) for setup checks and troubleshooting.
+
+## Nutrition data sources
+
+MediWise does not write nutrition values from model memory. It looks up a traceable source first:
+
+1. A local CFCD or branded food data package installed by a configuration assistant with the user's approval.
+2. USDA FoodData Central when `USDA_API_KEY` has been configured.
+3. Open Food Facts when `OPENFOODFACTS_ENABLED=1` has been explicitly enabled, mainly for packaged and barcode products.
+4. The nutrition label confirmed by the user when no database result is available.
+
+To keep food lookup fully offline, say:
+
+```text
+Disable all online food lookup in MediWise and confirm that it will use only local nutrition sources.
+```
+
+Online food APIs receive the search phrase and the language or pagination fields needed for that request. They do not receive a member ID, meal record, or health record. Check important diet decisions against the product label or a qualified professional.
+
+## Managing records for family members
+
+One person can maintain separate profiles for themselves, parents, a partner, or children in the same local OpenClaw installation.
+
+```text
+Add Zhang Jianguo as my father.
+Record Zhang Jianguo's blood pressure as 150/95 today.
+Show Zhang Jianguo's blood pressure trend for the last 30 days.
+```
+
+Member selection follows these rules:
+
+- If the database contains only one self profile, a request without a name can use that profile.
+- After a second member is added, every write must name the person. The assistant must ask if the name is missing.
+- Lists and confirmations show both the name and relationship, such as `Zhang Jianguo (father)`.
+- Relationship words such as "father" or "mother" work only when that relationship identifies one profile.
+- Members with the same name require both a name and relationship for disambiguation.
+
+Family members are records managed by the current local user. They are not separate accounts. Do not attach the same MediWise data directory to a group chat or shared service.
+
+## Privacy and network access
+
+### Default behavior
+
+- Health data is stored in local SQLite databases named `medical.db` and `lifestyle.db`.
+- The data directory defaults to permission mode `0700`. Databases, configuration, attachments, and backups default to `0600`.
+- API keys, passwords, and tokens should not pass through chat.
+- Node action logs omit complete parameters, health content, and OAuth credentials.
+- Git ignore rules exclude databases, attachments, configuration, exports, and backups.
+
+### Optional external services
+
+| Feature enabled by the user | Destination | Data sent |
+|---|---|---|
+| Cloud vision | The configured vision endpoint | Full image or PDF page and the extraction prompt, which may contain personal information |
+| USDA lookup | `api.nal.usda.gov` | Food search phrase and API key |
+| Open Food Facts lookup | `search.openfoodfacts.org` | Food search phrase, language, and pagination fields |
+| Remote embeddings | The configured embedding endpoint | Text fragments used for search |
+| Backend API mode | The configured backend | Complete health records, so this should point only to a trusted or self-hosted service |
+
+Normal local record keeping does not contact these services when they are disabled.
+
+If the OCR engine is explicitly set to PaddleOCR, a local recognition failure does not silently send the image or PDF to a cloud vision model.
+
+## Data location and backup
+
+Default data directories:
+
+| System | Location |
+|---|---|
+| macOS | `~/Library/Application Support/mediwise` |
+| Linux | `$XDG_DATA_HOME/mediwise` or `~/.local/share/mediwise` |
+| Windows | `%LOCALAPPDATA%\mediwise` |
+
+The location can be changed with `MEDIWISE_DATA_DIR`, `MEDIWISE_MEDICAL_DB_PATH`, and `MEDIWISE_LIFESTYLE_DB_PATH`. A configuration assistant should manage these settings for regular users.
+
+Back up or restore through natural language:
+
+```text
+Create a complete MediWise backup in my personal backup folder. When it finishes, tell me the file location, integrity check result, and permissions. Do not upload it to another service.
+
+Restore the MediWise backup I selected. Check the archive before starting, remind me to stop active synchronization jobs, and do not overwrite the current data until I confirm.
+```
+
+Backups use consistent SQLite snapshots and include a SHA-256 `manifest.json`. Restore checks file names, file sizes, hashes, and database integrity. If replacement or migration fails, the restore process puts the previous files back.
+
+The backup contains complete health records and is not encrypted. The manifest can detect ordinary corruption, but it is not signed and cannot prove who created the archive.
+
+## Architecture
+
+![MediWise Health Suite architecture and data boundary](docs/images/architecture.svg)
+
+The green dashed line marks the local privacy boundary. Requests pass through the local mode check and action router before reaching six domain skills. Medical records and lifestyle data are stored separately. Vision, food lookup, and device services sit outside the boundary and are contacted only after explicit configuration.
+
+| Module | Documentation |
+|---|---|
+| Core health records | [mediwise-health-tracker/SKILL.md](mediwise-health-tracker/SKILL.md) |
+| Diet | [diet-tracker/SKILL.md](diet-tracker/SKILL.md) |
+| Weight and exercise | [weight-manager/SKILL.md](weight-manager/SKILL.md) |
+| Sleep | [sleep-tracker/SKILL.md](sleep-tracker/SKILL.md) |
+| Monitoring | [health-monitor/SKILL.md](health-monitor/SKILL.md) |
+| Wearable imports | [wearable-sync/SKILL.md](wearable-sync/SKILL.md) |
+
+## Documentation
+
+- [Quick start](QUICKSTART.md) covers the shortest path after installation.
+- [Installation guide](docs/INSTALLATION.md) covers configuration, privacy choices, and troubleshooting.
+- [Installation instructions for AI agents](docs/INSTALL_AGENT.md) define the checks an assistant must perform.
+- [Wearable import guide](docs/WEARABLES.md) covers Apple Health and Gadgetbridge files.
+- [Health management overview](docs/HEALTH-MANAGEMENT-OVERVIEW.md) describes workflows and boundaries.
+- [Changelog](CHANGELOG.md) lists published changes.
+- [Contributing guide](CONTRIBUTING.md) explains how to submit changes safely.
+
+## Requirements
+
+- Python 3.8 or newer
+- Node.js 18 or newer
+- SQLite 3.x
+- OpenClaw 2026.3.0 or newer
+- Linux, macOS, or Windows
+
+## Contributing
+
+Bug reports, data source adapters, and documentation improvements are welcome. Do not include real names, reports, account credentials, databases, or other personal health information in an issue, log, or test fixture. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Acknowledgements
+
+- [LINUX DO](https://linux.do/) for open source discussions, testing feedback, and shared experience from the Chinese developer community.
+
+## License and medical disclaimer
+
+The code is available under the [MIT License](LICENSE).
+
+MediWise Health Suite records, organizes, and summarizes health information. It does not provide a diagnosis, treatment plan, or emergency medical service. Contact a qualified medical professional for health concerns and local emergency services for urgent symptoms.
+
+---
+
+<div align="center">
+
+[GitHub](https://github.com/JuneYaooo/mediwise-health-suite) · [v2.0.9](https://github.com/JuneYaooo/mediwise-health-suite/releases/tag/v2.0.9)
+
+</div>

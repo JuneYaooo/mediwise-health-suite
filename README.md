@@ -1,5 +1,7 @@
 # MediWise Health Suite
 
+中文 | [English](README_EN.md)
+
 <div align="center">
 
 **面向 OpenClaw 的个人本地健康助手**
@@ -311,8 +313,6 @@ MediWise 面向个人本地使用。你可以在自己的 OpenClaw 中分别建�
 
 ## 🙏 致谢与社区
 
-- [OpenClaw](https://openclaw.ai/) 与 [ClawHub](https://clawhub.ai/) — 提供对话式 Agent 和 Skills 生态。
-- [USDA FoodData Central](https://fdc.nal.usda.gov/) 与 [Open Food Facts](https://world.openfoodfacts.org/) — 提供可追溯的食物营养查询来源；使用时遵循各自条款和许可证。
 - [LINUX DO（L站）](https://linux.do/) — 感谢中文开发者社区中的开源分享、测试反馈与讨论。
 
 ## 📄 许可证与免责声明
