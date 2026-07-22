@@ -99,12 +99,12 @@ Missing measurements are shown as missing. MediWise does not invent values to fi
 | Health records | Member profiles, visits, symptoms, diagnoses, medication, lab results, and imaging notes | Implemented |
 | Health metrics | Blood pressure, blood glucose, heart rate, temperature, weight, blood oxygen, and trends | Implemented |
 | Image and PDF intake | Direct attachment reading by the current Agent, with optional local OCR or vision fallback | Implemented |
-| Medication and reminders | Active medication, medication logs, measurement reminders, follow-up reminders, and interaction lookup | Implemented |
+| Medication and reminders | Active medication, medication logs, and local reminder records; proactive delivery requires a configured Agent scheduler | Implemented locally |
 | Diet | Meal records, traceable nutrition sources, daily totals, and nutrition goals | Implemented |
 | Weight and exercise | Weight trends, BMI, BMR, TDEE, body measurements, activity, and goals | Implemented |
 | Sleep | Duration, deep sleep, light sleep, REM, awake periods, daily summaries, and weekly trends | Implemented |
 | Wearable imports | Apple Health and Gadgetbridge file imports with normalization and deduplication | Verified |
-| Monitoring | Custom thresholds, anomaly checks, alerts, dashboards, and trend review | In active development |
+| Monitoring | On-demand custom thresholds, anomaly checks, alerts, dashboards, and trend review | Implemented on demand |
 | Visit preparation | Recent symptoms, measurements, medication, and history exported as text, image, or PDF | Implemented |
 
 ### Wearable support
@@ -197,6 +197,8 @@ MediWise does not write nutrition values from model memory. It looks up a tracea
 3. Open Food Facts when `OPENFOODFACTS_ENABLED=1` has been explicitly enabled, mainly for packaged and barcode products.
 4. The nutrition label confirmed by the user when no database result is available.
 
+The repository does not bundle a food database. Without one of the configured sources above, photo-based food recognition can identify candidate foods but cannot save nutrition values until the user supplies a label or approves a source.
+
 To keep food lookup fully offline, say:
 
 ```text
@@ -285,6 +287,7 @@ Backups contain complete health records and are not encrypted. Keep them in a pr
 - Python 3.8 or newer
 - Node.js 18 or newer
 - SQLite 3.x
+- Chrome or Chromium for local PNG health cards and PDF rendering; text records and queries do not require it
 - An agent that can load Skills, access local files, and run scripts
 - OpenClaw 2026.3.0 or newer when using OpenClaw
 - Linux, macOS, or Windows

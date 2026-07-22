@@ -114,6 +114,18 @@ def sync_device(device_id, owner_id=None):
     if not _verify_device_access(device, owner_id):
         return {"status": "error", "message": f"无权访问设备: {device_id}"}
 
+    member_conn = health_db.get_medical_connection()
+    try:
+        member_row = member_conn.execute(
+            "SELECT id, name, relation FROM members WHERE id=? AND is_deleted=0",
+            (device["member_id"],),
+        ).fetchone()
+        member = health_db.row_to_dict(member_row) if member_row else {
+            "id": device["member_id"], "name": "未知成员", "relation": None,
+        }
+    finally:
+        member_conn.close()
+
     provider_name = device["provider"]
     provider = _get_provider(provider_name)
     if not provider:
@@ -168,7 +180,19 @@ def sync_device(device_id, owner_id=None):
 
     if not raw_metrics:
         _update_sync_log(sync_id, "success", 0, 0, None)
-        return {"status": "ok", "message": "无新数据", "synced": 0, "skipped": 0}
+        return {
+            "status": "ok",
+            "message": "无新数据",
+            "synced": 0,
+            "skipped": 0,
+            "device_id": device_id,
+            "sync_id": sync_id,
+            "provider": provider_name,
+            "member": member,
+            "metric_types": [],
+            "time_range": None,
+            "metric_stats": {},
+        }
 
     # Normalize
     normalized = normalize_metrics(raw_metrics, provider_name)
@@ -177,12 +201,19 @@ def sync_device(device_id, owner_id=None):
     member_id = device["member_id"]
     synced = 0
     skipped = 0
+    metric_stats = {}
+    for metric in normalized:
+        stats = metric_stats.setdefault(
+            metric["metric_type"], {"normalized": 0, "synced": 0, "skipped": 0}
+        )
+        stats["normalized"] += 1
 
     with health_db.transaction(domain="medical") as conn:
         for metric in normalized:
             if _check_duplicate(conn, member_id, metric["metric_type"],
                                 metric["measured_at"], metric["source"]):
                 skipped += 1
+                metric_stats[metric["metric_type"]]["skipped"] += 1
                 continue
             metric_id = health_db.generate_id()
             conn.execute(
@@ -194,6 +225,7 @@ def sync_device(device_id, owner_id=None):
                  health_db.now_iso())
             )
             synced += 1
+            metric_stats[metric["metric_type"]]["synced"] += 1
         conn.commit()
 
     # Update device last_sync_at in lifestyle domain (separate transaction)
@@ -218,6 +250,14 @@ def sync_device(device_id, owner_id=None):
         "skipped": skipped,
         "device_id": device_id,
         "sync_id": sync_id,
+        "provider": provider_name,
+        "member": member,
+        "metric_types": sorted(metric_stats),
+        "time_range": {
+            "earliest": min((metric["measured_at"] for metric in normalized), default=None),
+            "latest": max((metric["measured_at"] for metric in normalized), default=None),
+        } if normalized else None,
+        "metric_stats": metric_stats,
     }
 
 

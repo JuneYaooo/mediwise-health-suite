@@ -109,7 +109,7 @@ python3 {baseDir}/scripts/alert.py history --member-id <id> --limit 20
 - wearable-sync 成功导入数据后可以自动触发一次检查。
 - 用户也可以主动请求检查、查看 dashboard 或查询提醒历史。
 - health-monitor 只写入本地告警和 reminder 记录，不包含后台守护进程、IM Bot、Webhook、短信或电话推送能力。
-- 如当前个人 Agent 自身提供任务调度或通知能力，应使用该平台受支持的配置方式，并保持同一数据目录仅供当前本地用户使用；不要在 Skill 文档中拼接 shell、Webhook 或账号标识。
+- 如当前个人 Agent 自身提供任务调度或通知能力，应使用该平台受支持的配置方式，并保持同一数据目录仅供当前本地用户使用；必须完成任务注册、持久化和一次触发测试后，才能告诉用户会到点主动通知。不要在 Skill 文档中拼接 shell、Webhook 或账号标识。
 
 ## 反模式
 

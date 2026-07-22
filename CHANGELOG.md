@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added complete member profile, medical record, date-filtered metric, and daily snapshot save/query action routes.
+- Wearable sync results now include provider, target member, metric types, per-type counts, and the imported time range.
+- Added cross-module Node action tests plus Apple Health interval, ZIP/XML validation, and PDF renderer regression tests.
+- Added root and sleep-tracker OpenAI skill metadata.
+
+### Fixed
+- Action adapters now propagate Python business errors as top-level action failures instead of reporting a false success.
+- Apple Health imports now require the canonical `export.xml`, reject malformed/non-Health XML during full testing, support named HealthKit sleep stages, and calculate sleep from `startDate`/`endDate` intervals without double-counting overlapping in-bed records.
+- Gadgetbridge imports now remove exact samples duplicated across base and extended activity tables before aggregating steps and sleep.
+- Member actions no longer discard blood type, allergies, medical history, contact, emergency contact, timezone, or custom range fields.
+- Doctor-visit PDF rendering now uses the same cross-platform Chrome/Chromium discovery as PNG rendering and no longer invokes Unix-wide `pkill` cleanup.
+- Sleep queries now reject unknown members consistently.
+- Corrected the weight workflow text that incorrectly said MediWise automatically derives a calorie target.
+
 ### Changed
+- Installation checks now validate runtime versions, SQLite, all Python scripts, all six JavaScript action entries, and local Chrome/Chromium rendering availability.
+- Documentation now distinguishes local reminder records from host-Agent proactive delivery and states the nutrition-source requirement for photo meal logging.
 - Health Record Card typography is now larger throughout personal and family views, with more readable labels, medication schedules, timeline details, and disclaimers at both desktop and narrow widths.
 - Health Record Cards now use a clearer medical-blue visual system with improved contrast, blue metric charts, and a compact full-width layout for the final member in odd-sized family cards.
 - Clarified that MediWise works with Hermes, OpenClaw, Claude Code, Codex, WorkBuddy, and other Skills-compatible agents; OpenClaw-specific workspace and channel instructions remain documented as an adapter path rather than a product requirement.

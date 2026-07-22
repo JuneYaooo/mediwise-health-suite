@@ -29,6 +29,8 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 只有检查确实通过后，Agent 才能声称安装完成。
 
+本地 PNG 健康记录卡片和 PDF 使用 Chrome/Chromium 渲染。没有浏览器时，文字记录、查询和 HTML 报告仍可使用，但 Agent 应明确说明 PNG/PDF 暂不可用。
+
 ## 运行范围
 
 当前公开安装流程只支持个人本地实例：

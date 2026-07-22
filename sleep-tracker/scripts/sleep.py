@@ -112,6 +112,12 @@ def _format_duration(minutes: int) -> str:
 
 def _verify_member_access(conn, args) -> bool:
     """Verify the requested member belongs to the caller's owner context."""
+    member = conn.execute(
+        "SELECT 1 FROM members WHERE id=? AND is_deleted=0", (args.member_id,)
+    ).fetchone()
+    if not member:
+        health_db.output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
+        return False
     owner_id = getattr(args, "owner_id", None)
     if not health_db.verify_member_ownership(conn, args.member_id, owner_id):
         health_db.output_json({"status": "error", "message": f"无权访问成员: {args.member_id}"})

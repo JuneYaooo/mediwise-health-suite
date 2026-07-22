@@ -120,6 +120,10 @@ def _aggregate_sleep_sessions(raw_sleep: list[RawMetric], provider: str) -> list
     if not raw_sleep:
         return []
 
+    interval_samples = [sample for sample in raw_sleep if sample.extra.get("end_timestamp")]
+    if interval_samples:
+        return _aggregate_interval_sleep_sessions(interval_samples, provider)
+
     # Sort by timestamp
     sorted_samples = sorted(raw_sleep, key=lambda r: r.timestamp)
 
@@ -179,6 +183,88 @@ def _aggregate_sleep_sessions(raw_sleep: list[RawMetric], provider: str) -> list
         })
 
     return result
+
+
+def _aggregate_interval_sleep_sessions(raw_sleep: list[RawMetric], provider: str) -> list[dict]:
+    """Aggregate sleep records with explicit start/end intervals.
+
+    Apple Health exports intervals, not one-minute samples. Split overlapping
+    intervals into non-overlapping segments so in-bed records do not double-count
+    detailed awake/core/deep/REM records.
+    """
+    intervals = []
+    for sample in raw_sleep:
+        try:
+            start = datetime.strptime(sample.timestamp[:19], "%Y-%m-%d %H:%M:%S")
+            end = datetime.strptime(sample.extra["end_timestamp"][:19], "%Y-%m-%d %H:%M:%S")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end <= start:
+            continue
+        intervals.append((start, end, sample.value))
+
+    if not intervals:
+        return []
+    intervals.sort(key=lambda item: (item[0], item[1]))
+
+    sessions = []
+    current = [intervals[0]]
+    current_end = intervals[0][1]
+    for interval in intervals[1:]:
+        if interval[0] - current_end > timedelta(hours=2):
+            sessions.append(current)
+            current = [interval]
+            current_end = interval[1]
+            continue
+        current.append(interval)
+        current_end = max(current_end, interval[1])
+    sessions.append(current)
+
+    priority = {
+        "awake": 5,
+        "deep_sleep": 4,
+        "rem_sleep": 3,
+        "light_sleep": 2,
+        "in_bed": 1,
+    }
+    results = []
+    for session in sessions:
+        boundaries = sorted({point for start, end, _ in session for point in (start, end)})
+        minutes = defaultdict(float)
+        for start, end in zip(boundaries, boundaries[1:]):
+            if end <= start:
+                continue
+            midpoint = start + (end - start) / 2
+            active = [stage for item_start, item_end, stage in session
+                      if item_start <= midpoint < item_end]
+            if not active:
+                continue
+            stage = max(active, key=lambda name: priority.get(name, 0))
+            if stage == "in_bed":
+                stage = "awake"
+            minutes[stage] += (end - start).total_seconds() / 60
+
+        deep_min = round(minutes.get("deep_sleep", 0))
+        light_min = round(minutes.get("light_sleep", 0))
+        rem_min = round(minutes.get("rem_sleep", 0))
+        awake_min = round(minutes.get("awake", 0))
+        total_min = deep_min + light_min + rem_min + awake_min
+        if total_min < 30:
+            continue
+        sleep_value = {
+            "duration_min": total_min,
+            "deep_min": deep_min,
+            "light_min": light_min,
+            "rem_min": rem_min,
+            "awake_min": awake_min,
+        }
+        results.append({
+            "metric_type": "sleep",
+            "value": json.dumps(sleep_value),
+            "measured_at": min(item[0] for item in session).strftime("%Y-%m-%d %H:%M:%S"),
+            "source": provider,
+        })
+    return results
 
 
 def _pair_blood_pressure(raw_bp: list[RawMetric], provider: str) -> list[dict]:

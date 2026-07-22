@@ -1,0 +1,4 @@
+interface:
+  display_name: "MediWise 健康助手"
+  short_description: "管理个人与家庭健康档案、生活记录、设备导入和健康卡片"
+  default_prompt: "Use $mediwise-health-suite to manage my local health records and summarize recent changes."

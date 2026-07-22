@@ -20,6 +20,7 @@ import re
 import sys
 import subprocess
 from datetime import datetime, timedelta
+from pathlib import Path
 from string import Template
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -668,22 +669,26 @@ def generate_pdf(html_path: str, output_path: str | None = None) -> dict:
     if output_path is None:
         output_path = os.path.splitext(html_path)[0] + '.pdf'
 
+    import html_screenshot
+    chrome_binary = html_screenshot.find_chrome()
+    if not chrome_binary:
+        return {"status": "error", "error": "Chrome/Chromium not found"}
+
     chrome_cmd = [
-        'google-chrome',
+        chrome_binary,
         '--headless=new',
         '--disable-gpu',
         '--no-sandbox',
         '--disable-dev-shm-usage',
         '--print-to-pdf-no-header',
         f'--print-to-pdf={output_path}',
-        f'file://{os.path.abspath(html_path)}',
+        Path(html_path).resolve().as_uri(),
     ]
     try:
         result = subprocess.run(chrome_cmd, capture_output=True, text=True, timeout=25)
     except FileNotFoundError:
-        return {"status": "error", "error": 'google-chrome not found'}
+        return {"status": "error", "error": 'Chrome/Chromium not found'}
     except subprocess.TimeoutExpired:
-        subprocess.run(['pkill', '-f', 'chrome.*headless'], capture_output=True)
         return {"status": "error", "error": 'Chrome print-to-pdf timed out'}
 
     if result.returncode != 0 or not os.path.isfile(output_path):

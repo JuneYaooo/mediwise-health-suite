@@ -51,9 +51,9 @@ description: "Import Apple Health or Gadgetbridge exports into MediWise health r
 2. 确认附件已落到当前 Agent 可读取的本地路径，扩展名为 `.zip` 或 `.xml`。
 3. 调用 `device-add`，Provider 使用 `apple_health`。
 4. 调用 `device-auth`，把附件本地路径作为 `export_path`。
-5. 调用 `device-test` 检查文件。
+5. 调用 `device-test` 检查标准 `export.xml`、XML 完整性和 Apple Health 根节点。
 6. 调用 `sync-device` 导入。
-7. 查询该成员本次导入后的健康指标，汇总类型、条数和时间范围。
+7. 使用 `sync-device` 返回的 `provider`、`member`、`metric_types`、`metric_stats` 和 `time_range` 汇总本次结果；需要查看具体记录时再查询健康指标。
 
 Apple Health 导出是手动快照，不是实时流。用户再次上传新导出包时可重新导入；系统会按成员、指标类型、测量时间和来源跳过重复记录。
 

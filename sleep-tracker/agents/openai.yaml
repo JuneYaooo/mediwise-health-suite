@@ -1,0 +1,4 @@
+interface:
+  display_name: "睡眠追踪"
+  short_description: "记录睡眠时长和睡眠分期，并汇总每日详情与每周变化趋势"
+  default_prompt: "Use $sleep-tracker to record sleep and summarize my recent sleep trends."

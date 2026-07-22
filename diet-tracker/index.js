@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { actionResult } from '../shared/action_result.mjs';
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -154,7 +155,7 @@ export async function execute(inputs, context) {
 
     log(`[diet-tracker] script=${script}`);
     const result = await runScript(script, args);
-    return { status: 'ok', result };
+    return actionResult(result);
   } catch (err) {
     const stderr = typeof err?.stderr === 'string' ? err.stderr.trim() : '';
     const exitCode = err?.code ?? 'unknown';

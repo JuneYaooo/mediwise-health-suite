@@ -128,7 +128,7 @@ MediWise 不根据 TDEE 自动生成减重、增重或维持所需的每日热�
 2. 记录身高体重（通过 `mediwise-health-tracker` 的 `add-metric` 动作，type 填 weight / height）
 3. 使用 `calculate-bmi` 计算 BMI
 4. 使用 `calculate-bmr-tdee` 计算基础代谢和每日总消耗
-5. 使用 `set-goal` 设定体重管理目标（自动推算热量目标）
+5. 使用 `set-goal` 记录用户已经确定的体重目标；如用户或专业人员已确定每日热量目标，可一并记录
 6. 定期通过 `mediwise-health-tracker` 记录体重
 7. 通过 `diet-tracker` 记录每日饮食
 8. 通过 `add-exercise` 记录运动消耗

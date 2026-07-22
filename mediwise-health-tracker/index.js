@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { actionResult } from '../shared/action_result.mjs';
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,8 +22,26 @@ const ROUTES = {
   'add-member': (inputs) => {
     const p = inputs.params ?? {};
     const args = ['add', '--name', p.name ?? '', '--relation', p.relation ?? '本人'];
-    if (p.gender) args.push('--gender', p.gender);
-    if (p.birth_date) args.push('--birth-date', p.birth_date);
+    const fields = [
+      ['gender', '--gender'],
+      ['birth_date', '--birth-date'],
+      ['blood_type', '--blood-type'],
+      ['allergies', '--allergies'],
+      ['medical_history', '--medical-history'],
+      ['phone', '--phone'],
+      ['emergency_contact', '--emergency-contact'],
+      ['emergency_phone', '--emergency-phone'],
+      ['timezone', '--timezone'],
+    ];
+    for (const [key, flag] of fields) {
+      if (p[key] != null) args.push(flag, String(p[key]));
+    }
+    if (p.custom_metric_ranges != null) {
+      const value = typeof p.custom_metric_ranges === 'string'
+        ? p.custom_metric_ranges
+        : JSON.stringify(p.custom_metric_ranges);
+      args.push('--custom-metric-ranges', value);
+    }
     return { script: 'member.py', args };
   },
   'list-members': (inputs) => ({
@@ -36,6 +55,41 @@ const ROUTES = {
     if (p.relation) args.push('--relation', p.relation);
     return { script: 'member.py', args };
   },
+  'get-member': (inputs) => ({
+    script: 'member.py',
+    args: ['get', '--id', inputs.member_id ?? inputs.params?.id ?? ''],
+  }),
+  'update-member': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['update', '--id', inputs.member_id ?? p.id ?? ''];
+    const fields = [
+      ['name', '--name'],
+      ['relation', '--relation'],
+      ['gender', '--gender'],
+      ['birth_date', '--birth-date'],
+      ['blood_type', '--blood-type'],
+      ['allergies', '--allergies'],
+      ['medical_history', '--medical-history'],
+      ['phone', '--phone'],
+      ['emergency_contact', '--emergency-contact'],
+      ['emergency_phone', '--emergency-phone'],
+      ['timezone', '--timezone'],
+    ];
+    for (const [key, flag] of fields) {
+      if (p[key] != null) args.push(flag, String(p[key]));
+    }
+    if (p.custom_metric_ranges != null) {
+      const value = typeof p.custom_metric_ranges === 'string'
+        ? p.custom_metric_ranges
+        : JSON.stringify(p.custom_metric_ranges);
+      args.push('--custom-metric-ranges', value);
+    }
+    return { script: 'member.py', args };
+  },
+  'delete-member': (inputs) => ({
+    script: 'member.py',
+    args: ['delete', '--id', inputs.member_id ?? inputs.params?.id ?? ''],
+  }),
   'get-summary': (inputs) => ({
     script: 'query.py',
     args: ['summary', '--member-id', inputs.member_id],
@@ -50,11 +104,17 @@ const ROUTES = {
   }),
   'get-metrics': (inputs) => {
     const args = ['list', '--member-id', inputs.member_id];
-    if (inputs.params?.type) {
-      args.push('--type', inputs.params.type);
-    }
+    const p = inputs.params ?? {};
+    if (p.type) args.push('--type', p.type);
+    if (p.start_date) args.push('--start-date', p.start_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.limit != null) args.push('--limit', String(p.limit));
     return { script: 'health_metric.py', args };
   },
+  'delete-metric': (inputs) => ({
+    script: 'health_metric.py',
+    args: ['delete', '--id', inputs.params?.id ?? ''],
+  }),
   'get-visits': (inputs) => ({
     script: 'query.py',
     args: ['visits', '--member-id', inputs.member_id],
@@ -157,6 +217,28 @@ const ROUTES = {
     }
     return { script: 'briefing_report.py', args };
   },
+  'snapshot-save': (inputs) => ({
+    script: 'daily_snapshot.py',
+    args: ['save', '--member-id', inputs.member_id],
+  }),
+  'snapshot-save-all': () => ({
+    script: 'daily_snapshot.py',
+    args: ['save-all'],
+  }),
+  'snapshot-get': (inputs) => ({
+    script: 'daily_snapshot.py',
+    args: ['get', '--member-id', inputs.member_id, '--date', inputs.params?.date ?? ''],
+  }),
+  'snapshot-history': (inputs) => ({
+    script: 'daily_snapshot.py',
+    args: ['history', '--member-id', inputs.member_id,
+           '--days', String(inputs.params?.days ?? 7)],
+  }),
+  'snapshot-trend': (inputs) => ({
+    script: 'daily_snapshot.py',
+    args: ['trend', '--member-id', inputs.member_id,
+           '--days', String(inputs.params?.days ?? 30)],
+  }),
   'doctor-visit-report': (inputs) => {
     const args = ['text', '--member-id', inputs.member_id, '--description', inputs.params?.description ?? ''];
     if (inputs.params?.days) args.push('--days', String(inputs.params.days));
@@ -310,6 +392,34 @@ const ROUTES = {
     if (p.summary) args.push('--summary', p.summary);
     return { script: 'medical_record.py', args };
   },
+  'list-visits': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['list-visits', '--member-id', inputs.member_id];
+    if (p.start_date) args.push('--start-date', p.start_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.visit_type) args.push('--visit-type', p.visit_type);
+    return { script: 'medical_record.py', args };
+  },
+  'update-visit': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['update-visit', '--id', p.id ?? p.visit_id ?? ''];
+    const fields = [
+      ['visit_type', '--visit-type'], ['visit_date', '--visit-date'],
+      ['end_date', '--end-date'], ['hospital', '--hospital'],
+      ['department', '--department'], ['chief_complaint', '--chief-complaint'],
+      ['diagnosis', '--diagnosis'], ['summary', '--summary'],
+      ['visit_status', '--visit-status'], ['follow_up_date', '--follow-up-date'],
+      ['follow_up_notes', '--follow-up-notes'],
+    ];
+    for (const [key, flag] of fields) {
+      if (p[key] != null) args.push(flag, String(p[key]));
+    }
+    return { script: 'medical_record.py', args };
+  },
+  'delete-visit': (inputs) => ({
+    script: 'medical_record.py',
+    args: ['delete-visit', '--id', inputs.params?.id ?? inputs.params?.visit_id ?? ''],
+  }),
   'add-symptom': (inputs) => {
     const args = ['add-symptom', '--member-id', inputs.member_id,
                   '--symptom', inputs.params?.symptom ?? ''];
@@ -319,6 +429,11 @@ const ROUTES = {
     if (p.onset_date) args.push('--onset-date', p.onset_date);
     if (p.end_date) args.push('--end-date', p.end_date);
     if (p.description) args.push('--description', p.description);
+    return { script: 'medical_record.py', args };
+  },
+  'list-symptoms': (inputs) => {
+    const args = ['list-symptoms', '--member-id', inputs.member_id];
+    if (inputs.params?.visit_id) args.push('--visit-id', inputs.params.visit_id);
     return { script: 'medical_record.py', args };
   },
   'add-medication': (inputs) => {
@@ -331,6 +446,53 @@ const ROUTES = {
     if (p.start_date) args.push('--start-date', p.start_date);
     if (p.end_date) args.push('--end-date', p.end_date);
     if (p.purpose) args.push('--purpose', p.purpose);
+    return { script: 'medical_record.py', args };
+  },
+  'stop-medication': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['stop-medication', '--medication-id', p.medication_id ?? ''];
+    if (p.end_date) args.push('--end-date', p.end_date);
+    if (p.reason) args.push('--reason', p.reason);
+    return { script: 'medical_record.py', args };
+  },
+  'list-medications': (inputs) => {
+    const args = ['list-medications', '--member-id', inputs.member_id];
+    if (inputs.params?.active_only) args.push('--active-only');
+    return { script: 'medical_record.py', args };
+  },
+  'add-lab-result': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = [
+      'add-lab-result', '--member-id', inputs.member_id,
+      '--test-name', p.test_name ?? '', '--test-date', p.test_date ?? '',
+      '--items', JSON.stringify(p.items ?? []),
+    ];
+    if (p.visit_id) args.push('--visit-id', p.visit_id);
+    return { script: 'medical_record.py', args };
+  },
+  'list-lab-results': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['list-lab-results', '--member-id', inputs.member_id];
+    if (p.start_date) args.push('--start-date', p.start_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
+    return { script: 'medical_record.py', args };
+  },
+  'add-imaging': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = [
+      'add-imaging', '--member-id', inputs.member_id,
+      '--exam-name', p.exam_name ?? '', '--exam-date', p.exam_date ?? '',
+    ];
+    if (p.visit_id) args.push('--visit-id', p.visit_id);
+    if (p.findings) args.push('--findings', p.findings);
+    if (p.conclusion) args.push('--conclusion', p.conclusion);
+    return { script: 'medical_record.py', args };
+  },
+  'list-imaging': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['list-imaging', '--member-id', inputs.member_id];
+    if (p.start_date) args.push('--start-date', p.start_date);
+    if (p.end_date) args.push('--end-date', p.end_date);
     return { script: 'medical_record.py', args };
   },
   'add-metric': (inputs) => {
@@ -511,14 +673,7 @@ export async function execute(inputs, context) {
     log(`[mediwise-health-tracker] script=${script}`);
 
     const result = await runScript(script, args, subEnv);
-    if (result?.status === 'error') {
-      return {
-        status: 'error',
-        error: result.message ?? result.error ?? 'Python action returned an error',
-        result,
-      };
-    }
-    return { status: 'ok', result };
+    return actionResult(result);
   } catch (err) {
     const stderr = typeof err?.stderr === 'string' ? err.stderr.trim() : '';
     const exitCode = err?.code ?? 'unknown';

@@ -1395,8 +1395,16 @@ def cmd_restore(args):
                     db_path = os.path.join(DATA_DIR, name)
                     if not os.path.isfile(db_path):
                         continue
-                    check_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+                    # Restored snapshots can retain WAL journal mode. Opening
+                    # such a database with URI mode=ro fails on platforms
+                    # where SQLite must first create its local -wal/-shm
+                    # sidecars (notably macOS). The restored destination is a
+                    # trusted, private local file, so open it normally to let
+                    # SQLite establish those sidecars, then make the
+                    # validation connection query-only before checking it.
+                    check_conn = sqlite3.connect(db_path)
                     try:
+                        check_conn.execute("PRAGMA query_only=ON")
                         integrity = check_conn.execute("PRAGMA integrity_check").fetchone()
                     finally:
                         check_conn.close()

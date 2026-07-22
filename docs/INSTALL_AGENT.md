@@ -35,6 +35,8 @@ node --version
 - Node.js 18+
 - Git
 - 可用的 `pip`
+- 可用的 SQLite 3.x 命令行工具
+- 如需本地 PNG 健康记录卡片或 PDF：Chrome 或 Chromium
 - 当前工具能够加载 Skills、访问本地文件并执行脚本
 - 如果使用 OpenClaw：OpenClaw 2026.3.0+
 
@@ -125,7 +127,7 @@ python3 mediwise-health-tracker/scripts/setup.py test-intake --input both
 bash install-check.sh
 ```
 
-脚本会检查六个领域 Skill、共享路径工具和 Python 导入。安装在标准 `<agent-root>/skills/mediwise-health-suite` 路径时还会自动校验 OpenClaw 路径；使用自定义 OpenClaw workspace 时可传入已经确认的根目录：`bash install-check.sh --agent-root <agent-root>`。其他 Agent 不套用 OpenClaw 路径规则，只执行结构与导入检查。检查失败时，报告失败的具体阶段和命令输出摘要，不要绕过失败继续声称安装完成。
+脚本会检查 Python、Node.js、SQLite、六个领域 Skill、共享路径工具、全部 Python 脚本编译和六个 Action 入口语法。它还会发现 Chrome/Chromium：缺失时基础文字能力仍可安装，但必须明确报告本地 PNG/PDF 渲染不可用。安装在标准 `<agent-root>/skills/mediwise-health-suite` 路径时还会自动校验 OpenClaw 路径；使用自定义 OpenClaw workspace 时可传入已经确认的根目录：`bash install-check.sh --agent-root <agent-root>`。其他 Agent 不套用 OpenClaw 路径规则。检查失败时，报告失败的具体阶段和命令输出摘要，不要绕过失败继续声称安装完成。
 
 ### 6. 配置个人本地模式
 
@@ -183,5 +185,7 @@ bash install-check.sh
 4. `MEDIWISE_SINGLE_USER=1` 已写入实际运行 MediWise 的个人 Agent 环境，并在重载后验证生效。
 5. 已告诉用户重启或重新加载当前 Agent 的 Skills。
 6. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。
+
+如用户要求本地健康记录卡片或 PDF，安装结果还必须报告 Chrome/Chromium 是否可用，并分别完成一次脱敏 PNG 和 PDF 冒烟；浏览器缺失时不得声称这两项功能可用。
 
 图片/PDF fallback 不属于基础安装完成标准。若本次明确配置了 fallback，则相应的 `test-vision` 或 `test-paddleocr`、`test-pdf` 与 `test-intake --input both` 必须通过；失败时只能报告该可选能力未启用，不能影响已经通过的基础安装结论。

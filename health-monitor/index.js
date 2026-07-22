@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { actionResult } from '../shared/action_result.mjs';
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -112,12 +113,12 @@ export async function execute(inputs, context) {
       env: { ...process.env },
       timeout: 30000,
     });
-    return { status: 'ok', result: JSON.parse(stdout.trim()) };
+    return actionResult(JSON.parse(stdout.trim()));
   } catch (err) {
     const stderr = err.stderr ?? '';
     const stdout = err.stdout ?? '';
     try {
-      return { status: 'ok', result: JSON.parse(stdout.trim()) };
+      return actionResult(JSON.parse(stdout.trim()));
     } catch {
       const exitCode = err?.code ?? 'unknown';
       const message = (typeof stderr === 'string' ? stderr.trim() : '')

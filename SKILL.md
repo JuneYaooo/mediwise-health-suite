@@ -1,30 +1,6 @@
 ---
 name: mediwise-health-suite
-description: "Private local health assistant for Skills-compatible AI agents: health records, diet, weight, sleep, monitoring, and wearable imports. Local SQLite storage by default; optional cloud features require explicit setup."
-version: 2.0.9
-author: MediWise Team
-license: MIT
-homepage: https://github.com/JuneYaooo/mediwise-health-suite
-repository: https://github.com/JuneYaooo/mediwise-health-suite
-keywords:
-  - health
-  - medical
-  - family
-  - diet
-  - weight
-  - records
-  - chinese
-  - agent-skills
-  - hermes
-  - openclaw
-  - claude-code
-  - codex
-  - workbuddy
-requires:
-  bins:
-    - python3
-    - sqlite3
-    - node
+description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, health cards, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
 ---
 
 # MediWise Health Suite
@@ -58,10 +34,10 @@ requires:
 - 热量收支分析
 - 达标预测
 
-### ⚠ 4. 智能健康监测 (health-monitor) - 待完善
+### ✅ 4. 智能健康监测 (health-monitor) - 按需检查
 - 多级阈值告警（info/warning/urgent/emergency）
 - 趋势分析与异常检测
-- 自动提醒：用药提醒、复查提醒、指标测量提醒
+- 本地提醒记录：用药、复查、指标测量；到点主动通知依赖当前 Agent 的调度能力
 
 ### ✅ 5. 可穿戴数据导入 (wearable-sync)
 - Apple Health `export.zip` / `export.xml`：已验证本地导入与去重
@@ -125,6 +101,7 @@ requires:
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
+- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片或 PDF 时需要；纯文字记录与查询不需要
 
 ## 数据隐私
 
@@ -186,8 +163,6 @@ requires:
 | `MEDIWISE_DATA_DIR` | 覆盖 SQLite 数据库存储目录 | 默认 OS 用户数据目录（Linux: `~/.local/share/mediwise`） |
 | `MEDIWISE_MEDICAL_DB_PATH` | 覆盖医疗数据库（medical.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
 | `MEDIWISE_LIFESTYLE_DB_PATH` | 覆盖生活方式数据库（lifestyle.db）路径 | 存储在 `MEDIWISE_DATA_DIR` 下 |
-
-## 可选外部网络访问
 
 ## 安全说明
 

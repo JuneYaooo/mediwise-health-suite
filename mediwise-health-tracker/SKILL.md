@@ -64,12 +64,16 @@ python3 {baseDir}/scripts/query.py family-overview
 
 | 动作 | 说明 | 关键参数 |
 |------|------|----------|
-| `add-member` | 创建家庭成员档案 | name、relation；本人默认 relation=本人 |
+| `add-member` | 创建家庭成员档案 | name、relation；可选 gender、birth_date、blood_type、allergies、medical_history、phone、emergency_contact、emergency_phone、timezone |
+| `get-member` / `update-member` / `delete-member` | 查看、更新或删除成员档案 | member_id；更新时只传需要修改的字段 |
 | `resolve-member` | 按姓名/身份解析目标成员 | 可选 name、relation；多成员时用于消歧 |
 | `add-visit` | 添加就诊记录 | member_id, visit_type, visit_date；可选 hospital/department/diagnosis |
 | `add-symptom` | 添加症状记录 | member_id, symptom；可选 severity/visit_id/onset_date |
 | `add-medication` | 添加用药记录 | member_id, name；可选 dosage/frequency/visit_id/purpose |
 | `add-metric` | 添加健康指标 | member_id, type, value；可选 measured_at/source/context |
+| `get-metrics` / `delete-metric` | 按类型与日期范围查询或删除指标 | 查询可选 type/start_date/end_date/limit；删除传记录 id |
+| `add-lab-result` / `add-imaging` | 直接写入已确认的检验或影像结构化结果 | member_id、名称、日期与已确认内容 |
+| `snapshot-save` / `snapshot-get` / `snapshot-history` / `snapshot-trend` | 保存或查询每日健康快照 | member_id；查询单日时传 date，历史和趋势可传 days |
 
 自然语言或图片输入走 `smart-extract` → `smart-confirm` 流程；短文本指标走 `quick-entry-save`。
 
@@ -215,7 +219,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 
 ## 健康记录卡片定时推送规范（Agent 定时任务）
 
-**触发时机：每日早晨 8:00，由当前 Agent 的定时任务能力自动执行。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制；不具备定时能力时仍可由用户随时手动请求。**
+**建议触发时机：每日早晨 8:00。此任务不会随 MediWise 安装自动创建；只有当前 Agent 确实支持定时任务、已经完成任务注册并通过一次触发测试时，才可声称会自动执行。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制；不具备定时能力时由用户手动请求。**
 
 ### 执行流程
 
@@ -229,7 +233,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 
 ### 夜间做梦任务（Agent 定时任务）
 
-**触发时机：每晚 22:00，由当前 Agent 的定时任务能力自动执行并调用 DREAM skill。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制。**
+**建议触发时机：每晚 22:00。与早间卡片相同，必须由当前 Agent 显式注册、持久化并测试定时任务；MediWise 本身不包含后台守护进程。**
 
 做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日健康记录卡片展示。详见 `mediwise-health-tracker/DREAM.md`。
 
@@ -313,7 +317,7 @@ python3 {baseDir}/scripts/daily_snapshot.py trend --member-id <id> --days 30
 - 识别报告图片或化验单：把图片/PDF里的信息提取出来录入
 - 在你准备去看医生前，先生成一段”就医前摘要”：自动整理最近的关键情况、相关病史、过敏史、在用药和需要注意的事项；如果你需要，我再继续整理成图片或 PDF
 - 就诊全程管理：提前规划预约 → 就诊前智能汇总症状/指标/用药 → 就诊后记录诊断和处方 → 自动追踪复诊提醒
-- 健康记忆：随时告诉我你注意到的健康问题（如”最近膝盖有点疼”），我会记下来并在几天后主动提醒你跟进
+- 健康记忆：随时告诉我你注意到的健康问题（如”最近膝盖有点疼”），我会记下来并创建后续跟进待办；当前 Agent 已配置并验证调度时可到点主动通知
 
 如果你愿意，现在就可以直接告诉我：
 “帮我整理最近的情况”

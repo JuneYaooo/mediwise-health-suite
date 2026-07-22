@@ -185,4 +185,17 @@ class GadgetbridgeProvider(BaseProvider):
                     ))
 
         conn.close()
-        return metrics
+
+        # Some Gadgetbridge exports expose the same activity sample through a
+        # base table and an extended table. Remove exact raw duplicates before
+        # daily step and sleep aggregation so overlapping tables do not inflate
+        # totals or stage counts.
+        deduplicated = []
+        seen = set()
+        for metric in metrics:
+            key = (metric.metric_type, metric.timestamp, metric.value)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduplicated.append(metric)
+        return deduplicated

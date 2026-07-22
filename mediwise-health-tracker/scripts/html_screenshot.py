@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 
 def _strip_external_scripts(html_path: str) -> str:
@@ -84,7 +85,7 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
     viewport_height = 5000
 
     # Chrome headless screenshot
-    chrome_binary = _find_chrome()
+    chrome_binary = find_chrome()
     if not chrome_binary:
         return {"status": "error", "error": "Chrome/Chromium not found"}
 
@@ -99,7 +100,7 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
         "--disable-background-networking",
         f"--window-size={width},{viewport_height}",
         f"--screenshot={output_path}",
-        f"file://{os.path.abspath(render_path)}",
+        Path(render_path).resolve().as_uri(),
     ]
 
     try:
@@ -112,10 +113,6 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
     except FileNotFoundError:
         return {"status": "error", "error": "Chrome/Chromium not found"}
     except subprocess.TimeoutExpired:
-        # Kill any lingering chrome processes from this run
-        pkill = shutil.which("pkill")
-        if pkill:
-            subprocess.run([pkill, "-f", "chrome.*headless"], capture_output=True)
         return {"status": "error", "error": "Chrome screenshot timed out"}
 
     if not os.path.isfile(output_path):
@@ -191,7 +188,7 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
         }
 
 
-def _find_chrome() -> str | None:
+def find_chrome() -> str | None:
     """Locate Chrome/Chromium on Linux, macOS, or Windows."""
     for command in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"):
         resolved = shutil.which(command)
@@ -209,6 +206,10 @@ def _find_chrome() -> str | None:
         if candidate and os.path.isfile(candidate):
             return candidate
     return None
+
+
+# Backward-compatible alias for callers that imported the former private helper.
+_find_chrome = find_chrome
 
 
 def main():
