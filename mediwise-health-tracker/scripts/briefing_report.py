@@ -53,11 +53,15 @@ COPY = {
         "abnormal": "{count} 项明确异常", "no_flagged": "无明确异常标记", "diagnosis": "诊断",
         "conclusion": "结论", "active_meds": "当前在用药", "medicine": "药品名称",
         "dosage": "剂量", "frequency": "频次", "purpose": "用途", "start_date": "开始日期",
-        "no_meds": "暂无在用药记录", "family_overview": "家庭成员概览",
-        "family_timeline": "家庭近期医疗时间线", "stable": "无明确提醒", "needs_attention": "需要关注",
-        "data_present": "近期有记录", "data_missing": "近期记录较少", "diet_days_short": "饮食 {count} 天",
-        "activity_short": "运动 {count} 次", "sleep_short": "睡眠 {count} 夜", "care_short": "医疗 {count} 项",
-        "no_timeline": "所选时间范围内暂无家庭就医、检验或检查记录。", "health_timeline": "个人健康时间轴",
+        "no_meds": "暂无在用药记录", "family_overview": "成员状态、用药与提醒",
+        "stable": "当前无明确提醒", "needs_attention": "需要关注",
+        "data_present": "近期有状态记录", "data_missing": "近期状态记录较少",
+        "current_status": "当前状态", "current_meds": "当前用药", "reminders_attention": "提醒与注意",
+        "no_family_meds": "暂无在用药", "no_family_attention": "暂无待处理提醒或明确注意事项",
+        "attention_count": "{count} 项需要注意", "daily_at": "每天 {times}", "next_at": "下次 {time}",
+        "more_meds": "另有 {count} 种在用药", "more_attention": "另有 {count} 项提醒或注意事项",
+        "due_prefix": "待处理", "upcoming_prefix": "计划提醒",
+        "health_timeline": "个人健康时间轴",
         "no_health_timeline": "所选时间范围内暂无可展示的健康动态。", "metric_event": "指标",
         "food_event": "饮食", "activity_event": "运动", "sleep_event": "睡眠", "health_metric_update": "健康指标更新",
         "food_log": "饮食记录", "sleep_log": "睡眠记录", "sleep_score": "评分 {score}",
@@ -92,11 +96,15 @@ COPY = {
         "abnormal": "{count} explicitly flagged", "no_flagged": "No explicit abnormal flags", "diagnosis": "Diagnosis",
         "conclusion": "Conclusion", "active_meds": "Active medications", "medicine": "Medication",
         "dosage": "Dose", "frequency": "Frequency", "purpose": "Purpose", "start_date": "Start date",
-        "no_meds": "No active medications recorded", "family_overview": "Family overview",
-        "family_timeline": "Recent family care timeline", "stable": "No explicit alerts", "needs_attention": "Needs attention",
-        "data_present": "Recent records available", "data_missing": "Limited recent data", "diet_days_short": "Food {count}d",
-        "activity_short": "Activity {count}", "sleep_short": "Sleep {count} nights", "care_short": "Care {count}",
-        "no_timeline": "No visits, lab results, imaging, or exams were recorded for the family in this period.", "health_timeline": "Personal health timeline",
+        "no_meds": "No active medications recorded", "family_overview": "Member status, medications, and reminders",
+        "stable": "No explicit alerts", "needs_attention": "Needs attention",
+        "data_present": "Recent status records available", "data_missing": "Limited recent status data",
+        "current_status": "Current status", "current_meds": "Current medications", "reminders_attention": "Reminders and attention",
+        "no_family_meds": "No active medications", "no_family_attention": "No due reminders or explicit attention items",
+        "attention_count": "{count} items need attention", "daily_at": "Daily at {times}", "next_at": "Next {time}",
+        "more_meds": "{count} more active medications", "more_attention": "{count} more reminders or attention items",
+        "due_prefix": "Due", "upcoming_prefix": "Planned",
+        "health_timeline": "Personal health timeline",
         "no_health_timeline": "No health events are available for this period.", "metric_event": "Metrics",
         "food_event": "Food", "activity_event": "Activity", "sleep_event": "Sleep", "health_metric_update": "Health metrics updated",
         "food_log": "Food log", "sleep_log": "Sleep record", "sleep_score": "Score {score}",
@@ -218,9 +226,22 @@ def _query_active_medications(member_id: str) -> list[dict]:
     conn = health_db.get_medical_connection()
     try:
         return health_db.rows_to_list(conn.execute(
-            """SELECT name, dosage, frequency, start_date, purpose FROM medications
+            """SELECT id, name, dosage, frequency, start_date, purpose FROM medications
                WHERE member_id=? AND is_deleted=0 AND (end_date IS NULL OR end_date='')
                AND (is_active=1 OR is_active IS NULL) ORDER BY start_date DESC""", (member_id,)).fetchall())
+    finally:
+        conn.close()
+
+
+def _query_active_reminders(member_id: str) -> list[dict]:
+    conn = health_db.get_medical_connection()
+    try:
+        return health_db.rows_to_list(conn.execute(
+            """SELECT id, type, title, content, schedule_type, schedule_value,
+                      next_trigger_at, related_record_id, related_record_type, priority
+               FROM reminders
+               WHERE member_id=? AND is_deleted=0 AND is_active=1
+               ORDER BY next_trigger_at, created_at""", (member_id,)).fetchall())
     finally:
         conn.close()
 
@@ -793,12 +814,8 @@ def _personal_content(member: dict, member_data: dict, trends: dict, lifestyle: 
     return _attention_section(member_data, care, locale) + "".join(sections)
 
 
-def _family_card(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict,
-                 care: dict, locale: str, featured: bool = False) -> str:
+def _family_latest_metrics(trends: dict, locale: str) -> str:
     c = COPY[locale]
-    important_tips = [tip for tip in member_data.get("health_tips", []) if tip.get("severity") in ("alert", "warning")]
-    abnormal_count = _care_abnormal_count(care)
-    attention_count = len(important_tips) + len(member_data.get("due_reminders", [])) + (1 if abnormal_count else 0)
     latest_metrics = []
     for metric_type, points in list(trends.items())[:3]:
         point = points[-1]
@@ -808,38 +825,134 @@ def _family_card(member: dict, member_data: dict, trends: dict, lifestyle: dict,
             value = _fmt_number(_metric_number(point, metric_type), 1 if metric_type in ("blood_sugar", "weight") else 0)
         latest_metrics.append(f'<span><small>{_escape(METRIC_NAMES[locale].get(metric_type, metric_type))}</small><b>{_escape(value)} <i>{_escape(METRIC_UNITS.get(metric_type, ""))}</i></b></span>')
     if not latest_metrics:
-        latest_metrics.append(f'<span class="wide"><small>{c["metrics"]}</small><b>{c["data_missing"]}</b></span>')
-    care_count = _care_record_count(care)
-    if locale == "en-US":
-        chips = [f'Food {lifestyle["diet_days"]}d', _count_phrase(locale, lifestyle["exercise_count"], "", "activity", "activities"),
-                 _count_phrase(locale, sleep.get("count", 0), "", "sleep record"), _count_phrase(locale, care_count, "", "care item")]
-    else:
-        chips = [c["diet_days_short"].format(count=lifestyle["diet_days"]), c["activity_short"].format(count=lifestyle["exercise_count"]), c["sleep_short"].format(count=sleep.get("count", 0)), c["care_short"].format(count=care_count)]
+        return f'<div class="family-state-note">{c["data_missing"]}</div>'
+    return f'<div class="family-metrics">{"".join(latest_metrics)}</div>'
+
+
+def _family_medication_schedule(medication: dict, reminders: list[dict], locale: str) -> str:
+    c = COPY[locale]
+    linked = [
+        reminder for reminder in reminders
+        if reminder.get("type") == "medication"
+        and reminder.get("related_record_id") == medication.get("id")
+    ]
+    daily_times = sorted({
+        str(reminder.get("schedule_value") or "")
+        for reminder in linked
+        if reminder.get("schedule_type") == "daily" and reminder.get("schedule_value")
+    })
+    if daily_times:
+        separator = "、" if locale == "zh-CN" else ", "
+        return c["daily_at"].format(times=separator.join(daily_times))
+    next_times = sorted(
+        str(reminder.get("next_trigger_at") or "")[:16]
+        for reminder in linked if reminder.get("next_trigger_at")
+    )
+    return c["next_at"].format(time=next_times[0]) if next_times else ""
+
+
+def _family_medications_html(meds: list[dict], reminders: list[dict], locale: str) -> str:
+    c = COPY[locale]
+    if not meds:
+        return f'<div class="family-empty">{c["no_family_meds"]}</div>'
+    rows = []
+    for med in meds[:3]:
+        details = " · ".join(str(value) for value in (med.get("dosage"), med.get("frequency")) if value)
+        schedule = _family_medication_schedule(med, reminders, locale)
+        schedule_html = f'<em>{_escape(schedule)}</em>' if schedule else ""
+        rows.append(
+            f'<div class="family-list-item medication"><div><b>{_escape(med.get("name"))}</b>'
+            f'<small>{_escape(details)}</small></div>'
+            f'{schedule_html}</div>'
+        )
+    if len(meds) > 3:
+        rows.append(f'<div class="family-more">{c["more_meds"].format(count=len(meds)-3)}</div>')
+    return '<div class="family-list">' + "".join(rows) + '</div>'
+
+
+def _family_reminder_schedule(reminder: dict, locale: str) -> str:
+    c = COPY[locale]
+    if reminder.get("schedule_type") == "daily" and reminder.get("schedule_value"):
+        return c["daily_at"].format(times=reminder["schedule_value"])
+    if reminder.get("next_trigger_at"):
+        return c["next_at"].format(time=str(reminder["next_trigger_at"])[:16])
+    return ""
+
+
+def _family_attention_entries(member_data: dict, care: dict, reminders: list[dict], locale: str) -> list[tuple[str, str]]:
+    c = COPY[locale]
+    entries = []
+    seen = set()
+
+    def add(tone: str, text: str):
+        normalized = str(text or "").strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            entries.append((tone, normalized))
+
     abnormal_reports = _care_abnormal_reports(care)
-    attention = ""
-    if abnormal_reports:
-        lab = abnormal_reports[0]
-        attention = f'{lab.get("test_name") or c["lab_event"]}: {c["abnormal"].format(count=lab.get("abnormal_count", 0))}'
-    if not attention:
-        attention = " · ".join(_system_text(tip.get("title") or tip.get("message") or "", locale) for tip in important_tips[:1])
-    if not attention and member_data.get("due_reminders"):
-        attention = member_data["due_reminders"][0].get("title") or member_data["due_reminders"][0].get("content") or ""
-    has_recent_data = bool(trends or lifestyle["diet_days"] or lifestyle["exercise_count"] or
-                           lifestyle["step_days"] or sleep.get("count") or care_count)
+    for lab in abnormal_reports:
+        text = f'{lab.get("test_name") or c["lab_event"]}: {c["abnormal"].format(count=lab.get("abnormal_count", 0))}'
+        if lab.get("abnormal_labels"):
+            text += " · " + "; ".join(lab["abnormal_labels"])
+        add("alert", text)
+    for tip in member_data.get("health_tips", []):
+        if tip.get("severity") not in ("alert", "warning"):
+            continue
+        add(tip.get("severity", "warning"), _system_text(tip.get("title") or tip.get("message") or tip.get("detail") or "", locale))
+    due_ids = set()
+    for reminder in member_data.get("due_reminders", []):
+        due_ids.add(reminder.get("id"))
+        text = reminder.get("title") or reminder.get("content") or ""
+        add("warning", f'{c["due_prefix"]}：{text}' if locale == "zh-CN" else f'{c["due_prefix"]}: {text}')
+    for reminder in reminders:
+        if reminder.get("id") in due_ids or reminder.get("type") == "medication":
+            continue
+        text = reminder.get("title") or reminder.get("content") or ""
+        schedule = _family_reminder_schedule(reminder, locale)
+        prefix = f'{c["upcoming_prefix"]}：' if locale == "zh-CN" else f'{c["upcoming_prefix"]}: '
+        add("info", prefix + text + (f' · {schedule}' if schedule else ""))
+    return entries
+
+
+def _family_attention_html(entries: list[tuple[str, str]], locale: str) -> str:
+    c = COPY[locale]
+    if not entries:
+        return f'<div class="family-empty clear-state">✓ {c["no_family_attention"]}</div>'
+    visible = entries[:4]
+    items = "".join(
+        f'<div class="family-list-item attention {tone}"><i></i><p>{_escape(text)}</p></div>'
+        for tone, text in visible
+    )
+    if len(entries) > len(visible):
+        items += f'<div class="family-more">{c["more_attention"].format(count=len(entries)-len(visible))}</div>'
+    return '<div class="family-list">' + items + '</div>'
+
+
+def _family_card(member: dict, member_data: dict, trends: dict, care: dict,
+                 meds: list[dict], reminders: list[dict], locale: str,
+                 featured: bool = False) -> str:
+    c = COPY[locale]
+    attention_entries = _family_attention_entries(member_data, care, reminders, locale)
+    attention_count = sum(1 for tone, _ in attention_entries if tone in ("alert", "warning"))
+    has_recent_data = bool(trends or _care_record_count(care))
     status = c["needs_attention"] if attention_count else c["stable"]
-    summary = attention if attention else (c["data_present"] if has_recent_data else c["data_missing"])
+    summary = c["attention_count"].format(count=attention_count) if attention_count else (c["data_present"] if has_recent_data else c["stable"])
     return f'''<article class="family-card{' featured-member' if featured else ''}"><div class="family-card-head"><div><h3>{_escape(_member_label(member, locale))}</h3><p>{_escape(summary)}</p></div><span class="status {'watch' if attention_count else ''}">{status}</span></div>
-      <div class="family-metrics">{"".join(latest_metrics)}</div><div class="chips">{"".join(f'<span>{_escape(x)}</span>' for x in chips)}</div></article>'''
+      <div class="family-block"><div class="family-block-title">{c["current_status"]}</div>{_family_latest_metrics(trends, locale)}</div>
+      <div class="family-block"><div class="family-block-title">{c["current_meds"]}</div>{_family_medications_html(meds, reminders, locale)}</div>
+      <div class="family-block"><div class="family-block-title">{c["reminders_attention"]}</div>{_family_attention_html(attention_entries, locale)}</div></article>'''
 
 
 def _family_rank(data: dict) -> tuple:
-    """Put urgent members first, then members with richer recent evidence."""
+    """Put urgent members first, then members with active care plans or recent data."""
     tips = data["member_data"].get("health_tips", [])
     alerts = sum(1 for tip in tips if tip.get("severity") == "alert")
     warnings = sum(1 for tip in tips if tip.get("severity") == "warning")
     abnormal_labs = _care_abnormal_count(data["care"])
     reminders = len(data["member_data"].get("due_reminders", []))
-    coverage = (sum(len(points) for points in data["trends"].values()) +
+    coverage = (len(data.get("meds", [])) + len(data.get("reminders", [])) +
+                sum(len(points) for points in data["trends"].values()) +
                 int(data["lifestyle"].get("diet_days", 0)) +
                 int(data["lifestyle"].get("exercise_count", 0)) +
                 int(data["sleep"].get("count", 0)) +
@@ -847,26 +960,17 @@ def _family_rank(data: dict) -> tuple:
     return alerts, warnings + abnormal_labs, reminders, coverage
 
 
-def _family_timeline(all_data: list[dict], locale: str) -> str:
+def _family_content(all_data: list[dict], locale: str, featured_member: str | None) -> str:
     c = COPY[locale]
-    events = []
-    for data in all_data:
-        label = _member_label(data["member"], locale)
-        for item in data["care"]["visits"]:
-            events.append((item.get("visit_date", "")[:10], label, c["visit_event"], item.get("diagnosis") or item.get("department") or item.get("visit_type") or c["unknown"]))
-        for item in data["care"]["labs"]:
-            summary = item.get("test_name") or c["unknown"]
-            if item.get("abnormal_count"):
-                summary += " · " + c["abnormal"].format(count=item["abnormal_count"])
-            events.append((item.get("test_date", "")[:10], label, c["lab_event"], summary))
-        for item in data["care"]["imaging"]:
-            events.append((item.get("exam_date", "")[:10], label, c["imaging_event"], item.get("exam_name") or c["unknown"]))
-    events.sort(key=lambda value: value[0], reverse=True)
-    if not events:
-        body = f'<div class="empty">{c["no_timeline"]}</div>'
-    else:
-        body = '<div class="timeline">'+"".join(f'<div class="timeline-item"><time>{_escape(date)}</time><span></span><div><b>{_escape(label)}</b><small>{_escape(kind)}</small><p>{_escape(summary)}</p></div></div>' for date, label, kind, summary in events[:8])+'</div>'
-    return f'<section><div class="section-title"><span>02</span><h2>{c["family_timeline"]}</h2></div>{body}</section>'
+    cards = "".join(
+        _family_card(
+            data["member"], data["member_data"], data["trends"], data["care"],
+            data["meds"], data["reminders"], locale,
+            featured=data["member"]["id"] == featured_member,
+        )
+        for data in all_data
+    )
+    return f'<section><div class="section-title"><h2>{c["family_overview"]}</h2></div><div class="family-grid">{cards}</div></section>'
 
 
 def _summary_strip(briefing: dict, locale: str, family_data=None) -> str:
@@ -904,7 +1008,7 @@ section{{background:#fff;border:1px solid #DFEAE7;border-radius:20px;padding:21p
 .wellness-grid{{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:10px}} .wellness-grid.focused{{grid-template-columns:repeat(4,minmax(0,1fr))}} .featured-panel{{grid-column:span 2}} .panel{{min-height:158px;border-radius:15px;padding:14px;border:1px solid #DCE8E5;background:#F9FBFB}} .intake{{background:#F5F8FC;border-color:#DCE6F3}} .activity{{background:#F3F9F7;border-color:#D6E9E4}} .sleep{{background:#FCF7F4;border-color:#F1E0D9}} .eyebrow{{font-size:11px;font-weight:750;color:#506D67}} .big{{font-size:24px;font-weight:780;margin-top:6px;font-variant-numeric:tabular-nums}} .macro,.sleep-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:9px}} .macro span,.sleep-row span{{font-size:9px;color:#7A8D88}} .macro b,.sleep-row b{{display:block;font-size:11px;color:#284A44}} .step-box{{margin-top:9px;padding-top:8px;border-top:1px solid #D7E8E4;display:grid;grid-template-columns:1fr auto}} .step-box b{{font-size:16px;color:#176F63}} .step-box small{{grid-column:1/3;color:#82938F}} .top-gap{{margin-top:10px}} .scope-note{{margin:9px 2px 0;font-size:9px;color:#82938F}}
 .table-wrap{{overflow:hidden;border:1px solid #DFE8E6;border-radius:14px}} table{{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}} th{{background:#EDF4F2;color:#31564F;font-size:11px;text-align:left}} th,td{{padding:9px 12px;border-bottom:1px solid #EDF2F1}} tr:last-child td{{border:0}} td{{font-size:11px}}
 .clear{{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:13px;background:#E7F5F1;color:#16665B}} .clear i{{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#1B786B;color:white;font-style:normal}} .hero-clear{{margin:14px 0;background:white;border:1px solid #D7E8E3;box-shadow:0 9px 28px rgba(18,60,53,.05)}} .attention-section{{padding:14px 18px}} .attention-section.has-risk{{border-color:#E9B9AA;background:#FFFCFB}} .attention-section .compact-attention{{padding:0;border:0}} .attention-list{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;flex:1}} .attention-item{{display:flex;gap:9px;padding:8px 11px;border-radius:10px;background:#F4F8F7}} .attention-item span{{width:6px;height:6px;border-radius:50%;background:#2F6FEB;margin-top:7px;flex:none}} .attention-item.alert span{{background:#D65F45}} .attention-item.warning span{{background:#D49A30}} .attention-item p{{margin:0;font-size:12px}} .compact-attention{{display:flex;align-items:center;gap:14px;padding-bottom:13px;border-bottom:1px solid #E5EEEB}} .compact-attention>b{{font-size:12px;white-space:nowrap;color:#45645E}} .compact-attention>.clear{{flex:1;padding:8px 11px}} .compact-attention>.clear i{{width:20px;height:20px}}
-.family-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}} .family-card{{padding:18px;border:1px solid #DCE8E5;border-radius:17px;background:#FAFCFB}} .family-card.featured-member{{border-color:#E8A58F;background:#FFFAF8;box-shadow:inset 3px 0 #D76A4A}} .family-card-head{{display:flex;justify-content:space-between;gap:10px}} .family-card-head p{{margin:3px 0;color:#718580;font-size:10px}} .status{{height:max-content;padding:4px 8px;border-radius:99px;background:#E5F3EF;color:#176B60;font-size:9px;white-space:nowrap}} .status.watch{{background:#FCEBE5;color:#A64C36}} .family-metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}} .family-metrics span{{padding:9px;background:#F0F6F4;border-radius:10px}} .family-metrics span.wide{{grid-column:1/4}} .family-metrics small,.family-metrics b{{display:block}} .family-metrics small{{font-size:9px;color:#718580}} .family-metrics b{{font-size:14px;margin-top:3px}} .family-metrics i{{font-size:8px;font-style:normal;color:#7B8E89}} .chips{{display:flex;flex-wrap:wrap;gap:5px}} .chips span{{font-size:9px;padding:3px 7px;border:1px solid #DCE8E5;border-radius:99px;color:#637C76}}
+.family-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}} .family-card{{padding:18px;border:1px solid #DCE8E5;border-radius:17px;background:#FAFCFB}} .family-card.featured-member{{border-color:#E8A58F;background:#FFFAF8;box-shadow:inset 3px 0 #D76A4A}} .family-card-head{{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}} .family-card-head p{{margin:3px 0;color:#718580;font-size:10px}} .status{{height:max-content;padding:4px 8px;border-radius:99px;background:#E5F3EF;color:#176B60;font-size:9px;white-space:nowrap}} .status.watch{{background:#FCEBE5;color:#A64C36}} .family-block{{padding:11px 0;border-top:1px solid #E5EEEB}} .family-block-title{{font-size:10px;font-weight:760;color:#527069;margin-bottom:7px}} .family-metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}} .family-metrics span{{padding:8px;background:#F0F6F4;border-radius:10px;min-width:0}} .family-metrics small,.family-metrics b{{display:block}} .family-metrics small{{font-size:9px;color:#718580}} .family-metrics b{{font-size:13px;margin-top:2px;white-space:nowrap}} .family-metrics i{{font-size:8px;font-style:normal;color:#7B8E89}} .family-state-note,.family-empty{{padding:8px 10px;border-radius:10px;background:#F2F6F5;color:#718580;font-size:10px}} .family-empty.clear-state{{background:#EAF5F2;color:#176B60}} .family-list{{display:grid;gap:6px}} .family-list-item{{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:10px;background:#F2F6F5;min-width:0}} .family-list-item.medication{{justify-content:space-between;background:#EEF4FA}} .family-list-item.medication div{{min-width:0}} .family-list-item.medication b,.family-list-item.medication small{{display:block}} .family-list-item.medication b{{font-size:11px;color:#274D66}} .family-list-item.medication small{{font-size:9px;color:#71818D;margin-top:1px}} .family-list-item.medication em{{font-size:8px;font-style:normal;color:#2F6FEB;background:#fff;padding:3px 6px;border-radius:99px;white-space:nowrap}} .family-list-item.attention{{align-items:flex-start}} .family-list-item.attention i{{width:6px;height:6px;border-radius:50%;background:#2F6FEB;margin-top:6px;flex:none}} .family-list-item.attention.warning i{{background:#D49A30}} .family-list-item.attention.alert i{{background:#D65F45}} .family-list-item.attention p{{margin:0;font-size:10px;color:#49645E}} .family-more{{font-size:9px;color:#718580;padding-left:3px}}
 .timeline{{padding-left:6px}} .timeline-item{{display:grid;grid-template-columns:78px 12px 1fr;gap:9px;min-height:55px}} .timeline-item time{{font-size:10px;color:#718580;padding-top:2px;font-variant-numeric:tabular-nums}} .timeline-item>span{{position:relative}} .timeline-item>span:before{{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#D76A4A;top:5px;left:2px}} .timeline-item>span:after{{content:"";position:absolute;width:1px;background:#DDE8E5;top:15px;bottom:0;left:5px}} .timeline-item:last-child>span:after{{display:none}} .timeline-item b{{font-size:12px}} .timeline-item small{{margin-left:7px;padding:2px 6px;border-radius:99px;background:#F4E9E5;color:#9B5A47;font-size:8px}} .timeline-item p{{font-size:11px;color:#59726C;margin:1px 0}} .personal-timeline{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:25px}} .personal-timeline .timeline-item{{grid-template-columns:72px 12px 1fr;min-height:52px}} .personal-timeline .metric-event>span:before{{background:#2F6FEB}} .personal-timeline .metric-event small{{background:#E8F0FA;color:#2F6FEB}} .personal-timeline .food-event>span:before{{background:#557FBA}} .personal-timeline .food-event small{{background:#EDF3FA;color:#446A9E}} .personal-timeline .activity-event>span:before{{background:#1E7A6E}} .personal-timeline .activity-event small{{background:#E4F2EE;color:#176B60}} .personal-timeline .sleep-event>span:before{{background:#C8775E}} .personal-timeline .sleep-event small{{background:#F7EAE5;color:#A45C47}}
 .footer{{text-align:center;color:#758984;font-size:10px;padding:14px 10px 6px}} .footer b{{display:block;color:#385C55;margin:3px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid,.metric-grid.focused{{grid-template-columns:repeat(2,1fr)}}.wellness-grid,.wellness-grid.focused,.family-grid,.personal-timeline{{grid-template-columns:1fr}}.featured-panel{{grid-column:auto}}.attention-list{{grid-template-columns:1fr}}.compact-attention{{align-items:flex-start;flex-direction:column}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
 </style></head><body><main class="container"><header class="header"><div class="brand"><div class="mark">M</div><h1>{_escape(title)}</h1></div><div class="subtitle">{_escape(subtitle)}</div><div class="privacy">●&nbsp; {_escape(privacy)} · MediWise</div></header>{summary}{content}<footer class="footer"><span>{_escape(generated)}</span><b>MediWise Health Suite</b><span>{_escape(c["disclaimer"])}</span></footer></main></body></html>'''
@@ -954,7 +1058,8 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         member_data = lookup.get(mid, {"member_id": mid, "member_name": member["name"], "relation": member["relation"], "due_reminders": [], "health_tips": []})
         all_data.append({"member": member, "member_data": member_data, "trends": _query_metric_trends(mid, days),
                          "lifestyle": _query_lifestyle_summary(mid, days), "sleep": _query_sleep_summary(mid, days),
-                         "care": _query_recent_care(mid, days), "meds": _query_active_medications(mid)})
+                         "care": _query_recent_care(mid, days), "meds": _query_active_medications(mid),
+                         "reminders": _query_active_reminders(mid)})
 
     # health_advisor's reminder total is global. Recalculate card totals from
     # the selected member set so a personal card never inherits family tasks.
@@ -986,17 +1091,14 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         ranked = [_family_rank(data) for data in all_data]
         featured_member = all_data[0]["member"]["id"] if ranked and any(ranked[0][:3]) else None
         layout_profile = {
-            "focus": "attention" if featured_member else "coverage",
+            "focus": "attention" if featured_member else "status",
             "member_order": [data["member"]["id"] for data in all_data],
             "featured_member": featured_member,
         }
         title = c["family_title"]
         subtitle = f'{c["period"].format(start=start, end=end)} · {c["last_days"].format(days=days)} · {c["members"].format(count=len(all_data))}'
         summary = _summary_strip(card_briefing, locale, all_data)
-        cards = "".join(_family_card(d["member"], d["member_data"], d["trends"], d["lifestyle"],
-                                     d["sleep"], d["care"], locale,
-                                     featured=d["member"]["id"] == featured_member) for d in all_data)
-        content = f'<section><div class="section-title"><span>01</span><h2>{c["family_overview"]}</h2></div><div class="family-grid">{cards}</div></section>'+_family_timeline(all_data, locale)
+        content = _family_content(all_data, locale, featured_member)
         privacy = c["local_family"]
     html = _render_html(title, subtitle, privacy, summary, content, locale)
     reports_dir = os.path.join(DATA_DIR, "reports")

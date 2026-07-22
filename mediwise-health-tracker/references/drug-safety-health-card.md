@@ -111,9 +111,9 @@ python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 | `care` | 就医、检验、检查 | 个人健康时间轴前置 |
 | `medications` | 当前用药、服药提醒 | 在用药区前置 |
 
-家庭版不接受手动 focus。生成器自动将有 alert 的成员排在最前，其次是 warning、明确标记异常和到期提醒；无风险时按近期记录覆盖度排列。只有确有风险或待办的首位成员使用强化卡片样式。
+家庭版不接受手动 focus，也不展示家庭时间轴。它是按成员组织的状态看板，每张成员卡固定展示当前状态、有限的最新指标、在用药和服药计划、提醒与明确注意事项。生成器自动将有 alert 的成员排在最前，其次是 warning、明确标记异常和到期提醒；均无风险时，再按在用药、计划提醒和近期记录覆盖度排列。只有确有风险或到期待办的首位成员使用强化卡片样式。
 
-使用返回的 `layout_profile` 做验证和自然语言概括，不要把它原样发给用户。至少检查：`focus`、`section_order`，以及家庭版的 `member_order` 和 `featured_member`。
+使用返回的 `layout_profile` 做验证和自然语言概括，不要把它原样发给用户。个人版至少检查 `focus` 和 `section_order`；家庭版检查 `focus`、`member_order` 和 `featured_member`。
 
 ### 通用 HTML 截图
 

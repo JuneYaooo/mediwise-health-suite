@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Family health record cards now organize each member by current status, active medications and schedules, reminders, and explicit attention items. The family timeline has been removed.
+
 ### Planned
 - Integration with more wearable devices
 - Enhanced AI-powered health insights

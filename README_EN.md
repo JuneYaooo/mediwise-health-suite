@@ -67,7 +67,7 @@ The personal card keeps metric trends, recorded food intake, activity burn, step
 
 The timeline shows up to ten recent events in reverse chronological order. Medical records come first when several events share a date. The card is not locked to one layout: explicit abnormalities and due reminders take priority, then recorded data volume determines section order and which metric or lifestyle panel receives more space. A direct request about metrics, lifestyle, care, or medication overrides the automatic focus. Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
 
-MediWise also has a compact family card for one local user who manages several family profiles. It shows each person as `Name (relationship)`, places members with alerts, explicitly flagged results, or pending reminders first, then orders the rest by recent data coverage. It also combines recent visits, lab results, and imaging in a family care timeline. Ask for it explicitly:
+MediWise also has a compact family card for one local user who manages several family profiles. It shows each person's current status, active medications and medication schedules, due or upcoming reminders, and explicit attention items. It does not include a family timeline. Members with alerts, flagged results, or due reminders appear first. Ask for it explicitly:
 
 ```text
 Create a family health record card for the last 7 days.
