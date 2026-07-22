@@ -14,7 +14,7 @@ Keep personal and family health records in one place, including chat notes, medi
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation](#documentation)
+[Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
 
 </div>
 
@@ -260,32 +260,14 @@ Create a complete MediWise backup in my personal backup folder. When it finishes
 Restore the MediWise backup I selected. Check the archive before starting, remind me to stop active synchronization jobs, and do not overwrite the current data until I confirm.
 ```
 
-Backups use consistent SQLite snapshots and include a SHA-256 `manifest.json`. Restore checks file names, file sizes, hashes, and database integrity. If replacement or migration fails, the restore process puts the previous files back.
-
-The backup contains complete health records and is not encrypted. The manifest can detect ordinary corruption, but it is not signed and cannot prove who created the archive.
-
-## Architecture
-
-![MediWise Health Suite architecture and data boundary](docs/images/architecture.svg)
-
-The green dashed line marks the local privacy boundary. Requests pass through the local mode check and action router before reaching six domain skills. Medical records and lifestyle data are stored separately. Vision, food lookup, and device services sit outside the boundary and are contacted only after explicit configuration.
-
-| Module | Documentation |
-|---|---|
-| Core health records | [mediwise-health-tracker/SKILL.md](mediwise-health-tracker/SKILL.md) |
-| Diet | [diet-tracker/SKILL.md](diet-tracker/SKILL.md) |
-| Weight and exercise | [weight-manager/SKILL.md](weight-manager/SKILL.md) |
-| Sleep | [sleep-tracker/SKILL.md](sleep-tracker/SKILL.md) |
-| Monitoring | [health-monitor/SKILL.md](health-monitor/SKILL.md) |
-| Wearable imports | [wearable-sync/SKILL.md](wearable-sync/SKILL.md) |
+Backups contain complete health records and are not encrypted. Keep them in a private location. MediWise checks a backup before restoring it and keeps the current data until replacement is confirmed.
 
 ## Documentation
 
+- [Documentation center and project structure](docs/README.md) routes readers to user, installation, Agent, and contributor documentation.
 - [Quick start](QUICKSTART.md) covers the shortest path after installation.
 - [Installation guide](docs/INSTALLATION.md) covers configuration, privacy choices, and troubleshooting.
-- [Installation instructions for AI agents](docs/INSTALL_AGENT.md) define the checks an assistant must perform.
 - [Wearable import guide](docs/WEARABLES.md) covers Apple Health and Gadgetbridge files.
-- [Health management overview](docs/HEALTH-MANAGEMENT-OVERVIEW.md) describes workflows and boundaries.
 - [Changelog](CHANGELOG.md) lists published changes.
 - [Contributing guide](CONTRIBUTING.md) explains how to submit changes safely.
 
@@ -303,7 +285,7 @@ Bug reports, data source adapters, and documentation improvements are welcome. D
 
 ## Acknowledgements
 
-- [LINUX DO](https://linux.do/) for open source discussions, testing feedback, and shared experience from the Chinese developer community.
+- Thanks to the [LINUX DO (linux.do) community](https://linux.do/) for open source discussions, testing feedback, and shared experience, and to everyone who has used, reviewed, or contributed to MediWise.
 
 ## License and medical disclaimer
 

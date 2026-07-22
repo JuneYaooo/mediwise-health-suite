@@ -4,6 +4,8 @@
 
 Thank you for considering contributing to MediWise Health Suite!
 
+项目文档职责和目录结构见 [文档中心](docs/README.md)。
+
 ## 如何贡献 / How to Contribute
 
 ### 报告问题 / Reporting Issues
@@ -90,9 +92,14 @@ If you find a bug or have a feature suggestion:
 ### 文档 / Documentation
 
 如果您的更改影响用户使用方式，请更新：
-- README.md
-- 相关 SKILL.md
-- references/ 目录下的文档
+
+- 用户效果和能力：`README.md`
+- 第一次使用流程：`QUICKSTART.md`
+- 安装与排障：`docs/INSTALLATION.md` 或 `docs/INSTALL_AGENT.md`
+- Agent 行为：相关 `SKILL.md` 或 `references/`
+- 版本变化：`CHANGELOG.md`
+
+完整职责划分见 [文档中心](docs/README.md)。
 
 ### 许可证 / License
 

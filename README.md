@@ -14,7 +14,7 @@
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[常用场景](#三个常用场景) · [5 分钟上手](#5-分钟上手) · [功能全览](#功能全览) · [隐私与安全](#隐私与安全) · [完整文档](#文档导航)
+[常用场景](#三个常用场景) · [5 分钟上手](#5-分钟上手) · [功能全览](#功能全览) · [隐私与安全](#隐私与安全) · [文档中心](docs/README.md)
 
 </div>
 
@@ -181,15 +181,18 @@ MediWise 是个人健康助手，不是多人共享系统。你可以在自己�
 
 ## 文档导航
 
+- [文档中心](docs/README.md)：按普通用户、安装 Agent 和贡献者分类查看全部文档与项目目录。
 - [快速开始](QUICKSTART.md)：安装后的最短使用路径。
-- [完整安装指南](docs/INSTALLATION.md)：安装、图片/PDF 识别和常见问题。
-- [AI 自动安装指南](docs/INSTALL_AGENT.md)：给安装助手使用的执行说明。
+- [安装与配置指南](docs/INSTALLATION.md)：安装、备份、恢复、可选附件识别和常见问题。
 - [可穿戴数据导入指南](docs/WEARABLES.md)：Apple Health 与 Gadgetbridge 的导入方法。
-- [健康管理总览](docs/HEALTH-MANAGEMENT-OVERVIEW.md)：完整能力、边界和典型工作流。
 - [变更记录](CHANGELOG.md)：版本更新内容。
 - [贡献指南](CONTRIBUTING.md)：参与开发与提交规范。
 
 运行要求：Python 3.8+、Node.js 18+、SQLite 3.x、OpenClaw 2026.3.0+；支持 Linux、macOS 和 Windows。
+
+## 致谢
+
+感谢 [LINUX DO（linux.do）社区](https://linux.do/) 对开源项目的讨论、测试反馈和经验分享，也感谢所有参与使用、反馈和贡献的朋友。
 
 ## 许可证与免责声明
 

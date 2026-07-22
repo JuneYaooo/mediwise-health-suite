@@ -1,5 +1,7 @@
 # MediWise 安装与配置指南
 
+> [返回文档中心](README.md) · [快速开始](../QUICKSTART.md)
+
 本指南面向普通用户，所有安装、配置和检查动作都交给具备本机权限的 AI 助手完成。不要手动复制命令，不要在聊天中发送 API Key、密码或真实健康数据。
 
 如果你是负责执行安装的 Agent，请改读 [INSTALL_AGENT.md](INSTALL_AGENT.md)。

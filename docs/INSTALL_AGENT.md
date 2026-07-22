@@ -1,5 +1,7 @@
 # MediWise Health Suite 安装指南（给 AI Agent 读）
 
+> [返回文档中心](README.md) · [普通用户安装指南](INSTALLATION.md)
+
 > 这是一份让 OpenClaw、Codex、Claude Code、Cursor、Trae 等 AI 助手代用户完成安装的执行说明。人类用户通常不需要逐条照抄；把项目的 GitHub 仓库地址发给 AI 即可。
 
 ## 项目简介

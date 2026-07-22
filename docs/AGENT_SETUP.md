@@ -1,5 +1,7 @@
 # OpenClaw Agent 配置说明
 
+> [返回文档中心](README.md) · [安装 Agent 执行指南](INSTALL_AGENT.md)
+
 本文说明 MediWise 在 OpenClaw 中的运行边界。安装执行细节见 [INSTALL_AGENT.md](INSTALL_AGENT.md)，普通用户入口见 [INSTALLATION.md](INSTALLATION.md)。
 
 ## 支持的部署方式

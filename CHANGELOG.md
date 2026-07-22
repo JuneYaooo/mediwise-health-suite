@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Family health record cards now organize each member by current status, active medications and schedules, reminders, and explicit attention items. The family timeline has been removed.
 - Image and PDF intake now uses the current Agent's attachment-reading ability first. OCR and standalone vision services are optional fallbacks and are no longer required for installation.
 - Product and Skill boundaries now explicitly limit MediWise to recording, organizing, displaying, summarizing, and reminding. Health, nutrition, weight, sleep, cycle, and monitoring outputs no longer generate treatment, medication, diet, exercise, or lifestyle instructions.
+- Added a documentation center with audience-based navigation, a maintained project directory map, and clearer ownership for README, installation, Agent, and module documentation.
+- Added an explicit acknowledgement of the LINUX DO (linux.do) community to the Chinese and English README files.
 
 ### Planned
 - Integration with more wearable devices

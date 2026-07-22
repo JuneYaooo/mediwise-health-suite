@@ -1,5 +1,7 @@
 # MediWise Health Suite 健康管理总览
 
+> [返回文档中心](README.md) · [查看 README](../README.md)
+
 MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手。它把自然语言对话、报告图片、可穿戴导出和日常记录整理为可查询、可追踪、可备份的家庭健康档案。
 
 这里的“家庭”指一个本地用户代管本人及多位家人的档案，不代表群聊或多人共享服务。
@@ -142,15 +144,4 @@ MediWise 只提供健康信息的记录、整理、查询、展示、趋势汇�
 - USDA 与 Open Food Facts 只接收食物搜索所需参数，不接收成员或健康记录。
 - 备份包含完整健康档案，应只保存在用户信任的位置。
 
-## 模块
-
-| 模块 | 职责 |
-|---|---|
-| `mediwise-health-tracker` | 健康档案、指标、用药、提醒、卡片与就医摘要 |
-| `diet-tracker` | 饮食记录与可追溯营养来源 |
-| `weight-manager` | 体重、围度、运动与目标 |
-| `sleep-tracker` | 睡眠记录与趋势 |
-| `health-monitor` | 阈值、异常检测与告警 |
-| `wearable-sync` | 可穿戴导出文件的校验、同步与去重 |
-
-安装见 [INSTALLATION.md](INSTALLATION.md)，可穿戴导入见 [WEARABLES.md](WEARABLES.md)。
+项目模块、目录结构和各文档职责统一维护在 [文档中心](README.md)。安装见 [安装与配置指南](INSTALLATION.md)，可穿戴导入见 [可穿戴数据导入指南](WEARABLES.md)。
