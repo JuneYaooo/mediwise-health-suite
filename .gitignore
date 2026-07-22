@@ -237,3 +237,39 @@ config.json
 **/config.json
 .restore.lock
 **/.restore.lock
+
+# Node.js caches and diagnostic output
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment-specific secrets and credentials
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+tokens*.json
+
+# Health exports, local backups, and device session tokens
+**/export.zip
+**/export.xml
+**/tokenstore/
+mediwise-backup-*.tar.gz
+*.fit
+*.gpx
+*.tcx
+
+# OS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

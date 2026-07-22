@@ -96,14 +96,13 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 ```bash
 # 步骤 1：先查每种食物
-python3 {baseDir}/scripts/food_lookup.py search --query "炸排骨" --owner-id "<sender_id>"
-python3 {baseDir}/scripts/food_lookup.py search --query "米饭" --owner-id "<sender_id>"
+python3 {baseDir}/scripts/food_lookup.py search --query "炸排骨"
+python3 {baseDir}/scripts/food_lookup.py search --query "米饭"
 
 # 步骤 2：用查询结果里的营养数据填 --items，再记录
 python3 {baseDir}/scripts/diet.py add-meal \
   --member-id <id> --meal-type lunch --meal-date 2025-03-15 \
-  --items '[{"food_name":"炸排骨","amount":150,"unit":"g","calories":298,"protein":21.2,"fat":19.3,"carbs":9.1,"note":"来源:CFCD6"}]' \
-  --owner-id "<sender_id>"
+  --items '[{"food_name":"炸排骨","amount":150,"unit":"g","calories":298,"protein":21.2,"fat":19.3,"carbs":9.1,"note":"来源:CFCD6"}]'
 ```
 
 **查询未命中时的处理：**
@@ -126,7 +125,7 @@ python3 {baseDir}/scripts/diet.py add-meal \
 
 ## 注意事项
 
-- **每次调用脚本必须携带 `--owner-id`（强制）**：从会话上下文获取发送者 ID（格式 `<channel>:<user_id>`，如 `feishu:ou_xxx` 或 `qqbot:12345`），作为所有脚本的 `--owner-id` 参数，不得省略。
+- 当前公开版本只用于个人本地档案；身份隔离由安装时的个人模式和 action 适配层处理，不向普通用户暴露或索取 `owner_id`。
 - **禁止 AI 估算营养数据**：所有热量/蛋白质/脂肪/碳水/膳食纤维数值必须来自 `food-lookup search`，或经用户明确确认的手动输入，不得由 AI 凭自身知识估算后直接写入。
 - `note` 字段必须记录数据来源，便于用户事后核查。
 - meal_type 支持: breakfast（早餐）、lunch（午餐）、dinner（晚餐）、snack（加餐/零食）

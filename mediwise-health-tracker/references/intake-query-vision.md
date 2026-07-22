@@ -21,8 +21,8 @@
 - 血氧
 
 ```bash
-python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
-python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id> --owner-id "<sender_id>"
+python3 {baseDir}/scripts/quick_entry.py parse --text "血压130/85 心率72" --member-id <id>
+python3 {baseDir}/scripts/quick_entry.py parse-and-save --text "血压130/85 心率72" --member-id <id>
 ```
 
 如果返回 `fallback: true`，再切换到 `smart_intake.py`。

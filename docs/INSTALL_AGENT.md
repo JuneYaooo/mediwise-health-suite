@@ -125,7 +125,7 @@ python3 mediwise-health-tracker/scripts/setup.py test-intake --input both
 bash install-check.sh
 ```
 
-检查失败时，报告失败的具体阶段和命令输出摘要，不要绕过失败继续声称安装完成。
+脚本会检查六个领域 Skill、共享路径工具和 Python 导入。安装在标准 `<agent-root>/skills/mediwise-health-suite` 路径时还会自动校验 OpenClaw 路径；使用自定义 OpenClaw workspace 时可传入已经确认的根目录：`bash install-check.sh --agent-root <agent-root>`。其他 Agent 不套用 OpenClaw 路径规则，只执行结构与导入检查。检查失败时，报告失败的具体阶段和命令输出摘要，不要绕过失败继续声称安装完成。
 
 ### 6. 配置个人本地模式
 

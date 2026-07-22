@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # install-check.sh — MediWise 安装路径检测工具
 #
-# 用途：检查 skill 是否安装在 OpenClaw agent 工作区内部，
-#       防止触发 "escapes plugin root" 沙箱保护。
+# 用途：检查套件结构和 Python 导入；在 OpenClaw 的 skills 目录中运行时，
+#       同时校验安装路径，防止触发 "escapes plugin root" 沙箱保护。
 #
 # 用法：
 #   bash /path/to/mediwise-health-suite/install-check.sh
@@ -13,6 +13,30 @@ set -euo pipefail
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_NAME="mediwise-health-suite"
 CHECK_FAILED=0
+PATH_OK=1
+AGENT_ROOT=""
+AGENT_ROOT_EXPLICIT=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent-root)
+      if [[ $# -lt 2 ]]; then
+        echo "--agent-root 需要一个目录参数" >&2
+        exit 2
+      fi
+      AGENT_ROOT="$2"; AGENT_ROOT_EXPLICIT=1; shift 2 ;;
+    --agent-root=*)
+      AGENT_ROOT="${1#*=}"; AGENT_ROOT_EXPLICIT=1; shift ;;
+    *)
+      echo "未知参数: $1" >&2
+      exit 2 ;;
+  esac
+done
+
+if [[ "$AGENT_ROOT_EXPLICIT" -eq 1 && -z "$AGENT_ROOT" ]]; then
+  echo "--agent-root 不能是空目录" >&2
+  exit 2
+fi
 
 # ── 颜色输出 ────────────────────────────────────────────────────
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
@@ -24,68 +48,69 @@ info() { echo -e "${CYAN}[INFO]${RESET} $*"; }
 
 echo -e "\n${BOLD}MediWise Health Suite — 安装路径检测${RESET}"
 echo "────────────────────────────────────────"
-info "Skill 实际路径: $SKILL_DIR"
+info "Skill 目录: $(basename "$SKILL_DIR")"
 
-# ── 1. 检测 OpenClaw agent 根目录 ───────────────────────────────
-AGENT_ROOT=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --agent-root)
-      AGENT_ROOT="$2"; shift 2 ;;
-    --agent-root=*)
-      AGENT_ROOT="${1#*=}"; shift ;;
-    *)
-      shift ;;
-  esac
-done
-if [[ -z "$AGENT_ROOT" ]]; then
-  # 自动推导：skill 应在 <agent_root>/skills/<skill_name>/
-  # 向上走两级得到候选 agent root
-  CANDIDATE="$(dirname "$(dirname "$SKILL_DIR")")"
-  if [[ -d "$CANDIDATE" ]]; then
-    AGENT_ROOT="$CANDIDATE"
+# ── 1. 检测并校验 OpenClaw 安装路径 ─────────────────────────────
+PARENT_DIR="$(dirname "$SKILL_DIR")"
+if [[ -z "$AGENT_ROOT" && "$(basename "$PARENT_DIR")" == "skills" ]]; then
+  AGENT_ROOT="$(dirname "$PARENT_DIR")"
+fi
+
+if [[ -n "$AGENT_ROOT" ]]; then
+  if [[ ! -d "$AGENT_ROOT" ]]; then
+    err "Agent 根目录不存在: $AGENT_ROOT"
+    exit 1
   fi
-fi
-
-if [[ -z "$AGENT_ROOT" ]]; then
-  err "无法推导 agent 工作区根目录，请手动指定："
-  err "  bash install-check.sh --agent-root /path/to/workspace-health"
-  exit 1
-fi
-
-info "推导 Agent 根目录: $AGENT_ROOT"
-echo ""
-
-# ── 2. 检查 skill 路径是否在 agent root 内 ──────────────────────
-case "$SKILL_DIR" in
-  "$AGENT_ROOT"/*)
-    ok "路径检测通过：skill 位于 agent 工作区内部"
-    RELATIVE_PATH="$(python3 -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$SKILL_DIR" "$AGENT_ROOT")"
-    ok "  $AGENT_ROOT/…/$RELATIVE_PATH"
-    PATH_OK=1
-    ;;
-  *)
-    err "路径检测失败：skill 不在 agent 工作区内部"
+  AGENT_ROOT="$(cd "$AGENT_ROOT" && pwd)"
+  EXPECTED_PATH="$AGENT_ROOT/skills/$SKILL_NAME"
+  if [[ "$SKILL_DIR" == "$EXPECTED_PATH" ]]; then
+    ok "OpenClaw 安装路径正确: skills/$SKILL_NAME"
+  else
+    err "OpenClaw 安装路径不正确"
     err "  当前位置: $SKILL_DIR"
-    err "  期望在:   $AGENT_ROOT/skills/$SKILL_NAME/"
-    err "  这会触发 OpenClaw 'escapes plugin root' 保护，导致 SKILL.md 无法加载"
+    err "  期望位置: $EXPECTED_PATH"
+    err "  路径不匹配可能触发 'escapes plugin root' 保护"
     PATH_OK=0
     CHECK_FAILED=1
-    ;;
-esac
+  fi
+elif [[ "$AGENT_ROOT_EXPLICIT" -eq 0 ]]; then
+  warn "当前目录不在标准的 <agent-root>/skills/$SKILL_NAME 路径下"
+  warn "按通用 Skills 环境执行结构检查；OpenClaw 安装时请放入实际 workspace 的 skills 目录"
+fi
 
-# ── 3. 检查 SKILL.md 是否存在 ───────────────────────────────────
+# ── 2. 检查套件结构 ─────────────────────────────────────────────
 if [[ -f "$SKILL_DIR/SKILL.md" ]]; then
   ok "SKILL.md 存在"
 else
-    err "SKILL.md 不存在，OpenClaw 将无法识别此 skill"
-    CHECK_FAILED=1
+  err "SKILL.md 不存在，OpenClaw 将无法识别此 skill"
+  CHECK_FAILED=1
 fi
 
-# ── 4. 检查 Python 脚本是否可执行 ───────────────────────────────
+REQUIRED_MODULES=(
+  mediwise-health-tracker
+  diet-tracker
+  weight-manager
+  sleep-tracker
+  health-monitor
+  wearable-sync
+)
+for module in "${REQUIRED_MODULES[@]}"; do
+  if [[ ! -f "$SKILL_DIR/$module/SKILL.md" || ! -d "$SKILL_DIR/$module/scripts" ]]; then
+    err "模块结构不完整: $module"
+    CHECK_FAILED=1
+  fi
+done
+if [[ ! -f "$SKILL_DIR/shared/path_setup.py" ]]; then
+  err "共享路径工具缺失: shared/path_setup.py"
+  CHECK_FAILED=1
+else
+  ok "六个领域模块和共享路径工具完整"
+fi
+
+# ── 3. 检查 Python 脚本是否可导入 ───────────────────────────────
 SCRIPTS_DIR="$SKILL_DIR/mediwise-health-tracker/scripts"
 if [[ -d "$SCRIPTS_DIR" ]]; then
-  ok "脚本目录存在: $SCRIPTS_DIR"
+  ok "核心脚本目录存在"
   if SCRIPTS_DIR="$SCRIPTS_DIR" python3 - <<'EOF' 2>/dev/null
 import os
 import sys
@@ -103,7 +128,7 @@ else
   CHECK_FAILED=1
 fi
 
-# ── 5. 如果路径有问题，给出修复建议 ─────────────────────────────
+# ── 4. 如果路径有问题，给出修复建议 ─────────────────────────────
 if [[ "$PATH_OK" -eq 0 ]]; then
   CORRECT_PATH="$AGENT_ROOT/skills/$SKILL_NAME"
   echo ""
@@ -129,5 +154,9 @@ if [[ "$CHECK_FAILED" -ne 0 ]]; then
 fi
 
 echo ""
-ok "所有检测通过，安装路径正确。"
+if [[ -n "$AGENT_ROOT" ]]; then
+  ok "所有检查通过，OpenClaw 安装路径正确。"
+else
+  ok "结构与 Python 导入检查通过；未执行 OpenClaw 专用路径校验。"
+fi
 echo ""

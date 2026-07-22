@@ -8,14 +8,12 @@ import importlib
 import io
 import json
 import os
-import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-FIXTURE_DIR = SCRIPTS_DIR.parent / "test_data" / "generated_dataset"
 HEALTH_MONITOR_SCRIPTS_DIR = SCRIPTS_DIR.parent.parent / "health-monitor" / "scripts"
 
 if str(SCRIPTS_DIR) not in sys.path:
@@ -27,7 +25,6 @@ if str(HEALTH_MONITOR_SCRIPTS_DIR) not in sys.path:
 class AuthorizationRegressionTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-        shutil.copytree(FIXTURE_DIR, self.tmpdir.name, dirs_exist_ok=True)
         os.environ["MEDIWISE_DATA_DIR"] = self.tmpdir.name
         self.config = self._reload("config")
         self.health_db = self._reload("health_db")
@@ -37,6 +34,8 @@ class AuthorizationRegressionTests(unittest.TestCase):
         self.reminder = self._reload("reminder")
         self.export_mod = self._reload("export")
         self.alert = self._reload("alert")
+
+        self._create_minimal_fixture()
 
         conn = self.health_db.get_connection()
         try:
@@ -58,6 +57,76 @@ class AuthorizationRegressionTests(unittest.TestCase):
             self.self_alert_id = alert_row["id"]
         finally:
             conn.close()
+
+    def _create_minimal_fixture(self):
+        """Create only the synthetic rows required by this test class."""
+        self.health_db.ensure_db()
+        now = self.health_db.now_iso()
+        with self.health_db.transaction() as conn:
+            conn.executemany(
+                """INSERT INTO members
+                   (id, name, relation, owner_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    ("mem_self_li_chen", "测试成员甲", "本人", "owner_demo_a", now, now),
+                    ("mem_owner_b", "测试成员乙", "本人", "owner_demo_b", now, now),
+                ],
+            )
+            conn.executemany(
+                """INSERT INTO visits
+                   (id, member_id, visit_type, visit_date, hospital, department,
+                    chief_complaint, diagnosis, summary, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    (
+                        "visit_self_cardiology", "mem_self_li_chen", "门诊", "2026-01-01",
+                        "测试医院", "测试科室", "测试主诉", "测试记录", "测试摘要", now, now,
+                    ),
+                    (
+                        "visit_owner_b", "mem_owner_b", "门诊", "2026-01-02",
+                        "测试医院", "测试科室", "测试主诉", "测试记录", "测试摘要", now, now,
+                    ),
+                ],
+            )
+            conn.execute(
+                """INSERT INTO reminders
+                   (id, member_id, type, title, schedule_type, is_active, priority,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("reminder_self", "mem_self_li_chen", "custom", "测试提醒", "once", 1, "normal", now, now),
+            )
+            conn.execute(
+                """INSERT INTO attachments
+                   (id, member_id, original_filename, stored_filename, file_path,
+                    file_size, mime_type, category, sha256, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    "attachment_self", "mem_self_li_chen", "fixture.txt", "fixture.txt",
+                    "attachments/fixture.txt", 0, "text/plain", "other", "0" * 64, now, now,
+                ),
+            )
+            conn.execute(
+                """INSERT INTO attachment_links
+                   (id, attachment_id, record_type, record_id, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                ("attachment_link_self", "attachment_self", "visit", "visit_self_cardiology", now),
+            )
+            conn.execute(
+                """INSERT INTO observations
+                   (id, member_id, obs_type, title, facts, source_records, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    "observation_self", "mem_self_li_chen", "summary", "测试观察", "[]",
+                    json.dumps(["visit_self_cardiology"]), now,
+                ),
+            )
+            conn.execute(
+                """INSERT INTO monitor_alerts
+                   (id, member_id, metric_type, level, title, status, updated_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("alert_self", "mem_self_li_chen", "heart_rate", "warning", "测试提醒", "open", now, now),
+            )
+            conn.commit()
 
     def tearDown(self):
         os.environ.pop("MEDIWISE_DATA_DIR", None)

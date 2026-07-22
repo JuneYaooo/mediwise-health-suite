@@ -10,6 +10,7 @@ RELEASE_SUMMARY.md
 
 # Test data
 **/test_data/
+**/test_*.py
 
 # Temporary files
 *.tmp

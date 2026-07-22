@@ -4,7 +4,7 @@
   "description": "Private local health assistant for Skills-compatible AI agents: health records, diet, weight, sleep, monitoring, and wearable imports.",
   "main": "SKILL.md",
   "scripts": {
-    "test": "echo \"No tests specified yet\" && exit 0"
+    "test": "python3 -m unittest discover -s mediwise-health-tracker/scripts -p \"test_*.py\" && python3 -m unittest discover -s health-monitor/scripts -p \"test_*.py\""
   },
   "keywords": [
     "health",

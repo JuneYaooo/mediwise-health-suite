@@ -8,7 +8,6 @@ import io
 import json
 import importlib
 import os
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,7 +16,6 @@ from pathlib import Path
 TEST_DIR = Path(__file__).resolve().parent
 ROOT_DIR = TEST_DIR.parent.parent
 MEDIWISE_SCRIPTS_DIR = ROOT_DIR / "mediwise-health-tracker" / "scripts"
-GENERATOR = ROOT_DIR / "mediwise-health-tracker" / "test_data" / "generate_edge_sample.py"
 
 for path in (TEST_DIR, MEDIWISE_SCRIPTS_DIR):
     if str(path) not in sys.path:
@@ -27,12 +25,12 @@ for path in (TEST_DIR, MEDIWISE_SCRIPTS_DIR):
 class CheckRegressionTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-        subprocess.check_call(["python3", str(GENERATOR), "--output-dir", self.tmpdir.name])
         os.environ["MEDIWISE_DATA_DIR"] = self.tmpdir.name
         self.config = self._reload("config")
         self.health_db = self._reload("health_db")
         self.check = self._reload("check")
         self.alert = self._reload("alert")
+        self._create_minimal_fixture()
 
     def tearDown(self):
         os.environ.pop("MEDIWISE_DATA_DIR", None)
@@ -41,6 +39,31 @@ class CheckRegressionTests(unittest.TestCase):
     def _reload(self, module_name: str):
         module = importlib.import_module(module_name)
         return importlib.reload(module)
+
+    def _create_minimal_fixture(self):
+        """Create deterministic synthetic metrics without repository test data."""
+        self.health_db.ensure_db()
+        now = self.health_db.now_iso()
+        with self.health_db.transaction() as conn:
+            conn.execute(
+                """INSERT INTO members
+                   (id, name, relation, birth_date, owner_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                ("mem_edge_guo_tao", "测试成员", "本人", "1980-01-01", "owner_demo_a", now, now),
+            )
+            conn.executemany(
+                """INSERT INTO health_metrics
+                   (id, member_id, metric_type, value, measured_at, source, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    ("metric_hr", "mem_edge_guo_tao", "heart_rate", "154", now, "test", now),
+                    ("metric_spo2", "mem_edge_guo_tao", "blood_oxygen", "83", now, "test", now),
+                    ("metric_bp", "mem_edge_guo_tao", "blood_pressure", json.dumps({"systolic": 186, "diastolic": 118}), now, "test", now),
+                    ("metric_temp", "mem_edge_guo_tao", "temperature", "39.8", now, "test", now),
+                    ("metric_glucose", "mem_edge_guo_tao", "blood_sugar", json.dumps({"fasting": 12.6}), now, "test", now),
+                ],
+            )
+            conn.commit()
 
     def test_check_member_recognizes_blood_sugar_json_values(self):
         result = self.check.check_member("mem_edge_guo_tao", "24h")
