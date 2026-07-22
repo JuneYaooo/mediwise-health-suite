@@ -2,7 +2,7 @@
 
 > [返回文档中心](README.md) · [查看 README](../README.md)
 
-MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手。它把自然语言对话、报告图片、可穿戴导出和日常记录整理为可查询、可追踪、可备份的家庭健康档案。
+MediWise Health Suite 是面向支持 Skills 的 AI Agent 的个人本地健康助手，可运行在 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具中。它把自然语言对话、报告图片、可穿戴导出和日常记录整理为可查询、可追踪、可备份的家庭健康档案。
 
 这里的“家庭”指一个本地用户代管本人及多位家人的档案，不代表群聊或多人共享服务。
 

@@ -8,7 +8,7 @@
 
 ## 安装
 
-把下面的简单提示发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备终端与网络权限的 AI 助手：
+把下面的简单提示发给 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，或其他具备终端与网络权限的 AI 助手：
 
 ```text
 请帮我安装并配置 MediWise Health Suite：
@@ -20,12 +20,12 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 安装 Agent 应负责：
 
-1. 检查 Git、Python、Node.js 和 OpenClaw 版本。
-2. 找到当前 OpenClaw workspace 实际使用的 `skills` 目录。
+1. 检查 Git、Python、Node.js，以及当前 Agent 的 Skills 支持情况。
+2. 找到当前 Agent 实际加载的 Skills 目录或安装入口。
 3. 从 GitHub 仓库完成安装，且不覆盖已有本地修改。
 4. 安装项目依赖并运行 `install-check.sh`。
 5. 设置并验证个人本地模式。
-6. 告诉你是否需要重载 OpenClaw。
+6. 告诉你是否需要重启或重新加载当前 Agent 的 Skills。
 
 只有检查确实通过后，Agent 才能声称安装完成。
 
@@ -38,7 +38,9 @@ https://github.com/JuneYaooo/mediwise-health-suite
 - 创建第二位成员后，写入必须指定姓名，并用“姓名（身份）”确认。
 - 不配置群聊机器人，不提供多人共同访问同一数据目录的服务。
 
-如果安装 Agent 检测到目标 OpenClaw 实例已经用于群聊或多人共享，应停止安装并解释冲突。
+如果安装 Agent 检测到目标实例已经用于群聊或多人共享，应停止安装并解释冲突。
+
+OpenClaw 用户可使用项目现有的 workspace、ClawHub、飞书/微信私聊接入和重载说明。Hermes、Claude Code、Codex、WorkBuddy 等工具按各自的 Skills 加载机制安装；只要能够读取根 `SKILL.md` 和六个领域 Skill、访问本地文件并执行脚本，就可以运行 MediWise。
 
 ## 图片与 PDF 识别
 
@@ -111,7 +113,7 @@ Garmin Connect 是实验性来源，不作为普通用户默认配置；Huawei H
 
 ## 验收
 
-重载 OpenClaw 后，用下面的无敏感数据对话检查能力：
+让当前 Agent 重新加载 Skills 后，用下面的无敏感数据对话检查能力：
 
 ```text
 请检查 MediWise 是否已正确加载，但先不要创建任何测试健康记录。告诉我个人本地模式和基础依赖是否正常。
@@ -128,7 +130,7 @@ Garmin Connect 是实验性来源，不作为普通用户默认配置；Huawei H
 - 失败阶段和简短原因。
 - 做了哪些安全修复。
 - 哪些检查已经重新通过。
-- 是否需要重载 OpenClaw。
+- 是否需要重启或重新加载当前 Agent。
 - 是否存在未启用的可选能力。
 
 不要为了排障上传真实健康数据库、体检报告、账号凭据或包含个人信息的日志。

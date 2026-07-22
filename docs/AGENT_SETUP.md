@@ -4,9 +4,11 @@
 
 本文说明 MediWise 在 OpenClaw 中的运行边界。安装执行细节见 [INSTALL_AGENT.md](INSTALL_AGENT.md)，普通用户入口见 [INSTALLATION.md](INSTALLATION.md)。
 
+这是 OpenClaw 专用适配说明，不代表 MediWise 只支持 OpenClaw。Hermes、Claude Code、Codex、WorkBuddy 和其他支持 Skills 的 Agent 使用各自的 Skill 加载与重载机制。
+
 ## 支持的部署方式
 
-当前公开版本只支持个人本地 OpenClaw 实例：一个本地用户管理本人及多位家人的档案。
+MediWise 在 OpenClaw 中只支持个人本地实例：一个本地用户管理本人及多位家人的档案。
 
 必须满足：
 

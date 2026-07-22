@@ -15,7 +15,7 @@ trigger: scheduled (nightly ~22:00, ≥20h since last dream)
 
 ## 触发条件
 
-OpenClaw 定时任务在每晚 **22:00** 调用本 skill，触发时先检查是否满足做梦条件：
+当前 Agent 的定时任务在每晚 **22:00** 调用本 skill，触发时先检查是否满足做梦条件。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制：
 
 ```bash
 python3 {baseDir}/scripts/dream.py status --owner-id "<owner_id>"

@@ -5,7 +5,7 @@ description: "Import Apple Health or Gadgetbridge exports into MediWise health r
 
 # MediWise · 可穿戴数据导入 Skill
 
-把用户明确提供的可穿戴导出文件读取、标准化并写入 MediWise 健康指标。当前公开流程只面向个人本地 OpenClaw。
+把用户明确提供的可穿戴导出文件读取、标准化并写入 MediWise 健康指标。当前公开流程只面向个人本地 Agent 环境。
 
 ## 可用性分级
 
@@ -43,12 +43,12 @@ description: "Import Apple Health or Gadgetbridge exports into MediWise health r
 3. 选择“导出所有健康数据”。
 4. 保存或上传系统生成的 `export.zip`。
 
-导出包包含敏感健康数据，只能交给用户信任的个人本地 OpenClaw。
+导出包包含敏感健康数据，只能交给用户信任的个人本地 Agent。
 
 ### Agent 执行顺序
 
 1. 调用 `resolve-member`：唯一“本人”可默认；有多位成员时按姓名确认，并复述“姓名（身份）”。
-2. 确认附件已落到 OpenClaw 可读取的本地路径，扩展名为 `.zip` 或 `.xml`。
+2. 确认附件已落到当前 Agent 可读取的本地路径，扩展名为 `.zip` 或 `.xml`。
 3. 调用 `device-add`，Provider 使用 `apple_health`。
 4. 调用 `device-auth`，把附件本地路径作为 `export_path`。
 5. 调用 `device-test` 检查文件。
@@ -77,7 +77,7 @@ Apple Health 导出是手动快照，不是实时流。用户再次上传新导�
 ### Agent 执行顺序
 
 1. 调用 `resolve-member`：唯一“本人”可默认；有多位成员时按姓名确认，并复述“姓名（身份）”。
-2. 确认附件已落到 OpenClaw 可读取的本地路径。
+2. 确认附件已落到当前 Agent 可读取的本地路径。
 3. 调用 `device-add`，Provider 使用 `gadgetbridge`。
 4. 调用 `device-auth`，把附件本地路径作为 `export_path`。
 5. 调用 `device-test`，确认它是可读取的 SQLite 数据库且包含已知活动数据表。
@@ -141,7 +141,7 @@ Huawei Health Kit、Zepp / 小米云账号和 OpenWearables 不得进入用户�
 | ZIP/XML 不可读 | 说明文件损坏或不是 Apple Health 导出，不继续写库 |
 | SQLite 无已知表 | 说明当前 Gadgetbridge 设备/版本表结构尚未适配 |
 | 目标成员不明确 | 先列出成员并请用户选择 |
-| 个人模式未生效 | 由具备本机权限的 AI 修复 OpenClaw 安装配置 |
+| 个人模式未生效 | 由具备本机权限的 AI 修复当前 Agent 的安装配置 |
 | 来源暂不可用 | 如实说明状态，不尝试绕过 |
 
 ## 隐私边界

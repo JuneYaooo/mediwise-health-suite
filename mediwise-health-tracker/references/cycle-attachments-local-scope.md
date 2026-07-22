@@ -59,7 +59,7 @@ python3 {baseDir}/scripts/attachment.py get-url --id <attachment_id> --secret <s
 
 当前公开版本只面向一个本地用户管理本人和多位家人的档案：
 
-- OpenClaw 运行环境必须启用 `MEDIWISE_SINGLE_USER=1`。
+- 实际运行 MediWise 的 Agent 环境必须启用 `MEDIWISE_SINGLE_USER=1`。
 - 不把同一数据目录部署到群聊机器人或提供给多人共同访问。
 - `owner_id` 仅作为内部兼容参数保留，不是公开的多人共享功能。
 - 成员是被当前用户代管的健康对象，不是独立登录用户。

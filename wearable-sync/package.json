@@ -3,8 +3,8 @@
   "version": "0.2.0",
   "type": "module",
   "main": "index.js",
-  "description": "MediWise Health Suite 可穿戴数据导入 OpenClaw Skill",
+  "description": "MediWise Health Suite 可穿戴数据导入 Agent Skill",
   "author": "MediWise Team",
   "license": "MIT",
-  "keywords": ["openclaw", "skill", "wearable", "sync", "gadgetbridge", "health"]
+  "keywords": ["agent-skills", "openclaw", "skill", "wearable", "sync", "gadgetbridge", "health"]
 }

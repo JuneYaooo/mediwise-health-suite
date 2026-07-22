@@ -3,8 +3,8 @@
   "version": "0.3.0",
   "type": "module",
   "main": "index.js",
-  "description": "MediWise Health Suite 健康档案 OpenClaw Skill",
+  "description": "MediWise Health Suite 健康档案 Agent Skill",
   "author": "MediWise Team",
   "license": "MIT",
-  "keywords": ["openclaw", "skill", "health", "medical"]
+  "keywords": ["agent-skills", "openclaw", "skill", "health", "medical"]
 }

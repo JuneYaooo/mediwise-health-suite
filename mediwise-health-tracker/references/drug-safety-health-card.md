@@ -80,7 +80,7 @@ python3 {baseDir}/scripts/health_advisor.py briefing
 python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 ```
 
-拿到 `image_path` 后，使用当前 OpenClaw 客户端的图片消息能力发送：
+拿到 `image_path` 后，使用当前 Agent 客户端的图片或附件发送能力发送：
 
 ```text
 这是你的健康记录卡片：

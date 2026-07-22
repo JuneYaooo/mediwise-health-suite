@@ -2,11 +2,11 @@
 
 > [返回 README](README.md) · [查看文档中心](docs/README.md)
 
-MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手。一个本地用户可以管理自己的档案，也可以代管多位家人的档案；它不是群聊机器人或多人共享健康服务。
+MediWise Health Suite 是面向支持 Skills 的 AI Agent 的个人本地健康助手，可运行在 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具中。一个本地用户可以管理自己的档案，也可以代管多位家人的档案；它不是群聊机器人或多人共享健康服务。
 
 ## 1. 让 AI 完成安装
 
-把下面这段话发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备本机终端与网络权限的 AI 助手：
+把下面这段话发给 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，或其他具备本机终端与网络权限的 AI 助手：
 
 ```text
 请帮我安装并配置 MediWise Health Suite：
@@ -18,7 +18,7 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 ## 2. 创建第一个档案
 
-安装并重载 OpenClaw 后，直接说：
+安装并让当前 Agent 重新加载 Skills 后，直接说：
 
 ```text
 帮我创建本人档案，我叫林安。

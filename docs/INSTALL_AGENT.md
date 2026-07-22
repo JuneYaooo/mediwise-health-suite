@@ -2,11 +2,11 @@
 
 > [返回文档中心](README.md) · [普通用户安装指南](INSTALLATION.md)
 
-> 这是一份让 OpenClaw、Codex、Claude Code、Cursor、Trae 等 AI 助手代用户完成安装的执行说明。人类用户通常不需要逐条照抄；把项目的 GitHub 仓库地址发给 AI 即可。
+> 这是一份让 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy 等 AI Agent 代用户完成安装的执行说明。任何能够加载 Skills、访问本地文件并执行脚本的 Agent 工具都可以使用。人类用户通常不需要逐条照抄；把项目的 GitHub 仓库地址发给 AI 即可。
 
 ## 项目简介
 
-MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手，包含健康档案、饮食、体重、睡眠、健康监测和可穿戴数据导入。默认使用本地 SQLite，当前公开安装流程只面向个人本地实例：一个用户可以管理自己和多位家人的档案。
+MediWise Health Suite 是面向支持 Skills 的 AI Agent 的个人本地健康助手，包含健康档案、饮食、体重、睡眠、健康监测和可穿戴数据导入。默认使用本地 SQLite，当前公开安装流程只面向个人本地实例：一个用户可以管理自己和多位家人的档案。
 
 仓库：<https://github.com/JuneYaooo/mediwise-health-suite>
 
@@ -35,21 +35,24 @@ node --version
 - Node.js 18+
 - Git
 - 可用的 `pip`
-- OpenClaw 2026.3.0+
+- 当前工具能够加载 Skills、访问本地文件并执行脚本
+- 如果使用 OpenClaw：OpenClaw 2026.3.0+
 
 缺少依赖时，先说明缺什么，再使用当前操作系统的标准包管理方式安装；不要静默修改系统环境。
 
 ## 安装步骤
 
-### 1. 确定 OpenClaw Skill 目录
+### 1. 确定当前 Agent 的 Skill 目录
 
-优先使用当前 OpenClaw workspace 已配置的 `skills/` 目录。无法从上下文确定时，使用默认位置：
+先根据当前 Agent 的官方约定或现有配置，确定它实际加载的 Skills 目录。不要猜测 Hermes、Claude Code、Codex、WorkBuddy 或其他工具的固定路径；必须从当前环境中确认安装位置和加载方式。
+
+如果当前环境是 OpenClaw，优先使用 workspace 已配置的 `skills/` 目录。无法从上下文确定时，可使用其默认位置：
 
 ```text
 ~/.openclaw/skills/mediwise-health-suite
 ```
 
-如果目标目录已经存在：
+无论使用哪一种 Agent，如果目标目录已经存在：
 
 1. 运行 `git -C <目标目录> status --short`。
 2. 有本地改动时停止，不覆盖、不 reset，告诉用户需要先处理现有改动。
@@ -57,25 +60,29 @@ node --version
 
 ### 2. 安装项目
 
-如果当前环境已安装 `clawhub`，可以在正确的 OpenClaw workspace 中执行：
+使用当前 Agent 官方支持的 Skill 安装方式，把完整仓库放入它实际加载的 Skills 目录。安装完成后，根 `SKILL.md`、六个领域 Skill 目录及其脚本必须保持完整，不能只复制单个说明文件。
+
+OpenClaw 环境如果已安装 `clawhub`，可以在正确的 workspace 中执行：
 
 ```bash
 clawhub install JuneYaooo/mediwise-health-suite
 ```
 
-否则使用 Git：
+OpenClaw 也可以使用 Git：
 
 ```bash
 git clone https://github.com/JuneYaooo/mediwise-health-suite.git \
   ~/.openclaw/skills/mediwise-health-suite
 ```
 
-如果当前 workspace 使用其他 Skill 根目录，把最后一个路径替换为 `<当前 workspace>/skills/mediwise-health-suite`。
+如果当前 OpenClaw workspace 使用其他 Skill 根目录，把最后一个路径替换为 `<当前 workspace>/skills/mediwise-health-suite`。其他 Agent 应把仓库安装到该工具实际识别的目录；不要套用 `~/.openclaw` 路径。
 
 ### 3. 安装 Python 依赖
 
+在实际安装目录中执行：
+
 ```bash
-cd ~/.openclaw/skills/mediwise-health-suite
+cd <mediwise-health-suite-实际安装目录>
 python3 -m pip install -r requirements.txt
 ```
 
@@ -83,7 +90,7 @@ python3 -m pip install -r requirements.txt
 
 ### 4. 可选：配置图片/PDF fallback
 
-当前 OpenClaw/Agent 能直接读取用户上传的图片或 PDF 时，不配置 MediWise 视觉服务，也不以 `setup.py test-vision` 是否通过作为安装标准。Skill 可直接提取附件内容，但必须先让用户确认提取结果，再写入档案。
+当前 Agent 能直接读取用户上传的图片或 PDF 时，不配置 MediWise 视觉服务，也不以 `setup.py test-vision` 是否通过作为安装标准。Skill 可直接提取附件内容，但必须先让用户确认提取结果，再写入档案。
 
 只有当前 Agent 明确无法读取附件、实际读取失败，或用户主动要求独立识别路径时，才配置 fallback。优先使用本地 PaddleOCR 提取图片和扫描 PDF 文字；复杂版面确需云端视觉服务时，先说明隐私影响并取得用户明确同意。不得静默启用新的云端服务。
 
@@ -122,19 +129,19 @@ bash install-check.sh
 
 ### 6. 配置个人本地模式
 
-在当前 OpenClaw Agent 的运行时环境中设置 `MEDIWISE_SINGLE_USER=1`，然后确认重载后仍然生效。
+在实际运行 MediWise 的 Agent 环境中设置 `MEDIWISE_SINGLE_USER=1`，然后确认重载后仍然生效。
 
-- 使用当前 OpenClaw 已有的环境变量或 Agent 配置机制持久化。
+- 使用当前 Agent 已有的环境变量或配置机制持久化。
 - 不要只写入一个运行时不会加载的 `.env` 文件。
 - 不要要求用户自己执行 `export`、编辑配置或运行验证命令。
 - 不要配置群聊、多用户共享或请求级 `owner_id` 路由。
 - 如果检测到当前实例已经服务多人或群聊，停止安装并说明 MediWise 当前公开版本只支持个人本地使用。
 
-### 7. 提示重载 OpenClaw
+### 7. 提示重新加载 Skills
 
 安装完成后告诉用户：
 
-> MediWise Health Suite 已安装并通过环境检查。请重启或重新加载当前 OpenClaw Agent，让新的 Skills 生效。
+> MediWise Health Suite 已安装并通过环境检查。请重启或重新加载当前 Agent 的 Skills，让 MediWise 生效。
 
 同时返回：
 
@@ -173,8 +180,8 @@ bash install-check.sh
 1. 目标目录中存在根 `SKILL.md` 和六个领域 Skill 目录。
 2. `python3 -m pip install -r requirements.txt` 成功，或依赖已由用户环境满足。
 3. `bash install-check.sh` 返回 0。
-4. `MEDIWISE_SINGLE_USER=1` 已写入当前 OpenClaw 实际加载的个人 Agent 运行环境，并在重载后验证生效。
-5. 已告诉用户重启或重新加载 OpenClaw。
+4. `MEDIWISE_SINGLE_USER=1` 已写入实际运行 MediWise 的个人 Agent 环境，并在重载后验证生效。
+5. 已告诉用户重启或重新加载当前 Agent 的 Skills。
 6. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。
 
 图片/PDF fallback 不属于基础安装完成标准。若本次明确配置了 fallback，则相应的 `test-vision` 或 `test-paddleocr`、`test-pdf` 与 `test-intake --input both` 必须通过；失败时只能报告该可选能力未启用，不能影响已经通过的基础安装结论。

@@ -1,7 +1,7 @@
 {
   "name": "mediwise-health-suite",
   "version": "2.0.9",
-  "description": "Private local health assistant for OpenClaw: health records, diet, weight, sleep, monitoring, and wearable imports.",
+  "description": "Private local health assistant for Skills-compatible AI agents: health records, diet, weight, sleep, monitoring, and wearable imports.",
   "main": "SKILL.md",
   "scripts": {
     "test": "echo \"No tests specified yet\" && exit 0"
@@ -14,7 +14,12 @@
     "diet",
     "weight",
     "records",
+    "agent-skills",
+    "hermes",
     "openclaw",
+    "claude-code",
+    "codex",
+    "workbuddy",
     "skill",
     "chinese",
     "健康管理",

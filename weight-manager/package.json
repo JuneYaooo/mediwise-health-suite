@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "description": "MediWise Health Suite 体重与运动 OpenClaw Skill",
+  "description": "MediWise Health Suite 体重与运动 Agent Skill",
   "author": "MediWise Team",
   "license": "MIT",
-  "keywords": ["openclaw", "skill", "health", "weight", "fitness"]
+  "keywords": ["agent-skills", "openclaw", "skill", "health", "weight", "fitness"]
 }

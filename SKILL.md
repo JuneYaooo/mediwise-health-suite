@@ -1,6 +1,6 @@
 ---
 name: mediwise-health-suite
-description: "Private local health assistant for OpenClaw: health records, diet, weight, sleep, monitoring, and wearable imports. Local SQLite storage by default; optional cloud features require explicit setup."
+description: "Private local health assistant for Skills-compatible AI agents: health records, diet, weight, sleep, monitoring, and wearable imports. Local SQLite storage by default; optional cloud features require explicit setup."
 version: 2.0.9
 author: MediWise Team
 license: MIT
@@ -14,7 +14,12 @@ keywords:
   - weight
   - records
   - chinese
+  - agent-skills
+  - hermes
   - openclaw
+  - claude-code
+  - codex
+  - workbuddy
 requires:
   bins:
     - python3
@@ -24,7 +29,7 @@ requires:
 
 # MediWise Health Suite
 
-面向 OpenClaw 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。
+面向支持 Skills 的 AI Agent 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。支持 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具。
 
 对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。图片汇总能力统一称为“健康记录卡片”，家庭概览版本称为“家庭健康记录卡片”；普通文字查询结果称为“文字健康摘要”，不要与图片卡片混称。
 
@@ -78,7 +83,7 @@ requires:
 
 安装 Agent 进入仓库后必须先读取 `docs/INSTALL_AGENT.md`。
 
-当前公开安装流程只支持个人本地 OpenClaw：一个用户可以管理自己和多位家人的档案，不部署到群聊或多人共享服务。
+当前公开流程只支持个人本地使用：一个用户可以管理自己和多位家人的档案，不部署到群聊或多人共享服务。不同 Agent 按各自的 Skills 加载机制安装；OpenClaw 的完整适配说明见 `docs/AGENT_SETUP.md`。
 
 ### 基本使用
 
@@ -115,9 +120,11 @@ requires:
 ## 系统要求
 
 - **Python**: 3.8+
+- **Node.js**: 18+
 - **SQLite**: 3.x
 - **操作系统**: Linux / macOS / Windows
-- **OpenClaw**: 2026.3.0+
+- **Agent**: 能够加载 Skills、访问本地文件并执行脚本
+- **OpenClaw（如使用）**: 2026.3.0+
 
 ## 数据隐私
 
@@ -171,7 +178,7 @@ requires:
 
 | 变量名 | 用途 | 默认行为 |
 |--------|------|----------|
-| `MEDIWISE_SINGLE_USER` | 个人本地 OpenClaw 运行模式，由安装 Agent 配置 | 公开安装流程设为 `1` |
+| `MEDIWISE_SINGLE_USER` | 个人本地 Agent 运行模式，由安装 Agent 在实际运行 MediWise 的环境中配置 | 公开安装流程设为 `1` |
 | `USDA_API_KEY` | USDA FoodData Central API Key，用于国际食材查询。免费注册：https://api.data.gov/signup/ | 未设置且未安装获授权的本地数据包时，食物查询会明确返回数据源不可用 |
 | `OPENFOODFACTS_ENABLED` | 启用 Open Food Facts 包装/品牌食品搜索（ODbL 1.0） | 默认关闭；设为 `1` 才启用 |
 | `OPENFOODFACTS_SEARCH_URL` | Open Food Facts 官方 Search-a-licious 查询地址 | `https://search.openfoodfacts.org/search` |
@@ -225,7 +232,7 @@ requires:
 
 - **数据库**: SQLite（`medical.db` 与 `lifestyle.db` 分域存储，兼容旧版 `health.db`）
 - **脚本语言**: Python 3.8+
-- **Skill 框架**: OpenClaw Agent Skills
+- **Skill 框架**: 支持 Skills 的 AI Agent；OpenClaw 另有 action 路由适配
 - **模块化设计**: 6 个 skills（健康档案、饮食、体重、睡眠、监测、可穿戴）
 - **可选功能**: 后端 API、向量搜索（默认关闭）
 

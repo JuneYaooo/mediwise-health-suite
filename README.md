@@ -4,13 +4,14 @@
 
 <div align="center">
 
-**面向 OpenClaw 的个人本地健康助手**
+**面向支持 Skills 的 AI Agent 的个人本地健康助手**
 
 拍照、发文件或直接聊天，就能记录饮食运动、整理医疗资料、追踪健康设备数据，并把本人和家人的健康信息留在自己的设备上。
 
 [![Version](https://img.shields.io/badge/version-v2.0.9-2f6feb.svg)](https://github.com/JuneYaooo/mediwise-health-suite/releases/tag/v2.0.9)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-2f6feb.svg)](SKILL.md)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
@@ -20,9 +21,9 @@
 
 ---
 
-MediWise Health Suite（简称 **MediWise**）适合在自己的 OpenClaw 中长期管理本人和家人的健康信息。默认数据保存在本地，换设备时也可以备份和迁移。
+MediWise Health Suite（简称 **MediWise**）可以运行在 **Hermes、OpenClaw、Claude Code、Codex、WorkBuddy**，以及其他能够加载 Skills、访问本地文件并执行脚本的 AI Agent 工具中。它适合长期管理本人和家人的健康信息，默认数据保存在本地，换设备时也可以备份和迁移。
 
-把 OpenClaw（龙虾）接入飞书或微信私聊后，就可以在聊天窗口里使用。Hermes 等其他 Agent 如果支持加载本 Skill，也可以作为入口。当前版本的安装和测试以个人本地 OpenClaw 为准。
+不同工具的 Skill 安装位置和聊天入口可能不同。OpenClaw（龙虾）目前另有完整的自动安装、飞书或微信私聊接入与验收说明；使用其他 Agent 时，按该工具自己的 Skills 加载方式安装即可。
 
 > MediWise 只提供健康信息的记录、整理、查询、展示和提醒，不提供诊断、治疗建议、用药建议、营养治疗建议、临床判断或其他医疗指导。
 
@@ -99,7 +100,7 @@ MediWise Health Suite（简称 **MediWise**）适合在自己的 OpenClaw 中长
 
 ### 1. 让 AI 完成安装
 
-把下面这段话发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备本机终端与网络权限的 AI 助手：
+把下面这段话发给 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，或其他具备本机终端与网络权限的 AI 助手：
 
 ```text
 请帮我安装并配置 MediWise Health Suite：
@@ -111,7 +112,7 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 ### 2. 创建第一个档案
 
-安装并重载 OpenClaw 后，直接说：
+安装并让当前 Agent 重新加载 Skills 后，直接说：
 
 ```text
 帮我创建本人档案，我叫林安。
@@ -125,7 +126,7 @@ https://github.com/JuneYaooo/mediwise-health-suite
 帮我添加一位家庭成员：张建国，是我的父亲，65 岁。
 ```
 
-下面是在飞书中安装并使用 MediWise 的实际界面。其他 OpenClaw 客户端的样式可能不同，但对话方式相同。
+下面是在 OpenClaw 接入飞书后安装并使用 MediWise 的实际界面。Hermes、Claude Code、Codex、WorkBuddy 等工具的界面可能不同，但对话和记录方式相同。
 
 <table>
   <tr>
@@ -194,7 +195,7 @@ MediWise 是个人健康助手，不是多人共享系统。你可以在自己�
 - [变更记录](CHANGELOG.md)：版本更新内容。
 - [贡献指南](CONTRIBUTING.md)：参与开发与提交规范。
 
-运行要求：Python 3.8+、Node.js 18+、SQLite 3.x、OpenClaw 2026.3.0+；支持 Linux、macOS 和 Windows。
+运行要求：Python 3.8+、Node.js 18+、SQLite 3.x，以及一个能够加载 Skills、访问本地文件并执行脚本的 Agent；支持 Linux、macOS 和 Windows。使用 OpenClaw 时要求 2026.3.0+。
 
 ## 致谢
 

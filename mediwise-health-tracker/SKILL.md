@@ -213,9 +213,9 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
     - 情绪/精力：累、乏力、焦虑、情绪低落、提不起劲
     - 用药感受：吃了药之后…、副作用、效果不明显
 
-## 健康记录卡片定时推送规范（OpenClaw 定时任务）
+## 健康记录卡片定时推送规范（Agent 定时任务）
 
-**触发时机：每日早晨 8:00，由 OpenClaw agent 自动执行。**
+**触发时机：每日早晨 8:00，由当前 Agent 的定时任务能力自动执行。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制；不具备定时能力时仍可由用户随时手动请求。**
 
 ### 执行流程
 
@@ -227,9 +227,9 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 5. 推送给用户（见下方推送规则）
 ```
 
-### 夜间做梦任务（OpenClaw 定时任务）
+### 夜间做梦任务（Agent 定时任务）
 
-**触发时机：每晚 22:00，由 OpenClaw agent 自动执行，调用 DREAM skill。**
+**触发时机：每晚 22:00，由当前 Agent 的定时任务能力自动执行并调用 DREAM skill。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制。**
 
 做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日健康记录卡片展示。详见 `mediwise-health-tracker/DREAM.md`。
 

@@ -43,7 +43,8 @@ Paste the full error message here
 
 - OS: [e.g. Ubuntu 22.04, macOS 14.0, Windows 11]
 - Python Version: [e.g. 3.8.10]
-- OpenClaw Version: [e.g. 2026.3.0]
+- Agent / Tool: [e.g. Hermes, OpenClaw, Claude Code, Codex, WorkBuddy]
+- Agent / Tool Version:
 - MediWise Health Suite Version: [e.g. 1.0.0]
 
 ## 附加信息 / Additional Context

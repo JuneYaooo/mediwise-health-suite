@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "description": "MediWise Health Suite 睡眠追踪 OpenClaw Skill",
+  "description": "MediWise Health Suite 睡眠追踪 Agent Skill",
   "author": "MediWise Team",
   "license": "MIT",
-  "keywords": ["openclaw", "skill", "health", "sleep", "sleep-tracker"]
+  "keywords": ["agent-skills", "openclaw", "skill", "health", "sleep", "sleep-tracker"]
 }

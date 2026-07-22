@@ -1,6 +1,6 @@
 # MediWise 文档中心
 
-这里汇总 MediWise Health Suite 的用户文档、安装说明、Agent 规则和项目结构。普通用户从项目根目录的 [README](../README.md) 或 [快速开始](../QUICKSTART.md) 阅读即可；只有在安装、排障或参与开发时，才需要继续查看更详细的文档。
+这里汇总 MediWise Health Suite 的用户文档、安装说明、Agent 规则和项目结构。MediWise 支持 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具。普通用户从项目根目录的 [README](../README.md) 或 [快速开始](../QUICKSTART.md) 阅读即可；只有在安装、排障或参与开发时，才需要继续查看更详细的文档。
 
 ## 按需求查文档
 
@@ -12,7 +12,7 @@
 | 导入 Apple Health 或 Gadgetbridge | [可穿戴数据导入指南](WEARABLES.md) | 普通用户 |
 | 查看完整功能范围和典型流程 | [健康管理总览](HEALTH-MANAGEMENT-OVERVIEW.md) | 产品使用者、贡献者 |
 | 让 AI 自动完成安装与验收 | [安装 Agent 执行指南](INSTALL_AGENT.md) | 具备本机权限的 Agent |
-| 配置 OpenClaw 运行边界 | [OpenClaw Agent 配置说明](AGENT_SETUP.md) | 集成者、维护者 |
+| 配置 OpenClaw 专用运行边界 | [OpenClaw Agent 配置说明](AGENT_SETUP.md) | OpenClaw 集成者、维护者 |
 | 参与开发或修改文档 | [贡献指南](../CONTRIBUTING.md) | 贡献者 |
 | 查看版本变化 | [变更记录](../CHANGELOG.md) | 所有人 |
 
@@ -58,7 +58,7 @@ mediwise-health-suite/
 每个领域目录遵循相同约定：
 
 - `SKILL.md`：告诉 Agent 何时使用、如何调用以及有哪些边界。
-- `index.js`：把 OpenClaw action 路由到对应脚本。
+- `index.js`：为 OpenClaw 等支持 action 路由的环境提供脚本适配入口；其他 Agent 可按自身的 Skills 调用机制执行对应脚本。
 - `scripts/`：本地数据处理和命令实现。
 - `agents/`：特定 Agent 平台需要的元数据；并非每个模块都必须存在。
 - `references/`：仅在核心健康档案模块中使用的细分工作流说明。

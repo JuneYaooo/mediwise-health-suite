@@ -4,13 +4,14 @@
 
 <div align="center">
 
-**A private, local health assistant for OpenClaw**
+**A private, local health assistant for Skills-compatible AI agents**
 
 Keep personal and family health records in one place, including chat notes, medical reports, meals, body measurements, sleep, and wearable exports.
 
 [![Version](https://img.shields.io/badge/version-v2.0.9-2f6feb.svg)](https://github.com/JuneYaooo/mediwise-health-suite/releases/tag/v2.0.9)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-2f6feb.svg)](SKILL.md)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
@@ -21,6 +22,8 @@ Keep personal and family health records in one place, including chat notes, medi
 ---
 
 The product and complete capability set are named **MediWise Health Suite**, shortened to **MediWise** after the first mention. Names such as `mediwise-health-tracker` and `diet-tracker` are internal Skill module IDs, not separate product names. The generated image summary is consistently called a **Health Record Card**, or a **Family Health Record Card** for the family overview.
+
+MediWise works with **Hermes, OpenClaw, Claude Code, Codex, WorkBuddy**, and other AI agent tools that can load Skills, access local files, and run scripts. Skill locations and chat interfaces vary by tool. OpenClaw currently has the most complete project-specific instructions for automated installation, Feishu or WeChat access, and verification; other agents use their own Skills loading mechanism.
 
 ## What it does
 
@@ -55,7 +58,7 @@ Share information through chat, photos, PDFs, or wearable exports. MediWise orga
   </tr>
 </table>
 
-These screenshots show MediWise Health Suite running in OpenClaw through Feishu. They use the current Chinese interface. The layout may differ in other OpenClaw clients or releases.
+These screenshots show MediWise Health Suite running in OpenClaw through Feishu. They use the current Chinese interface. Hermes, Claude Code, Codex, WorkBuddy, and other agent tools may look different, but the conversation and record-keeping flow is the same.
 
 ### Health record card
 
@@ -147,7 +150,7 @@ For a first trial, create a self profile, record one or two measurements for sev
 
 ### Ask an AI assistant to install it
 
-This is the only setup method recommended for regular users. Send the repository address to OpenClaw, Codex, Claude Code, Cursor, Trae, or another assistant that can use the terminal and network on your computer:
+This is the only setup method recommended for regular users. Send the repository address to Hermes, OpenClaw, Claude Code, Codex, WorkBuddy, or another assistant that can use the terminal and network on your computer:
 
 ```text
 Please install and configure MediWise Health Suite from this repository:
@@ -204,7 +207,7 @@ Online food APIs receive the search phrase and the language or pagination fields
 
 ## Managing records for family members
 
-One person can maintain separate profiles for themselves, parents, a partner, or children in the same local OpenClaw installation.
+One person can maintain separate profiles for themselves, parents, a partner, or children in the same local MediWise installation.
 
 ```text
 Add Zhang Jianguo as my father.
@@ -282,7 +285,8 @@ Backups contain complete health records and are not encrypted. Keep them in a pr
 - Python 3.8 or newer
 - Node.js 18 or newer
 - SQLite 3.x
-- OpenClaw 2026.3.0 or newer
+- An agent that can load Skills, access local files, and run scripts
+- OpenClaw 2026.3.0 or newer when using OpenClaw
 - Linux, macOS, or Windows
 
 ## Contributing
