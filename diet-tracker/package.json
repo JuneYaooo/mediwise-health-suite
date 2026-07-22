@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "description": "日常饮食记录与营养分析 OpenClaw Skill",
-  "author": "mediwise",
+  "description": "MediWise Health Suite 饮食追踪 OpenClaw Skill",
+  "author": "MediWise Team",
   "license": "MIT",
   "keywords": ["openclaw", "skill", "health", "diet", "nutrition"]
 }

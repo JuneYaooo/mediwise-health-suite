@@ -206,7 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Mediwise Health Suite - Local data (NEVER commit)
+# MediWise Health Suite - Local data (NEVER commit)
 *.db
 *.db-wal
 *.db-shm
@@ -227,12 +227,12 @@ backups/
 **/backups/
 logs/
 **/logs/
-# Mediwise - test data with PII
+# MediWise - test data with PII
 **/test_data/*.db
 **/test_data/*.sqlite
 **/test_data/*.json
 !**/test_data/.gitkeep
-# Mediwise - local config may contain API keys (default stored outside repo, but guard anyway)
+# MediWise - local config may contain API keys (default stored outside repo, but guard anyway)
 config.json
 **/config.json
 .restore.lock

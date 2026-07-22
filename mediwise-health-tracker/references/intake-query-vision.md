@@ -50,7 +50,7 @@ python3 {baseDir}/scripts/medical_record.py add-medication --member-id <id> --na
 
 - 体征查询：描述趋势，不要只堆数字
 - 用药查询：按清单展示药名、剂量、频率、开始时间
-- 健康摘要：突出重点，不要把全部字段都念一遍
+- 文字健康摘要：突出重点，不要把全部字段都念一遍；不要与图片形式的“健康记录卡片”混称
 - 时间线：按时间讲述发生了什么
 
 ### 示例
@@ -64,7 +64,12 @@ python3 {baseDir}/scripts/medical_record.py add-medication --member-id <id> --na
 
 ### 强制规则
 
-**不要使用自身视觉能力读取医疗图片。** 所有图片 / PDF 识别必须通过外部视觉模型。
+**不要在没有受控识别路径时直接解读医疗图片。** 图片和 PDF 必须走以下至少一种已经实际测试通过的路径：
+
+- 能读取图片的多模态模型，并已写入 MediWise 视觉配置、通过 `setup.py test-vision`、`setup.py test-pdf` 和 `setup.py test-intake --input both`。
+- 普通文本模型搭配 PaddleOCR；PaddleOCR 负责提取图片或扫描 PDF 的文字，并已通过 `setup.py test-paddleocr`、`setup.py test-pdf` 和 `setup.py test-intake --input both`。
+
+当前对话模型声称“支持视觉”不等于 MediWise 的附件处理脚本已经可用。不要绕过配置和测试，也不要把识别失败的附件悄悄切换到未经用户授权的云端服务。
 
 ### 首次使用先检查配置
 
@@ -72,19 +77,20 @@ python3 {baseDir}/scripts/medical_record.py add-medication --member-id <id> --na
 python3 {baseDir}/scripts/setup.py check
 ```
 
-如果 `vision_configured: false`：
+按检查结果选择路径：
 
-1. 告知用户需要先配置视觉模型
-2. 推荐 SiliconFlow 的 `Qwen/Qwen3.6-35B-A3B`（国内首选）、`zai-org/GLM-4.5V`（国内备选）或 Google Gemini `gemini-3.1-pro-preview`（海外备选）；保存前确认模型当前支持图片输入
-3. 用户给出 API Key 后执行配置
-4. 再运行测试验证
+1. `vision_configured: true`：运行 `test-vision`、`test-pdf` 和 `test-intake --input both`；只有脱敏测试图、扫描 PDF 与结构化结果都通过后才声称两类附件可解析。
+2. `pdf_tools.paddleocr: true`：运行 `test-paddleocr`、`test-pdf` 和 `test-intake --input both`；三者通过后可以使用 OCR + 文本模型处理图片和扫描 PDF。
+3. 两条路径都不可用：交给具备本机权限的配置 Agent。不要让普通用户运行命令，也不要在聊天中索要 API Key。
+
+配置多模态模型时，可参考 SiliconFlow 的 `Qwen/Qwen3.6-35B-A3B`、`zai-org/GLM-4.5V`，或配置 Agent 当时能够验证的其他视觉模型。模型名称不能证明图片输入能力，必须查询当前服务信息并用实际图片测试。凭据只能通过客户端安全本地输入或系统 keyring 处理。
 
 ```bash
-python3 {baseDir}/scripts/setup.py set-vision --provider siliconflow --model "Qwen/Qwen3.6-35B-A3B" --api-key <KEY> --base-url "https://api.siliconflow.cn/v1"
-# 用内置测试图测试（需 references/test-vision.jpg 存在）：
 python3 {baseDir}/scripts/setup.py test-vision
-# 或指定任意本地图片测试（推荐）：
 python3 {baseDir}/scripts/setup.py test-vision --image /path/to/any_lab_report.jpg
+python3 {baseDir}/scripts/setup.py test-paddleocr
+python3 {baseDir}/scripts/setup.py test-pdf
+python3 {baseDir}/scripts/setup.py test-intake --input both
 ```
 
 ### 已配置后处理附件

@@ -6,16 +6,16 @@
 
 ## 安装
 
-把下面的完整提示发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备终端与网络权限的 AI 助手：
+把下面的简单提示发给 OpenClaw、Codex、Claude Code、Cursor、Trae 或其他具备终端与网络权限的 AI 助手：
 
 ```text
-请帮我安装 MediWise Health Suite：
+请帮我安装并配置 MediWise Health Suite：
 https://github.com/JuneYaooo/mediwise-health-suite
 
-请先阅读仓库里的 docs/INSTALL_AGENT.md，再按文档检查依赖、选择当前 OpenClaw workspace 的 skills 目录、完成安装并运行 install-check.sh。
-这是个人本地健康助手，只配置个人模式，不要部署为群聊机器人或多人共享服务。
-不要覆盖已有本地改动，不要向我索要 API Key、密码或真实健康数据。完成后告诉我安装路径、检查结果和是否需要重启 OpenClaw。
+请同时配置图片和 PDF 识别。优先使用能读图的多模态模型；如果当前模型不能读图，就搭配 OCR 能力。完成后帮我检查是否可以正常使用。
 ```
+
+仓库内的 [INSTALL_AGENT.md](INSTALL_AGENT.md) 已包含安装目录、依赖、个人模式、安全边界和检查步骤，普通用户不需要把这些细节写进提示词。
 
 安装 Agent 应负责：
 
@@ -24,7 +24,7 @@ https://github.com/JuneYaooo/mediwise-health-suite
 3. 从 GitHub 仓库完成安装，且不覆盖已有本地修改。
 4. 安装项目依赖并运行 `install-check.sh`。
 5. 设置并验证个人本地模式。
-6. 尝试配置 PaddleOCR，明确报告实际测试结果。
+6. 配置并测试一种图片/PDF 识别路径：多模态模型，或文本模型搭配 OCR。
 7. 告诉你是否需要重载 OpenClaw。
 
 只有检查确实通过后，Agent 才能声称安装完成。
@@ -42,19 +42,19 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 ## 图片与 PDF 识别
 
-PaddleOCR 是普通图片和扫描 PDF 的推荐本地识别方案。复杂表格、图表或版面理解可以另外配置视觉模型。
+可以使用能直接读取图片的多模态模型，也可以让普通文本模型搭配 OCR。PaddleOCR 是内置的本地 OCR 路径；复杂表格、图表和版面理解更适合多模态模型。
 
 直接告诉配置 Agent：
 
 ```text
-请帮我配置 MediWise 的图片/PDF 识别。优先检查并配置本地 PaddleOCR；如果我还需要复杂图表理解，再说明本地视觉模型和云端视觉模型的隐私差异。配置完成后分别执行 OCR 和视觉能力测试。不要让我在聊天中发送 API Key，也不要把凭据写入仓库。
+请帮我启用 MediWise 的图片和 PDF 识别，并用一份脱敏文件测试。能读图的模型直接配置多模态识别；不能读图的模型请搭配 OCR。
 ```
 
 配置结果应区分：
 
-- `PaddleOCR 已可用`：必须以本机测试图片确实识别成功为依据。
+- `PaddleOCR 已可用`：必须以本机测试图片和图像型扫描 PDF 都确实识别成功为依据。
 - `PaddleOCR 未启用`：应说明平台、依赖或模型初始化的具体失败原因，基础文本功能仍可使用。
-- `视觉模型已可用`：必须用脱敏测试图验证图片输入，不能只凭模型名称判断。
+- `视觉模型已可用`：必须用脱敏测试图验证图片输入；要声称同时支持 PDF，还必须通过扫描 PDF 测试，不能只凭模型名称判断。
 
 当前可参考的视觉模型示例：
 

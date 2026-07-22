@@ -3,7 +3,7 @@ name: diet-tracker
 description: "Diet and nutrition tracking: log meals, manage food items, view daily/weekly nutrition summaries, analyze calorie trends. Integrates with mediwise-health-tracker and weight-manager."
 ---
 
-# diet-tracker
+# MediWise · 饮食追踪 Skill
 
 ## 概述
 

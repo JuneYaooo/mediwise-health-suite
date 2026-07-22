@@ -20,6 +20,8 @@ Keep personal and family health records in one place, including chat notes, medi
 
 ---
 
+The product and complete capability set are named **MediWise Health Suite**, shortened to **MediWise** after the first mention. Names such as `mediwise-health-tracker` and `diet-tracker` are internal Skill module IDs, not separate product names. The generated image summary is consistently called a **Health Record Card**, or a **Family Health Record Card** for the family overview.
+
 ## What it does
 
 Health records tend to be scattered across messages, exported files, report images, and device apps. MediWise turns those fragments into a searchable local record.
@@ -36,12 +38,12 @@ MediWise organizes health information and shows trends. It does not diagnose con
 
 <table>
   <tr>
-    <td width="33%" align="center"><img src="docs/images/install-in-chat.jpg" alt="Installing the MediWise skill through a chat conversation"></td>
+    <td width="33%" align="center"><img src="docs/images/install-in-chat.jpg" alt="Installing MediWise Health Suite through a chat conversation"></td>
     <td width="33%" align="center"><img src="docs/images/skill-overview.jpg" alt="MediWise capabilities shown after installation"></td>
     <td width="33%" align="center"><img src="docs/images/create-member.jpg" alt="Creating a family member profile with natural language"></td>
   </tr>
   <tr>
-    <td align="center">1. Ask the assistant to install the skill</td>
+    <td align="center">1. Ask the assistant to install the suite</td>
     <td align="center">2. Review the available features</td>
     <td align="center">3. Create a health profile</td>
   </tr>
@@ -63,9 +65,9 @@ The personal card keeps metric trends, recorded food intake, activity burn, step
   <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with compact metrics, intake and activity, sleep, a personal health timeline, and medication">
 </p>
 
-The timeline shows up to ten recent events in reverse chronological order. Medical records come first when several events share a date. Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
+The timeline shows up to ten recent events in reverse chronological order. Medical records come first when several events share a date. The card is not locked to one layout: explicit abnormalities and due reminders take priority, then recorded data volume determines section order and which metric or lifestyle panel receives more space. A direct request about metrics, lifestyle, care, or medication overrides the automatic focus. Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
 
-MediWise also has a compact family card for one local user who manages several family profiles. It shows each person as `Name (relationship)`, prioritizes members with alerts or pending reminders, and combines recent visits, lab results, and imaging in a family care timeline. Ask for it explicitly:
+MediWise also has a compact family card for one local user who manages several family profiles. It shows each person as `Name (relationship)`, places members with alerts, explicitly flagged results, or pending reminders first, then orders the rest by recent data coverage. It also combines recent visits, lab results, and imaging in a family care timeline. Ask for it explicitly:
 
 ```text
 Create a family health record card for the last 7 days.
@@ -139,18 +141,16 @@ For a first trial, create a self profile, record one or two measurements for sev
 
 ### Ask an AI assistant to install it
 
-This is the only setup method recommended for regular users. Send the following prompt to OpenClaw, Codex, Claude Code, Cursor, Trae, or another assistant that can use the terminal and network on your computer:
+This is the only setup method recommended for regular users. Send the repository address to OpenClaw, Codex, Claude Code, Cursor, Trae, or another assistant that can use the terminal and network on your computer:
 
 ```text
-Please install MediWise Health Suite from this repository:
+Please install and configure MediWise Health Suite from this repository:
 https://github.com/JuneYaooo/mediwise-health-suite
 
-Read docs/INSTALL_AGENT.md first. Check the dependencies, find the skills directory used by the current OpenClaw workspace, install the project, and run install-check.sh.
-Configure it as a private local assistant for one user. Do not deploy it to a group chat or as a shared multi-user service.
-Do not overwrite existing local changes. Do not ask me to send API keys, passwords, or real health data in chat. When you finish, report the installation path, the check results, and whether OpenClaw needs to be restarted.
+Please also enable image and PDF intake. Prefer a multimodal model that can read images; if the current model is text-only, pair it with OCR. Test that the installation works when you finish.
 ```
 
-The installation assistant chooses the correct directory, installs dependencies, enables personal local mode, and runs the checks. You do not need to copy terminal commands or edit configuration files.
+The repository already contains the detailed instructions an installation assistant needs. It chooses the correct directory, installs dependencies, enables personal local mode and image/PDF intake, and runs the checks. You do not need to repeat implementation details, copy terminal commands, or edit configuration files.
 
 MediWise currently supports one local user who may maintain records for themselves and several family members. It is not intended to serve several people from the same data directory.
 
@@ -162,17 +162,17 @@ Record Zhang Jianguo's blood pressure as 130/85 and heart rate as 72 today.
 Show Zhang Jianguo's health records from the last 7 days.
 ```
 
-### Optional image and PDF recognition
+### Image and PDF recognition
 
-Image and PDF intake is optional. The installation assistant may try to set up local PaddleOCR, but the feature is available only if a real test image passes on that machine.
+Image and PDF intake is best configured during installation. MediWise can use a multimodal model that reads images directly, or a text model paired with OCR. PaddleOCR is the built-in local OCR path. The feature is available only after a redacted test image, scanned PDF, and structured extraction all pass on that machine.
 
 Ask a configuration assistant to set it up:
 
 ```text
-Configure image and PDF intake for MediWise. Check local PaddleOCR first. If I also need complex table or chart understanding, explain the privacy difference between a local vision model and a cloud vision model before configuring one. Test OCR and vision separately when setup is complete. Do not ask me to put an API key in chat, and do not store credentials in the repository.
+Enable image and PDF intake for MediWise and test it with a redacted file. Configure multimodal intake if the model can read images; otherwise pair the text model with OCR.
 ```
 
-PaddleOCR can extract Chinese text from ordinary images and scanned PDFs without uploading the source file. A text model may still be used to turn OCR text into structured records. Complex layouts and charts may require a vision model.
+PaddleOCR can extract Chinese text from ordinary images and scanned PDFs without uploading the source file, then a text model can turn the OCR output into structured records. Multimodal models are better suited to complex layouts, tables, and charts.
 
 A cloud vision provider receives the full image or PDF page. Medical documents often contain names, government identifiers, and record numbers. Remove identifying information first or use a local model.
 

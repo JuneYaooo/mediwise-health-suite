@@ -4,7 +4,7 @@ description: 健康做梦机制 — 每日健康信息回顾与记忆整合 skil
 trigger: scheduled (nightly ~22:00, ≥20h since last dream)
 ---
 
-# MediWise Health Suite · 健康回顾 Skill
+# MediWise · 健康回顾 Skill
 
 > **核心理念**：做梦不是实时操作，而是深夜的回顾与沉淀。
 > agent 以"做梦者"身份收集当日健康原始素材，对比历史趋势，

@@ -1,6 +1,6 @@
 ---
 name: mediwise-health-suite
-description: "Family health management suite: health records, diet, weight, sleep, monitoring, and wearable sync. Local SQLite storage by default; optional cloud features require explicit setup."
+description: "Private local health assistant for OpenClaw: health records, diet, weight, sleep, monitoring, and wearable imports. Local SQLite storage by default; optional cloud features require explicit setup."
 version: 2.0.9
 author: MediWise Team
 license: MIT
@@ -26,15 +26,17 @@ requires:
 
 面向 OpenClaw 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。
 
+对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。图片汇总能力统一称为“健康记录卡片”，家庭概览版本称为“家庭健康记录卡片”；普通文字查询结果称为“文字健康摘要”，不要与图片卡片混称。
+
 ## 核心能力
 
-### ✅ 1. 家庭健康档案 (mediwise-health-tracker)
+### ✅ 1. 健康档案 (`mediwise-health-tracker`)
 - 成员信息管理：姓名、关系、性别、出生日期、血型
 - 基础病史：既往史、过敏史、联系方式、紧急联系人
 - 病程记录：门诊、住院、急诊、症状、诊断、检验、影像
 - 用药信息：当前在用药、历史用药、停药原因
 - 日常指标：血压、血糖、心率、血氧、体温、体重等
-- 查询能力：健康摘要、时间线、在用药、全家概览
+- 查询能力：文字健康摘要、时间线、在用药、全家概览
 - **就医前摘要**：自动整理病情、既往史、在用药，生成文本/图片/PDF
 
 ### ✅ 2. 饮食追踪 (diet-tracker)
@@ -90,9 +92,9 @@ requires:
    "帮我记录今天血压 130/85，心率 72"
    ```
 
-3. **查看健康摘要**
+3. **生成健康记录卡片**
    ```
-   "帮我看看最近的健康情况"
+   "帮我生成最近 7 天的健康记录卡片"
    ```
 
 4. **饮食记录**
@@ -132,7 +134,7 @@ requires:
 
 ### 多模态视觉模型（可选，用于复杂版面与图表理解）
 
-用于识别体检报告图片、化验单、病历 PDF。不配置则无法处理图片输入。
+用于理解体检报告图片、化验单和病历 PDF 的复杂版面与图表。未配置视觉模型时，仍可使用已通过测试的 PaddleOCR 提取图片和扫描 PDF 文字；视觉与 OCR 都不可用时才不能处理此类附件。
 
 | 变量名 | 说明 | 推荐值 |
 |--------|------|--------|

@@ -1,5 +1,5 @@
 /**
- * MediWise Wearable Sync - OpenClaw Skill
+ * MediWise Health Suite - Wearable Import Skill
  *
  * ESM entry point that routes actions to Python scripts.
  */

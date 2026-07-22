@@ -3,7 +3,7 @@ name: wearable-sync
 description: "Import Apple Health or Gadgetbridge exports into MediWise health records. Garmin is experimental; Huawei, Zepp cloud, and OpenWearables are not user-ready."
 ---
 
-# Wearable Sync - 可穿戴数据导入
+# MediWise · 可穿戴数据导入 Skill
 
 把用户明确提供的可穿戴导出文件读取、标准化并写入 MediWise 健康指标。当前公开流程只面向个人本地 OpenClaw。
 

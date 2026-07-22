@@ -25,7 +25,7 @@ __pycache__/
 .vscode/
 .idea/
 
-# Mediwise Health Suite - Local data (NEVER package)
+# MediWise Health Suite - Local data (NEVER package)
 *.db
 *.db-wal
 *.db-shm

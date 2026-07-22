@@ -1,5 +1,5 @@
 /**
- * MediWise Health Monitor - OpenClaw Skill
+ * MediWise Health Suite - Health Monitor Skill
  *
  * ESM entry point that routes actions to Python scripts.
  */

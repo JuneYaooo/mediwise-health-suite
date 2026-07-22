@@ -152,6 +152,9 @@ const ROUTES = {
     if (inputs.params?.view) {
       args.push('--view', String(inputs.params.view));
     }
+    if (inputs.params?.focus) {
+      args.push('--focus', String(inputs.params.focus));
+    }
     return { script: 'briefing_report.py', args };
   },
   'doctor-visit-report': (inputs) => {
@@ -508,6 +511,13 @@ export async function execute(inputs, context) {
     log(`[mediwise-health-tracker] script=${script}`);
 
     const result = await runScript(script, args, subEnv);
+    if (result?.status === 'error') {
+      return {
+        status: 'error',
+        error: result.message ?? result.error ?? 'Python action returned an error',
+        result,
+      };
+    }
     return { status: 'ok', result };
   } catch (err) {
     const stderr = typeof err?.stderr === 'string' ? err.stderr.trim() : '';

@@ -4,7 +4,7 @@ Usage:
   python3 scripts/setup.py check          # Check current config status
   python3 scripts/setup.py init           # Initialize with defaults
   python3 scripts/setup.py set-db-path --path /path/to/health.db
-  python3 scripts/setup.py set-vision --provider siliconflow --model Qwen/Qwen3.6-35B-A3B --api-key sk-xxx --base-url https://api.siliconflow.cn/v1
+  python3 scripts/setup.py set-vision --provider siliconflow --api-key-stdin
   python3 scripts/setup.py disable-vision
   python3 scripts/setup.py set-privacy --level anonymized
   python3 scripts/setup.py show           # Show current config
@@ -41,7 +41,7 @@ from health_db import (
 )
 
 # ---------------------------------------------------------------------------
-# Vision provider presets — users only need to supply --api-key
+# Vision provider presets — credentials should come from protected stdin or env
 # ---------------------------------------------------------------------------
 VISION_PROVIDER_PRESETS = {
     "siliconflow": {
@@ -182,6 +182,15 @@ def _mask_key(s: str) -> str:
     return s[:4] + "***"
 
 
+def _vision_api_key(args) -> str:
+    """Resolve a vision credential without requiring it in process arguments."""
+    if getattr(args, "api_key_stdin", False):
+        value = sys.stdin.readline().rstrip("\r\n")
+    else:
+        value = getattr(args, "api_key", "") or os.environ.get("MEDIWISE_VISION_API_KEY", "")
+    return value.strip()
+
+
 def cmd_check(args):
     """Check config status and report issues."""
     status = check_config_status()
@@ -205,11 +214,11 @@ def cmd_check(args):
     # When vision is not configured, include a step-by-step quick setup guide
     if not status.get("vision_configured"):
         status["vision_quick_setup"] = {
-            "message": "配置视觉模型只需两步：① 选方案 ② 填 API Key",
+            "message": "配置视觉模型只需两步：① 选方案 ② 通过受保护输入提供 API Key",
             "step1_list_providers": "python3 setup.py list-vision-providers",
-            "step2_example": "python3 setup.py set-vision --provider siliconflow --api-key sk-xxx",
-            "step3_test": "python3 setup.py test-vision",
-            "note": "--model 和 --base-url 有默认值，只需填 --provider 和 --api-key 即可完成配置",
+            "step2_example": "python3 setup.py set-vision --provider siliconflow --api-key-stdin",
+            "step3_test": "依次运行 test-vision、test-pdf 和 test-intake --input both",
+            "note": "由配置 Agent 通过受保护的 stdin 或 MEDIWISE_VISION_API_KEY 环境注入凭据；不要把 Key 写进聊天或命令参数",
         }
 
     output_json({"status": "ok", **status})
@@ -251,6 +260,17 @@ def cmd_set_db_path(args):
 def cmd_set_vision(args):
     """Configure vision model, with provider presets for common choices."""
     preset = VISION_PROVIDER_PRESETS.get(args.provider, {})
+    api_key = _vision_api_key(args)
+
+    if not api_key:
+        output_json({
+            "status": "error",
+            "message": (
+                "未收到视觉模型 API Key。请让配置 Agent 通过 --api-key-stdin 或 "
+                "MEDIWISE_VISION_API_KEY 安全注入；不要在聊天或命令参数中发送凭据。"
+            ),
+        })
+        return
 
     # Resolve actual provider name (gemini maps to "openai" for API compat)
     resolved_provider = preset.get("provider", args.provider)
@@ -275,7 +295,7 @@ def cmd_set_vision(args):
         "enabled": True,
         "provider": resolved_provider,
         "model": model,
-        "api_key": args.api_key,
+        "api_key": api_key,
         "base_url": base_url,
     }
     save_config(cfg)
@@ -288,7 +308,7 @@ def cmd_set_vision(args):
             f"多模态视觉模型已配置: {resolved_provider}/{model}"
             + (f"（使用 {args.provider} 预设）" if preset else "")
         ),
-        "next_step": "运行 `python3 setup.py test-vision` 验证配置是否正常",
+        "next_step": "依次运行 test-vision、test-pdf 和 test-intake --input both，验证图片/PDF 识别与结构化解析",
         "config": display,
     })
 
@@ -305,7 +325,7 @@ def cmd_list_vision_providers(args):
             "default_base_url": p["base_url"],
             "api_key_hint": p["api_key_hint"],
             "notes": p["notes"],
-            "quick_command": f"python3 setup.py set-vision --provider {key} --api-key <YOUR_KEY>",
+            "quick_command": f"python3 setup.py set-vision --provider {key} --api-key-stdin",
         })
     output_json({
         "status": "ok",
@@ -672,6 +692,157 @@ def cmd_test_paddleocr(args):
         "character_count": len(text),
         "line_count": len([line for line in text.splitlines() if line.strip()]),
         "text_preview": text[:500],
+    })
+
+
+def _build_scanned_test_pdf(image_path: str, pdf_path: str) -> None:
+    """Create an image-only PDF for a real scanned-document smoke test."""
+    import fitz
+
+    image = fitz.Pixmap(image_path)
+    width = 612
+    height = max(1, width * image.height / max(image.width, 1))
+    image = None
+    document = fitz.open()
+    try:
+        page = document.new_page(width=width, height=height)
+        page.insert_image(page.rect, filename=image_path)
+        document.save(pdf_path)
+    finally:
+        document.close()
+
+
+def cmd_test_pdf(args):
+    """Run the configured intake path against an actual image-only PDF."""
+    from config import get_pdf_config
+    from smart_intake import _extract_text_from_pdf
+
+    using_custom_pdf = bool(args.pdf)
+    tools = check_pdf_tools()
+    try:
+        if using_custom_pdf:
+            pdf_path = os.path.abspath(args.pdf)
+            if not os.path.isfile(pdf_path):
+                output_json({"status": "error", "message": f"测试 PDF 不存在: {pdf_path}"})
+                return
+            text = _extract_text_from_pdf(pdf_path)
+        else:
+            image_path = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), "..", "references", "test-vision.jpg"
+            ))
+            if not os.path.isfile(image_path):
+                output_json({"status": "error", "message": f"内置脱敏测试图片不存在: {image_path}"})
+                return
+            if not tools.get("PyMuPDF"):
+                output_json({
+                    "status": "error",
+                    "message": "扫描 PDF 测试需要 PyMuPDF 生成并渲染临时页面；请让配置 Agent 安装后重试。",
+                })
+                return
+            with tempfile.TemporaryDirectory(prefix="mediwise-pdf-test-") as temp_dir:
+                pdf_path = os.path.join(temp_dir, "scanned-medical-report.pdf")
+                _build_scanned_test_pdf(image_path, pdf_path)
+                text = _extract_text_from_pdf(pdf_path)
+    except Exception as exc:
+        output_json({
+            "status": "error",
+            "message": f"扫描 PDF 文字提取测试失败: {exc}",
+            "configured_engine": get_pdf_config().get("ocr_engine", "auto"),
+            "tools": tools,
+        })
+        return
+
+    if not text or not text.strip():
+        output_json({
+            "status": "error",
+            "message": "扫描 PDF 处理链路已启动，但没有提取到文字。",
+            "configured_engine": get_pdf_config().get("ocr_engine", "auto"),
+        })
+        return
+
+    expected_keywords = [] if using_custom_pdf else ["7.23", "4.33", "胆固醇"]
+    matched = [keyword for keyword in expected_keywords if keyword in text]
+    if expected_keywords and len(matched) < 2:
+        output_json({
+            "status": "error",
+            "message": f"扫描 PDF 已返回文字，但仅识别 {len(matched)}/{len(expected_keywords)} 个内置关键内容。",
+            "matched_keywords": matched,
+            "missing_keywords": [keyword for keyword in expected_keywords if keyword not in text],
+            "configured_engine": get_pdf_config().get("ocr_engine", "auto"),
+            "text_preview": text[:500],
+        })
+        return
+
+    output_json({
+        "status": "ok",
+        "message": "扫描 PDF 文字提取测试通过。",
+        "configured_engine": get_pdf_config().get("ocr_engine", "auto"),
+        "matched_keywords": matched,
+        "character_count": len(text),
+        "text_preview": text[:500],
+    })
+
+
+def _intake_test_summary(kind: str, result: dict) -> dict:
+    records = result.get("records") if isinstance(result, dict) else None
+    records = records if isinstance(records, list) else []
+    error = result.get("error") if isinstance(result, dict) else "invalid result"
+    return {
+        "input": kind,
+        "status": "ok" if records and not error else "error",
+        "record_count": len(records),
+        "record_types": sorted({str(item.get("type")) for item in records if isinstance(item, dict) and item.get("type")}),
+        "extraction_source": result.get("extraction_source") if isinstance(result, dict) else None,
+        "message": (
+            result.get("source_summary") or result.get("error") or
+            ("未返回结构化记录；请检查文本模型配置。" if isinstance(result, dict) else "返回格式无效。")
+        ),
+    }
+
+
+def cmd_test_intake(args):
+    """Verify that redacted image/PDF input reaches structured records without writing a database."""
+    from smart_intake import extract
+
+    image_path = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "references", "test-vision.jpg"
+    ))
+    if not os.path.isfile(image_path):
+        output_json({"status": "error", "message": f"内置脱敏测试图片不存在: {image_path}"})
+        return
+
+    requested = ("image", "pdf") if args.input == "both" else (args.input,)
+    results = []
+    try:
+        with tempfile.TemporaryDirectory(prefix="mediwise-intake-test-") as temp_dir:
+            for kind in requested:
+                if kind == "image":
+                    result = extract("image", image_path)
+                else:
+                    if not check_pdf_tools().get("PyMuPDF"):
+                        results.append({
+                            "input": "pdf", "status": "error", "record_count": 0,
+                            "record_types": [], "extraction_source": None,
+                            "message": "缺少 PyMuPDF，无法生成并渲染扫描 PDF 测试页。",
+                        })
+                        continue
+                    pdf_path = os.path.join(temp_dir, "scanned-medical-report.pdf")
+                    _build_scanned_test_pdf(image_path, pdf_path)
+                    result = extract("pdf", pdf_path)
+                results.append(_intake_test_summary(kind, result))
+    except Exception as exc:
+        output_json({"status": "error", "message": f"结构化附件录入测试失败: {exc}", "results": results})
+        return
+
+    passed = bool(results) and all(item["status"] == "ok" for item in results)
+    output_json({
+        "status": "ok" if passed else "error",
+        "message": (
+            "图片/PDF 结构化解析测试通过；测试只读取内置脱敏附件，没有写入健康数据库。"
+            if passed else
+            "附件文字识别可能可用，但结构化解析尚未全部通过；不要向用户声称上传后可自动解析。"
+        ),
+        "results": results,
     })
 
 
@@ -1275,7 +1446,11 @@ def main():
                    help="提供商预设名或自定义名: siliconflow / siliconflow-glm / gemini / openai / stepfun / ollama，"
                         "或任意自定义值（需同时指定 --model 和 --base-url）")
     p.add_argument("--model", default="", help="模型名称（内置预设会自动填入，可省略）")
-    p.add_argument("--api-key", required=True, help="API Key")
+    key_group = p.add_mutually_exclusive_group()
+    key_group.add_argument("--api-key-stdin", action="store_true",
+                           help="从标准输入读取 API Key（推荐；也可设置 MEDIWISE_VISION_API_KEY）")
+    key_group.add_argument("--api-key", default="",
+                           help="直接传入 API Key（仅为兼容保留，可能暴露在进程参数或 shell 历史中）")
     p.add_argument("--base-url", default="", help="API Base URL（内置预设会自动填入，可省略）")
 
     sub.add_parser("list-vision-providers", help="列出所有内置视觉模型预设及默认配置")
@@ -1301,6 +1476,13 @@ def main():
 
     p = sub.add_parser("test-paddleocr", help="测试 PaddleOCR 是否能识别本地图片文字")
     p.add_argument("--image", default="", help="自定义测试图片路径（可选，默认使用内置测试图片）")
+
+    p = sub.add_parser("test-pdf", help="测试扫描 PDF 是否能通过当前 OCR 或多模态路径提取文字")
+    p.add_argument("--pdf", default="", help="自定义脱敏扫描 PDF 路径（可选；默认临时生成，不写入仓库）")
+
+    p = sub.add_parser("test-intake", help="测试脱敏图片/PDF 是否能被完整解析为结构化健康记录（不写库）")
+    p.add_argument("--input", choices=["image", "pdf", "both"], default="both",
+                   help="测试图片、扫描 PDF 或两者（默认 both）")
 
     p = sub.add_parser("set-backend", help="启用后端 API 模式")
     p.add_argument("--url", required=True, help="后端 API 地址，如 http://localhost:8000/api")
@@ -1330,7 +1512,8 @@ def main():
         "show": cmd_show, "set-embedding": cmd_set_embedding,
         "test-embedding": cmd_test_embedding,
         "check-pdf": cmd_check_pdf, "set-pdf-engine": cmd_set_pdf_engine,
-        "test-paddleocr": cmd_test_paddleocr,
+        "test-paddleocr": cmd_test_paddleocr, "test-pdf": cmd_test_pdf,
+        "test-intake": cmd_test_intake,
         "set-backend": cmd_set_backend, "disable-backend": cmd_disable_backend,
         "set-privacy": cmd_set_privacy,
         "migrate-split-db": cmd_migrate_split_db,

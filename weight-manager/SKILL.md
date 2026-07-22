@@ -3,7 +3,7 @@ name: weight-manager
 description: "Weight management: set goals, track progress, log exercise, calculate BMI/BMR/TDEE, analyze calorie balance and body composition. Integrates with diet-tracker and mediwise-health-tracker."
 ---
 
-# weight-manager
+# MediWise · 体重与运动 Skill
 
 ## 概述
 

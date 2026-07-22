@@ -3,7 +3,7 @@ name: mediwise-health-tracker
 description: Family health and medical record management. Tracks members, visits, medications, lab results, daily metrics, reminders, health cards, and pre-visit summaries.
 ---
 
-# MediWise Health Suite · 健康档案 Skill
+# MediWise · 健康档案 Skill
 
 健康档案与病程记录 Skill。所有操作通过 `{baseDir}/scripts/` 下的 Python 脚本完成，默认输出 JSON，再转成自然语言回复给用户。
 
@@ -157,7 +157,7 @@ python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-
 python3 {baseDir}/scripts/setup.py check
 ```
 
-先检查 `pdf_tools.paddleocr`。PaddleOCR 是图片和扫描 PDF 的首选本地文字识别能力，不需要把原图上传到云端；由具备本机权限的配置 Agent 安装、设置并运行 `test-paddleocr`，不得要求普通用户运行命令。
+先检查 `pdf_tools.paddleocr`。PaddleOCR 是图片和扫描 PDF 的首选本地文字识别能力，不需要把原图上传到云端；由具备本机权限的配置 Agent 安装、设置并运行 `test-paddleocr` 和 `test-pdf`，不得要求普通用户运行命令。
 
 若用户需要复杂版面、图表理解或自动结构化，再检查 `vision_configured`。**不要在聊天中索要 API Key**，也不要把安装或配置命令转交给普通用户。
 
@@ -182,15 +182,17 @@ python3 {baseDir}/scripts/setup.py check
 
 ```bash
 python3 {baseDir}/scripts/setup.py test-vision
+python3 {baseDir}/scripts/setup.py test-pdf
+python3 {baseDir}/scripts/setup.py test-intake --input both
 ```
 
-- 测试通过 → "配置好了！现在可以直接把报告图片或 PDF 发给我来识别。"
+- 图片、扫描 PDF 与结构化解析测试都通过 → "配置好了！现在可以直接把报告图片或 PDF 发给我来识别。"
 - 测试失败 → 根据错误信息提示用户检查 API Key 是否正确，或网络是否可用。
 
 ### 原则
 
 - **不在聊天中收集凭据**：API Key 属于敏感信息，只能通过客户端安全本地输入或系统 keyring，不得经过对话传递。
-- **后台静默执行**：`setup.py test-vision` 等验证命令在后台完成，不要把 JSON 输出贴给用户。
+- **后台静默执行**：`setup.py test-vision`、`setup.py test-paddleocr`、`setup.py test-pdf` 和 `setup.py test-intake` 等验证命令在后台完成，不要把 JSON 输出贴给用户。
 - **配置失败友好提示**：失败时给出具体原因和可操作的修复建议，不要直接贴报错。
 
 ## 不可跳过的规则
@@ -263,12 +265,14 @@ dream.py unlock   → 释放锁，标记完成
 当用户说“帮我生成最近 7 天的健康记录卡片”“给我看近期健康简报”“今天身体怎么样”等口语表达时，统一按“健康记录卡片”能力处理：
 
 1. 个人版先按姓名与身份规则调用 `resolve-member`。只有唯一“本人”档案时可以默认本人；有多位成员且用户未说明姓名时必须先询问。明确请求家庭版时跳过单成员解析。
-2. 个人版调用 `generate-report`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。
+2. 个人版调用 `generate-report`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。用户明确问指标趋势、饮食运动、医疗记录或用药时，再分别传 `focus=metrics|lifestyle|care|medications`；普通概览保持 `focus=auto`。
 3. 将生成的 PNG 作为图片消息发送，并用一句自然语言概括最重要的提醒。
 4. 用户明确说“家庭健康记录卡片”“全家健康卡片”时，调用 `generate-report` 并传入 `view=family`，不要传 `member_id`。家庭版用于一个本地用户管理本人及家人的概览，不代表多人共享服务。
-5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。对外名称分别统一为 “Health Record Card” 和“健康记录卡片”。
+5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。个人版对外名称统一为 “Health Record Card” / “健康记录卡片”，家庭版统一为 “Family Health Record Card” / “家庭健康记录卡片”。“健康简报”“健康小报”等只作为意图触发词，不作为回复或卡片标题。
 
-个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药，并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。家庭版展示成员关注状态、有限的关键指标、数据覆盖摘要和家庭医疗时间线，不把多张完整个人卡片纵向拼接。饮食日均只按有记录日计算；运动消耗不等于完整能量支出；没有独立饮水或临床液体出入量记录时不得生成相关数字；检验异常仅认原始数据中的明确标记。
+个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药，并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。`focus=auto` 必须使用生成器返回的确定性布局：先按 alert / warning、明确标记异常和到期提醒决定安全优先级，再按各模块的实际记录量决定主模块；重点模块前置，重点指标或数据最多的生活方式面板可放大，空且与本次问题无关的模块省略。不得让模型根据数值自行推断异常，也不得仅因记录多就把明确异常压到后面。
+
+家庭版展示成员关注状态、有限的关键指标、数据覆盖摘要和家庭医疗时间线，不把多张完整个人卡片纵向拼接。成员顺序由生成器自动决定：有 alert 的成员最优先，其次是 warning、明确标记异常或到期提醒，均无风险时再按近期数据覆盖度排列。饮食日均只按有记录日计算；运动消耗不等于完整能量支出；没有独立饮水或临床液体出入量记录时不得生成相关数字；检验异常仅认原始数据中的明确标记。详细布局规则见 `mediwise-health-tracker/references/drug-safety-health-card.md`。
 
 ## 每日健康快照记忆（daily_snapshot.py）
 

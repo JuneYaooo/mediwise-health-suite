@@ -15,7 +15,7 @@ MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手，包含健
 - 不覆盖已有目录中的本地改动。
 - 只配置个人本地模式，不把这一数据目录部署到群聊机器人或多人共享服务。
 - 由 Agent 完成命令执行，不要求普通用户复制或运行安装、配置、检查脚本。
-- 安装只负责本地代码、依赖、个人模式和环境检查；视觉模型、USDA、Open Food Facts 等可选功能留给用户之后显式启用。
+- 用户在安装请求中要求图片/PDF 识别时，同步配置多模态视觉或 OCR 路径；USDA、Open Food Facts 等联网数据源仍留给用户之后显式启用。
 
 ## 前置依赖
 
@@ -79,7 +79,13 @@ python3 -m pip install -r requirements.txt
 
 优先使用用户已有的虚拟环境；没有虚拟环境时，不要擅自用 `sudo pip`。
 
-### 4. 配置本地 PaddleOCR
+### 4. 配置图片/PDF 识别
+
+优先复用或配置能够接入 MediWise 视觉配置、且经 `setup.py test-vision` 验证支持图片输入的多模态模型。不能确认图片输入能力，或当前模型只能处理文本时，配置 OCR 路径：优先使用本地 PaddleOCR 提取图片和扫描 PDF 文字，再交给文本模型结构化。不要因为当前 OpenClaw 对话模型能看图，或模型名称中带有 VL、Vision 等字样，就跳过 MediWise 自身的配置和实际附件测试。
+
+云端视觉凭据通过客户端受保护输入、`set-vision --api-key-stdin` 或 `MEDIWISE_VISION_API_KEY` 注入。不要把 Key 放进聊天、命令参数、shell 历史或仓库；系统 keyring 可用时 MediWise 会优先存入 keyring。
+
+当前内置 OCR 适配是 PaddleOCR。若计划使用第三方 OCR API，先确认仓库已有对应适配和测试入口；不得只保存一个项目无法调用的 API 地址后声称配置完成。
 
 PaddleOCR 是推荐的本地图片和扫描 PDF 文字识别方案。由 Agent 完成安装，不能让普通用户复制命令。
 
@@ -91,9 +97,11 @@ PaddleOCR 是推荐的本地图片和扫描 PDF 文字识别方案。由 Agent �
 ```bash
 python3 mediwise-health-tracker/scripts/setup.py set-pdf-engine --engine paddleocr
 python3 mediwise-health-tracker/scripts/setup.py test-paddleocr
+python3 mediwise-health-tracker/scripts/setup.py test-pdf
+python3 mediwise-health-tracker/scripts/setup.py test-intake --input both
 ```
 
-只有 `test-paddleocr` 返回 `status: ok` 时，才可以告诉用户“PaddleOCR 已可用”。如果当前平台没有兼容轮子或模型初始化失败：
+多模态路径也必须依次运行 `test-vision`、`test-pdf` 和 `test-intake --input both`。图片测试与 `test-pdf` 证明文字识别链路，`test-intake` 再证明图片和 PDF 能够进入结构化记录结果；它们都返回 `status: ok` 时，才可以告诉用户“可以上传并解析图片和 PDF”。测试默认使用内置脱敏图片，并在临时目录生成图像型 PDF，不会写入健康数据库或仓库；也可以由 Agent 使用用户授权的脱敏附件。若当前平台没有兼容轮子、模型初始化失败或任一测试失败：
 
 - 不破坏基础安装，也不使用 `sudo pip`。
 - 把 OCR 引擎恢复为 `auto`。
@@ -130,7 +138,7 @@ bash install-check.sh
 - Python 和 Node.js 版本
 - `install-check.sh` 是否通过
 - 个人本地模式是否已经生效
-- PaddleOCR 是否通过本地图片识别测试；未启用时给出原因
+- 图片/PDF 识别采用多模态模型还是 OCR 路径、图片识别、扫描 PDF 提取和结构化解析测试是否分别通过；未启用时给出原因
 
 ## 重启后的冒烟对话
 
@@ -161,7 +169,7 @@ bash install-check.sh
 1. 目标目录中存在根 `SKILL.md` 和六个领域 Skill 目录。
 2. `python3 -m pip install -r requirements.txt` 成功，或依赖已由用户环境满足。
 3. `bash install-check.sh` 返回 0。
-4. 已尝试配置 PaddleOCR，并明确报告 `test-paddleocr` 的实际结果；失败时没有声称可用。
+4. 已配置并实际测试一种图片/PDF 识别路径：多模态模型的 `test-vision` 或 PaddleOCR 的 `test-paddleocr` 先通过，随后 `test-pdf` 与 `test-intake --input both` 也通过；任一环节失败时明确报告对应能力未启用，没有声称图片和 PDF 都能自动解析。
 5. `MEDIWISE_SINGLE_USER=1` 已写入当前 OpenClaw 实际加载的个人 Agent 运行环境，并在重载后验证生效。
 6. 已告诉用户重启或重新加载 OpenClaw。
 7. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。

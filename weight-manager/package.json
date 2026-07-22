@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "description": "体重管理与减肥驱动 OpenClaw Skill",
-  "author": "mediwise",
+  "description": "MediWise Health Suite 体重与运动 OpenClaw Skill",
+  "author": "MediWise Team",
   "license": "MIT",
   "keywords": ["openclaw", "skill", "health", "weight", "fitness"]
 }
