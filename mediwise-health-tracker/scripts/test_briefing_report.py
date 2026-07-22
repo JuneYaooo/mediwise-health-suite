@@ -103,5 +103,31 @@ class FamilyHealthCardTest(unittest.TestCase):
         self.assertIn("当前无明确提醒", html)
 
 
+class HealthCardThemeTest(unittest.TestCase):
+    def test_health_card_uses_blue_visual_system(self):
+        html = briefing_report._render_html(
+            "健康记录卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
+        )
+
+        self.assertIn("--page:#F3F7FC", html)
+        self.assertIn("--primary:#246BCE", html)
+        self.assertIn("linear-gradient(135deg,#0A2F55,#155E9E)", html)
+        self.assertIn(".family-grid>.family-card:nth-child(odd):last-child", html)
+        self.assertNotIn("linear-gradient(135deg,#123C35,#1A6B5E)", html)
+
+    def test_metric_sparklines_use_blue_as_the_default(self):
+        html = briefing_report._sparkline(
+            "heart_rate",
+            [
+                {"value": 70, "date": "2026-07-20"},
+                {"value": 72, "date": "2026-07-21"},
+            ],
+            "zh-CN",
+        )
+
+        self.assertIn("#246BCE", html)
+        self.assertNotIn("#1E7A6E", html)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -130,11 +130,11 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
 
         # Find the bottom boundary of actual content.
         # Scan from the bottom up, looking for rows that aren't the
-        # background color (the page bg is #F4F8F7 ≈ rgb(244,248,247)).
+        # background color (the page bg is #F3F7FC ≈ rgb(243,247,252)).
         pixels = img.load()
         w, h = img.size
         bg_threshold = 10  # tolerance for "close to background color"
-        bg_r, bg_g, bg_b = 244, 248, 247
+        bg_r, bg_g, bg_b = 243, 247, 252
 
         bottom = h
         for y in range(h - 1, 0, -1):
