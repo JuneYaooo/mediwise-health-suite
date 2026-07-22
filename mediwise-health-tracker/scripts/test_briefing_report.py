@@ -115,6 +115,19 @@ class HealthCardThemeTest(unittest.TestCase):
         self.assertIn(".family-grid>.family-card:nth-child(odd):last-child", html)
         self.assertNotIn("linear-gradient(135deg,#123C35,#1A6B5E)", html)
 
+    def test_health_card_uses_readable_typography(self):
+        html = briefing_report._render_html(
+            "健康记录卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
+        )
+
+        self.assertIn('font:16px/1.65', html)
+        self.assertIn('h1{font-size:32px', html)
+        self.assertIn('.metric-value{font-size:28px', html)
+        self.assertIn('.family-list-item.medication b{font-size:13px', html)
+        self.assertNotIn('font-size:8px', html)
+        self.assertNotIn('font-size:9px', html)
+        self.assertNotIn('font-size:10px', html)
+
     def test_metric_sparklines_use_blue_as_the_default(self):
         html = briefing_report._sparkline(
             "heart_rate",

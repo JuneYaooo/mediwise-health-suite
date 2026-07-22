@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Health Record Card typography is now larger throughout personal and family views, with more readable labels, medication schedules, timeline details, and disclaimers at both desktop and narrow widths.
 - Health Record Cards now use a clearer medical-blue visual system with improved contrast, blue metric charts, and a compact full-width layout for the final member in odd-sized family cards.
 - Clarified that MediWise works with Hermes, OpenClaw, Claude Code, Codex, WorkBuddy, and other Skills-compatible agents; OpenClaw-specific workspace and channel instructions remain documented as an adapter path rather than a product requirement.
 - Family health record cards now organize each member by current status, active medications and schedules, reminders, and explicit attention items. The family timeline has been removed.

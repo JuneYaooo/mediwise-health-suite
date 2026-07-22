@@ -186,15 +186,6 @@ MediWise 是个人健康助手，不是多人共享系统。你可以在自己�
 - 本项目只记录、整理、查询、展示和提醒，不会根据健康数据提供诊断、治疗、用药或其他医疗指导。
 - 严重或突发症状请及时联系当地医疗机构，不要依赖本项目处理紧急情况。
 
-## 文档导航
-
-- [文档中心](docs/README.md)：按普通用户、安装 Agent 和贡献者分类查看全部文档与项目目录。
-- [快速开始](QUICKSTART.md)：安装后的最短使用路径。
-- [安装与配置指南](docs/INSTALLATION.md)：安装、备份、恢复、可选附件识别和常见问题。
-- [可穿戴数据导入指南](docs/WEARABLES.md)：Apple Health 与 Gadgetbridge 的导入方法。
-- [变更记录](CHANGELOG.md)：版本更新内容。
-- [贡献指南](CONTRIBUTING.md)：参与开发与提交规范。
-
 运行要求：Python 3.8+、Node.js 18+、SQLite 3.x，以及一个能够加载 Skills、访问本地文件并执行脚本的 Agent；支持 Linux、macOS 和 Windows。使用 OpenClaw 时要求 2026.3.0+。
 
 ## 致谢
