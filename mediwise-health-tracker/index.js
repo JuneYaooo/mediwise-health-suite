@@ -146,6 +146,12 @@ const ROUTES = {
     if (inputs.params?.days) {
       args.push('--days', String(inputs.params.days));
     }
+    if (inputs.params?.locale) {
+      args.push('--locale', String(inputs.params.locale));
+    }
+    if (inputs.params?.view) {
+      args.push('--view', String(inputs.params.view));
+    }
     return { script: 'briefing_report.py', args };
   },
   'doctor-visit-report': (inputs) => {

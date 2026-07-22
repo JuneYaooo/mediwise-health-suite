@@ -1,99 +1,204 @@
-"""Generate a self-contained HTML recent-health card.
+"""Generate local, self-contained personal and family health record cards.
 
-Renders briefing data, recent metric trends, and reminders into a single
-HTML file with inline CSS and SVG sparklines. No remote chart assets are used.
+The renderer uses only local data and inline CSS/SVG. It deliberately reports
+recorded intake and recorded activity separately: without a complete energy
+expenditure model, it must not imply a calorie deficit or clinical fluid I/O.
 
 Usage:
   python3 scripts/briefing_report.py generate [--member-id <id>]
+      [--days 7] [--locale zh-CN|en-US] [--view auto|personal|family]
 """
 
 from __future__ import annotations
 
+import argparse
+import json
+import logging
 import os
 import sys
-import json
 from datetime import datetime, timedelta
-from string import Template
 
-import health_db
 import health_advisor
+import health_db
 from config import DATA_DIR
 
 
-# --- Metric display names ---
+LOG = logging.getLogger(__name__)
 
-METRIC_DISPLAY = {
-    "blood_pressure": "血压",
-    "blood_sugar": "血糖",
-    "heart_rate": "心率",
-    "weight": "体重",
-    "temperature": "体温",
-    "blood_oxygen": "血氧",
+COPY = {
+    "zh-CN": {
+        "lang": "zh-CN", "title": "健康记录卡片", "family_title": "家庭健康记录卡片",
+        "last_days": "最近 {days} 天", "period": "{start} 至 {end}",
+        "local_profile": "个人本地档案", "local_family": "本地家庭档案",
+        "members": "{count} 位成员", "attention_people": "{count} 人需要关注",
+        "pending": "{count} 项待办", "attention": "需要关注", "all_clear": "未发现告警或待办提醒",
+        "alerts": "{count} 项警告", "warnings": "{count} 项提醒", "todos": "{count} 项待处理提醒",
+        "metrics": "核心健康指标", "records": "{count} 条", "latest": "最近",
+        "source": "来源", "not_enough": "记录不足，暂不判断趋势", "flat": "与期初持平",
+        "change": "较期初 {value}", "no_metrics": "所选时间范围内暂无可展示的健康指标。",
+        "intake_activity": "摄入与消耗", "recorded_intake": "记录摄入",
+        "recorded_days": "{count} 个饮食记录日", "daily_average": "日均（按记录日）",
+        "protein": "蛋白质", "carbs": "碳水", "fat": "脂肪", "fiber": "膳食纤维",
+        "activity": "运动记录", "sessions": "{count} 次", "duration": "运动时长",
+        "activity_burn": "运动消耗", "steps": "日均步数", "step_days": "{count} 个步数记录日",
+        "no_diet": "暂无饮食记录", "no_activity": "暂无运动记录", "no_steps": "暂无步数记录",
+        "not_balance": "摄入与运动消耗均为已记录数据，不代表完整能量收支。",
+        "sleep": "睡眠", "sleep_nights": "{count} 个睡眠记录夜", "avg_sleep": "平均睡眠",
+        "avg_score": "平均评分", "latest_deep": "最近深睡", "latest_rem": "最近 REM",
+        "no_sleep": "暂无睡眠记录", "hours": "小时", "minutes": "分钟",
+        "recent_care": "最近医疗记录", "visits": "最近就医", "labs": "最近检验",
+        "imaging": "最近检查", "no_visits": "所选时间范围内暂无就医记录",
+        "no_labs": "所选时间范围内暂无检验记录", "no_imaging": "所选时间范围内暂无检查记录",
+        "abnormal": "{count} 项明确异常", "no_flagged": "无明确异常标记", "diagnosis": "诊断",
+        "conclusion": "结论", "active_meds": "当前在用药", "medicine": "药品名称",
+        "dosage": "剂量", "frequency": "频次", "purpose": "用途", "start_date": "开始日期",
+        "no_meds": "暂无在用药记录", "family_overview": "家庭成员概览",
+        "family_timeline": "家庭近期医疗时间线", "stable": "无明确提醒", "needs_attention": "需要关注",
+        "data_present": "近期有记录", "data_missing": "近期记录较少", "diet_days_short": "饮食 {count} 天",
+        "activity_short": "运动 {count} 次", "sleep_short": "睡眠 {count} 夜", "care_short": "医疗 {count} 项",
+        "no_timeline": "所选时间范围内暂无家庭就医、检验或检查记录。",
+        "generated": "生成时间：{time}",
+        "disclaimer": "本卡片仅整理已记录信息，不构成诊断或医疗建议；如有不适或异常，请咨询专业医生。",
+        "self": "本人", "visit_event": "就医", "lab_event": "检验", "imaging_event": "检查",
+        "unknown": "未填写", "day": "天",
+    },
+    "en-US": {
+        "lang": "en", "title": "Health Record Card", "family_title": "Family Health Record Card",
+        "last_days": "Last {days} days", "period": "{start} to {end}",
+        "local_profile": "Private local profile", "local_family": "Private local family record",
+        "members": "{count} members", "attention_people": "{count} need attention",
+        "pending": "{count} pending", "attention": "Needs attention", "all_clear": "No alerts or pending reminders found",
+        "alerts": "{count} alerts", "warnings": "{count} notices", "todos": "{count} pending reminders",
+        "metrics": "Key health metrics", "records": "{count} records", "latest": "Latest",
+        "source": "Source", "not_enough": "Not enough records to show a trend", "flat": "No change from first record",
+        "change": "{value} from first record", "no_metrics": "No supported health metrics were recorded in this period.",
+        "intake_activity": "Intake and activity", "recorded_intake": "Recorded intake",
+        "recorded_days": "{count} food log days", "daily_average": "Daily average on logged days",
+        "protein": "Protein", "carbs": "Carbohydrate", "fat": "Fat", "fiber": "Fiber",
+        "activity": "Recorded activity", "sessions": "{count} sessions", "duration": "Active time",
+        "activity_burn": "Activity burn", "steps": "Average daily steps", "step_days": "{count} step log days",
+        "no_diet": "No food logs", "no_activity": "No activity logs", "no_steps": "No step logs",
+        "not_balance": "Intake and activity burn are recorded values, not a complete energy balance.",
+        "sleep": "Sleep", "sleep_nights": "{count} sleep records", "avg_sleep": "Average sleep",
+        "avg_score": "Average score", "latest_deep": "Latest deep sleep", "latest_rem": "Latest REM",
+        "no_sleep": "No sleep records", "hours": "hr", "minutes": "min",
+        "recent_care": "Recent care", "visits": "Recent visits", "labs": "Recent lab results",
+        "imaging": "Recent imaging and exams", "no_visits": "No visits recorded in this period",
+        "no_labs": "No lab results recorded in this period", "no_imaging": "No imaging or exams recorded in this period",
+        "abnormal": "{count} explicitly flagged", "no_flagged": "No explicit abnormal flags", "diagnosis": "Diagnosis",
+        "conclusion": "Conclusion", "active_meds": "Active medications", "medicine": "Medication",
+        "dosage": "Dose", "frequency": "Frequency", "purpose": "Purpose", "start_date": "Start date",
+        "no_meds": "No active medications recorded", "family_overview": "Family overview",
+        "family_timeline": "Recent family care timeline", "stable": "No explicit alerts", "needs_attention": "Needs attention",
+        "data_present": "Recent records available", "data_missing": "Limited recent data", "diet_days_short": "Food {count}d",
+        "activity_short": "Activity {count}", "sleep_short": "Sleep {count} nights", "care_short": "Care {count}",
+        "no_timeline": "No visits, lab results, imaging, or exams were recorded for the family in this period.",
+        "generated": "Generated {time}",
+        "disclaimer": "This card organizes recorded information only. It is not a diagnosis or medical advice. Consult a qualified clinician about symptoms or abnormal results.",
+        "self": "self", "visit_event": "Visit", "lab_event": "Lab", "imaging_event": "Imaging",
+        "unknown": "Not recorded", "day": "days",
+    },
 }
 
-METRIC_UNITS = {
-    "blood_pressure": "mmHg",
-    "blood_sugar": "mmol/L",
-    "heart_rate": "bpm",
-    "weight": "kg",
-    "temperature": "°C",
-    "blood_oxygen": "%",
+METRIC_NAMES = {
+    "zh-CN": {"blood_pressure": "血压", "blood_sugar": "血糖", "heart_rate": "心率", "weight": "体重", "temperature": "体温", "blood_oxygen": "血氧"},
+    "en-US": {"blood_pressure": "Blood pressure", "blood_sugar": "Blood glucose", "heart_rate": "Heart rate", "weight": "Weight", "temperature": "Temperature", "blood_oxygen": "Blood oxygen"},
 }
+METRIC_UNITS = {"blood_pressure": "mmHg", "blood_sugar": "mmol/L", "heart_rate": "bpm", "weight": "kg", "temperature": "°C", "blood_oxygen": "%"}
+SOURCES = {
+    "zh-CN": {"manual": "手动记录", "手动记录": "手动记录", "apple_health": "Apple Health", "gadgetbridge": "Gadgetbridge", "garmin": "Garmin Connect"},
+    "en-US": {"manual": "Manual", "手动记录": "Manual", "apple_health": "Apple Health", "gadgetbridge": "Gadgetbridge", "garmin": "Garmin Connect"},
+}
+RELATIONS_EN = {"本人": "self", "父亲": "father", "母亲": "mother", "配偶": "partner", "丈夫": "husband", "妻子": "wife", "儿子": "son", "女儿": "daughter", "子女": "child", "祖父": "grandfather", "祖母": "grandmother"}
+ABNORMAL_WORDS = {"high", "low", "abnormal", "critical", "h", "l", "a", "hh", "ll"}
 
-SOURCE_DISPLAY = {
-    "manual": "手动记录",
-    "apple_health": "Apple Health",
-    "gadgetbridge": "Gadgetbridge",
-    "garmin": "Garmin Connect",
-}
 
-# Severity styles
-SEVERITY_COLORS = {
-    "alert": {"bg": "#FEE2E2", "border": "#EF4444", "text": "#991B1B", "icon": "&#x1F6A8;"},
-    "warning": {"bg": "#FEF3C7", "border": "#F59E0B", "text": "#92400E", "icon": "&#x26A0;&#xFE0F;"},
-    "info": {"bg": "#DBEAFE", "border": "#3B82F6", "text": "#1E40AF", "icon": "&#x2139;&#xFE0F;"},
-}
+def _escape(value) -> str:
+    if value is None:
+        return ""
+    return (str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&#x27;"))
+
+
+def _fmt_number(value, digits=0) -> str:
+    if value is None:
+        return "—"
+    try:
+        number = float(value)
+        return f"{number:.{digits}f}" if digits else f"{number:,.0f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _count_phrase(locale: str, count: int, zh_noun: str, en_singular: str, en_plural: str | None = None) -> str:
+    """Format a small localized count with correct English plurality."""
+    if locale == "zh-CN":
+        return f"{count} {zh_noun}"
+    noun = en_singular if count == 1 else (en_plural or f"{en_singular}s")
+    return f"{count} {noun}"
+
+
+def _relation(value: str | None, locale: str) -> str:
+    value = value or COPY[locale]["self"]
+    return RELATIONS_EN.get(value, value) if locale == "en-US" else value
+
+
+def _member_label(member: dict, locale: str) -> str:
+    return f'{member.get("name", "")} ({_relation(member.get("relation"), locale)})' if locale == "en-US" else f'{member.get("name", "")}（{_relation(member.get("relation"), locale)}）'
+
+
+def _source(value: str | None, locale: str) -> str:
+    value = value or "manual"
+    return SOURCES[locale].get(value, value.replace("_", " ").title() if locale == "en-US" else value.replace("_", " "))
+
+
+def _system_text(value: str | None, locale: str) -> str:
+    """Localize short, system-generated advisor labels without altering user notes."""
+    if not value or locale != "en-US":
+        return value or ""
+    metric_map = {"血压": "blood pressure", "血糖": "blood glucose", "心率": "heart rate",
+                  "体重": "weight", "体温": "temperature", "血氧": "blood oxygen"}
+    if value.startswith("尚未记录"):
+        metric = metric_map.get(value[4:], value[4:])
+        return f"No {metric} recorded"
+    for chinese, english in metric_map.items():
+        if value == f"{chinese}偏高":
+            return f"High {english}"
+        if value == f"{chinese}偏低":
+            return f"Low {english}"
+        if value == f"{chinese}持续异常":
+            return f"Persistent {english} concern"
+        if value.startswith(f"{chinese}已 ") and value.endswith(" 天未测量"):
+            count = value[len(chinese)+2:-6].strip()
+            return f"No {english} measurement for {count} days"
+    return value
 
 
 def _query_metric_trends(member_id: str, days: int = 30) -> dict:
-    """Query the last N days of key metrics for a member.
-
-    Returns dict keyed by metric_type, each containing a list of
-    {date, value/systolic/diastolic} dicts ordered chronologically.
-    """
-    conn = health_db.get_connection()
-    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    conn = health_db.get_medical_connection()
+    cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
     trends = {}
     try:
-        for metric_type in ("blood_pressure", "blood_sugar", "heart_rate", "weight", "blood_oxygen"):
+        for metric_type in ("blood_pressure", "blood_sugar", "heart_rate", "weight", "temperature", "blood_oxygen"):
             rows = conn.execute(
                 """SELECT measured_at, value, source FROM health_metrics
-                   WHERE member_id=? AND metric_type=? AND is_deleted=0
-                   AND measured_at >= ?
-                   ORDER BY measured_at""",
-                (member_id, metric_type, cutoff),
-            ).fetchall()
-            if not rows:
-                continue
+                   WHERE member_id=? AND metric_type=? AND is_deleted=0 AND measured_at>=?
+                   ORDER BY measured_at""", (member_id, metric_type, cutoff)).fetchall()
             points = []
             for row in rows:
-                date_str = row["measured_at"][:10]
+                raw = row["value"]
                 try:
-                    parsed = json.loads(row["value"]) if isinstance(row["value"], str) else row["value"]
+                    parsed = json.loads(raw) if isinstance(raw, str) else raw
                 except (json.JSONDecodeError, TypeError):
-                    try:
-                        parsed = {"value": float(row["value"])}
-                    except (TypeError, ValueError):
-                        continue
+                    parsed = raw
                 if isinstance(parsed, dict):
-                    point = {"date": date_str, "source": row["source"] or "手动记录"}
-                    point.update(parsed)
-                    points.append(point)
+                    point = {"date": row["measured_at"][:10], "source": row["source"] or "manual", **parsed}
                 else:
                     try:
-                        points.append({"date": date_str, "value": float(parsed), "source": row["source"] or "手动记录"})
+                        point = {"date": row["measured_at"][:10], "source": row["source"] or "manual", "value": float(parsed)}
                     except (TypeError, ValueError):
                         continue
+                points.append(point)
             if points:
                 trends[metric_type] = points
         return trends
@@ -102,82 +207,145 @@ def _query_metric_trends(member_id: str, days: int = 30) -> dict:
 
 
 def _query_active_medications(member_id: str) -> list[dict]:
-    """Get active medications for a member."""
-    conn = health_db.get_connection()
+    conn = health_db.get_medical_connection()
     try:
-        rows = health_db.rows_to_list(conn.execute(
-            """SELECT name, dosage, frequency, start_date, purpose
-               FROM medications
-               WHERE member_id=? AND is_deleted=0 AND end_date IS NULL
-               ORDER BY start_date""",
-            (member_id,),
-        ).fetchall())
-        return rows
+        return health_db.rows_to_list(conn.execute(
+            """SELECT name, dosage, frequency, start_date, purpose FROM medications
+               WHERE member_id=? AND is_deleted=0 AND (end_date IS NULL OR end_date='')
+               AND (is_active=1 OR is_active IS NULL) ORDER BY start_date DESC""", (member_id,)).fetchall())
     finally:
         conn.close()
 
 
-def _escape(text: str) -> str:
-    """Escape HTML special characters."""
-    if not text:
-        return ""
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#x27;")
-    )
+def _query_lifestyle_summary(member_id: str, days: int) -> dict:
+    cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
+    result = {"diet_days": 0, "diet": None, "exercise_count": 0, "exercise_days": 0,
+              "duration": 0, "calories_burned": 0.0, "step_days": 0, "avg_steps": None}
+    conn = health_db.get_lifestyle_connection()
+    try:
+        row = conn.execute(
+            """SELECT COUNT(DISTINCT meal_date) AS days, SUM(total_calories) AS calories,
+                      SUM(total_protein) AS protein, SUM(total_fat) AS fat,
+                      SUM(total_carbs) AS carbs, SUM(total_fiber) AS fiber
+               FROM diet_records WHERE member_id=? AND is_deleted=0 AND meal_date>=?""", (member_id, cutoff)).fetchone()
+        diet_days = int(row["days"] or 0)
+        result["diet_days"] = diet_days
+        if diet_days:
+            result["diet"] = {key: float(row[key] or 0) / diet_days for key in ("calories", "protein", "fat", "carbs", "fiber")}
+        row = conn.execute(
+            """SELECT COUNT(*) AS count, COUNT(DISTINCT exercise_date) AS days,
+                      SUM(duration) AS duration, SUM(calories_burned) AS burned
+               FROM exercise_records WHERE member_id=? AND is_deleted=0 AND exercise_date>=?""", (member_id, cutoff)).fetchone()
+        result.update(exercise_count=int(row["count"] or 0), exercise_days=int(row["days"] or 0),
+                      duration=int(row["duration"] or 0), calories_burned=float(row["burned"] or 0))
+    finally:
+        conn.close()
+
+    conn = health_db.get_medical_connection()
+    try:
+        rows = conn.execute(
+            """SELECT measured_at, value FROM health_metrics WHERE member_id=? AND metric_type='steps'
+               AND is_deleted=0 AND measured_at>=? ORDER BY measured_at""", (member_id, cutoff)).fetchall()
+        daily = {}
+        for row in rows:
+            try:
+                parsed = json.loads(row["value"]) if isinstance(row["value"], str) else row["value"]
+                value = parsed.get("value", parsed.get("steps")) if isinstance(parsed, dict) else parsed
+                daily[row["measured_at"][:10]] = daily.get(row["measured_at"][:10], 0) + float(value)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+        if daily:
+            result["step_days"] = len(daily)
+            result["avg_steps"] = sum(daily.values()) / len(daily)
+    finally:
+        conn.close()
+    return result
 
 
-def _source_display(source: str | None) -> str:
-    if not source:
-        return "手动记录"
-    return SOURCE_DISPLAY.get(source, source.replace("_", " "))
+def _query_sleep_summary(member_id: str, days: int) -> dict:
+    cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
+    conn = health_db.get_medical_connection()
+    records = []
+    try:
+        rows = conn.execute(
+            """SELECT measured_at, value FROM health_metrics WHERE member_id=? AND metric_type='sleep'
+               AND is_deleted=0 AND measured_at>=? ORDER BY measured_at""", (member_id, cutoff)).fetchall()
+        for row in rows:
+            try:
+                value = json.loads(row["value"]) if isinstance(row["value"], str) else row["value"]
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(value, dict) and value.get("duration_min") is not None:
+                records.append({"date": row["measured_at"][:10], **value})
+    finally:
+        conn.close()
+    if not records:
+        return {"count": 0}
+    def average(key):
+        values = [float(item[key]) for item in records if item.get(key) is not None]
+        return sum(values) / len(values) if values else None
+    return {"count": len(records), "avg_duration": average("duration_min"), "avg_score": average("score"),
+            "latest_deep": records[-1].get("deep_min"), "latest_rem": records[-1].get("rem_min"),
+            "latest_date": records[-1]["date"]}
 
 
-def _build_alert_cards_html(briefing: dict) -> str:
-    """Build the alert/warning/info summary cards."""
-    total_alerts = briefing.get("total_alerts", 0)
-    total_warnings = briefing.get("total_warnings", 0)
-    total_reminders = briefing.get("total_due_reminders", 0)
+def _lab_items(raw) -> list[dict]:
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        for key in ("items", "results", "tests"):
+            if isinstance(value.get(key), list):
+                return [item for item in value[key] if isinstance(item, dict)]
+        if value and all(isinstance(item, dict) for item in value.values()):
+            return [{"name": name, **item} for name, item in value.items()]
+        return [value]
+    return []
 
-    cards = []
-    if total_alerts > 0:
-        s = SEVERITY_COLORS["alert"]
-        cards.append(
-            f'<div class="summary-card" style="background:{s["bg"]};border-left:4px solid {s["border"]}">'
-            f'<div class="card-icon">{s["icon"]}</div>'
-            f'<div class="card-body"><div class="card-count" style="color:{s["text"]}">{total_alerts}</div>'
-            f'<div class="card-label">项警告</div></div></div>'
-        )
-    if total_warnings > 0:
-        s = SEVERITY_COLORS["warning"]
-        cards.append(
-            f'<div class="summary-card" style="background:{s["bg"]};border-left:4px solid {s["border"]}">'
-            f'<div class="card-icon">{s["icon"]}</div>'
-            f'<div class="card-body"><div class="card-count" style="color:{s["text"]}">{total_warnings}</div>'
-            f'<div class="card-label">项提醒</div></div></div>'
-        )
-    if total_reminders > 0:
-        s = SEVERITY_COLORS["info"]
-        cards.append(
-            f'<div class="summary-card" style="background:{s["bg"]};border-left:4px solid {s["border"]}">'
-            f'<div class="card-icon">&#x1F48A;</div>'
-            f'<div class="card-body"><div class="card-count" style="color:{s["text"]}">{total_reminders}</div>'
-            f'<div class="card-label">项待处理提醒</div></div></div>'
-        )
 
-    if not cards:
-        cards.append(
-            '<div class="summary-card" style="background:#D1FAE5;border-left:4px solid #10B981">'
-            '<div class="card-icon">&#x2705;</div>'
-            '<div class="card-body"><div class="card-label" style="color:#065F46;font-size:16px">'
-            '未发现告警或待办提醒</div></div></div>'
-        )
+def _is_abnormal(item: dict) -> bool:
+    if item.get("abnormal") is True or item.get("is_abnormal") is True:
+        return True
+    return any(str(item.get(key, "")).strip().lower() in ABNORMAL_WORDS for key in ("status", "flag"))
 
-    return '<div class="summary-cards">' + "\n".join(cards) + "</div>"
+
+def _abnormal_label(item: dict) -> str:
+    name = item.get("name") or item.get("item_name") or item.get("test_name") or item.get("indicator") or ""
+    value = item.get("value")
+    unit = item.get("unit") or ""
+    flag = item.get("flag") or item.get("status") or ""
+    pieces = [str(name)] if name else []
+    if value not in (None, ""):
+        pieces.append(f"{value} {unit}".strip())
+    if flag:
+        pieces.append(str(flag))
+    return " · ".join(pieces)
+
+
+def _query_recent_care(member_id: str, days: int, limit: int = 3) -> dict:
+    cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
+    conn = health_db.get_medical_connection()
+    try:
+        visits = health_db.rows_to_list(conn.execute(
+            """SELECT visit_date, visit_type, hospital, department, diagnosis, summary FROM visits
+               WHERE member_id=? AND is_deleted=0 AND visit_date>=? ORDER BY visit_date DESC LIMIT ?""",
+            (member_id, cutoff, limit)).fetchall())
+        labs = health_db.rows_to_list(conn.execute(
+            """SELECT test_date, test_name, items FROM lab_results WHERE member_id=? AND is_deleted=0
+               AND test_date>=? ORDER BY test_date DESC LIMIT ?""", (member_id, cutoff, limit)).fetchall())
+        imaging = health_db.rows_to_list(conn.execute(
+            """SELECT exam_date, exam_name, findings, conclusion FROM imaging_results WHERE member_id=?
+               AND is_deleted=0 AND exam_date>=? ORDER BY exam_date DESC LIMIT ?""", (member_id, cutoff, limit)).fetchall())
+    finally:
+        conn.close()
+    for lab in labs:
+        abnormal = [item for item in _lab_items(lab.get("items")) if _is_abnormal(item)]
+        lab["abnormal_count"] = len(abnormal)
+        lab["abnormal_labels"] = [_abnormal_label(item) for item in abnormal if _abnormal_label(item)][:2]
+    return {"visits": visits, "labs": labs, "imaging": imaging}
 
 
 def _metric_number(point: dict, metric_type: str):
@@ -188,509 +356,349 @@ def _metric_number(point: dict, metric_type: str):
     return point.get("value")
 
 
-def _sparkline_svg(metric_type: str, points: list[dict]) -> str:
-    """Build an inline SVG sparkline without external JavaScript."""
-    width, height, pad = 250, 62, 6
-
-    def line(values, color):
-        valid = [(idx, float(value)) for idx, value in enumerate(values) if value is not None]
+def _sparkline(metric_type: str, points: list[dict], locale: str) -> str:
+    width, height, pad = 260, 54, 5
+    def path(values, color):
+        valid = [(i, float(v)) for i, v in enumerate(values) if v is not None]
         if not valid:
             return ""
-        all_values = [value for _, value in valid]
-        low, high = min(all_values), max(all_values)
-        span = high - low or 1.0
-        count = max(len(values) - 1, 1)
-        coords = []
-        for idx, value in valid:
-            x = pad + (width - 2 * pad) * idx / count
-            y = pad + (height - 2 * pad) * (high - value) / span
-            coords.append(f"{x:.1f},{y:.1f}")
-        dots = "".join(
-            f'<circle cx="{coord.split(",")[0]}" cy="{coord.split(",")[1]}" r="2.5" fill="{color}"/>'
-            for coord in coords
-        )
-        return f'<polyline points="{" ".join(coords)}" fill="none" stroke="{color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>{dots}'
-
+        low, high = min(v for _, v in valid), max(v for _, v in valid)
+        span, denom = high - low or 1, max(len(values) - 1, 1)
+        coords = [(pad + (width - 2 * pad) * i / denom, pad + (height - 2 * pad) * (high - v) / span) for i, v in valid]
+        line = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+        dots = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.3" fill="{color}"/>' for x, y in coords)
+        return f'<polyline points="{line}" fill="none" stroke="{color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>{dots}'
     if metric_type == "blood_pressure":
-        paths = line([p.get("systolic") for p in points], "#D76A4A")
-        paths += line([p.get("diastolic") for p in points], "#2F6FEB")
+        content = path([p.get("systolic") for p in points], "#D76A4A") + path([p.get("diastolic") for p in points], "#2F6FEB")
     else:
-        paths = line([_metric_number(p, metric_type) for p in points], "#1E7A6E")
-    return (
-        f'<svg class="sparkline" viewBox="0 0 {width} {height}" role="img" '
-        f'aria-label="{_escape(METRIC_DISPLAY.get(metric_type, metric_type))}趋势">'
-        f'<line x1="{pad}" y1="{height - pad}" x2="{width - pad}" y2="{height - pad}" stroke="#DDE8E5"/>'
-        f'{paths}</svg>'
-    )
+        content = path([_metric_number(p, metric_type) for p in points], "#1E7A6E")
+    label = _escape(METRIC_NAMES[locale].get(metric_type, metric_type))
+    return f'<svg class="spark" viewBox="0 0 {width} {height}" role="img" aria-label="{label}"><line x1="{pad}" y1="{height-pad}" x2="{width-pad}" y2="{height-pad}" stroke="#DDE8E5"/>{content}</svg>'
 
 
-def _build_metric_cards_html(trends: dict, days: int) -> str:
+def _metric_cards(trends: dict, locale: str) -> str:
+    c = COPY[locale]
     cards = []
     for metric_type, points in trends.items():
-        if not points:
-            continue
-        latest = points[-1]
-        first = points[0]
+        latest, first = points[-1], points[0]
         if metric_type == "blood_pressure":
-            latest_value = f'{latest.get("systolic", "-")}/{latest.get("diastolic", "-")}'
-            first_value = first.get("systolic")
-            last_number = latest.get("systolic")
+            value = f'{latest.get("systolic", "—")}/{latest.get("diastolic", "—")}'
+            first_num, last_num = first.get("systolic"), latest.get("systolic")
         else:
-            last_number = _metric_number(latest, metric_type)
-            first_value = _metric_number(first, metric_type)
-            latest_value = "-" if last_number is None else f"{float(last_number):g}"
+            first_num, last_num = _metric_number(first, metric_type), _metric_number(latest, metric_type)
+            value = _fmt_number(last_num, 1 if metric_type in ("blood_sugar", "weight") else 0)
+        delta = c["not_enough"]
+        if first_num is not None and last_num is not None and len(points) > 1:
+            diff = float(last_num) - float(first_num)
+            delta = c["flat"] if abs(diff) < 1e-9 else c["change"].format(value=f'{diff:+g}')
+        cards.append(f'''<article class="metric-card">
+          <div class="metric-head"><b>{_escape(METRIC_NAMES[locale].get(metric_type, metric_type))}</b><span>{_count_phrase(locale, len(points), "条", "record")}</span></div>
+          <div class="metric-value">{_escape(value)} <small>{_escape(METRIC_UNITS.get(metric_type, ""))}</small></div>
+          <div class="muted">{_escape(delta)}</div>{_sparkline(metric_type, points, locale)}
+          <div class="meta"><span>{c["latest"]}: {_escape(latest.get("date"))}</span><span>{c["source"]}: {_escape(_source(latest.get("source"), locale))}</span></div>
+        </article>''')
+    return '<div class="empty">'+c["no_metrics"]+'</div>' if not cards else '<div class="metric-grid">'+"".join(cards)+"</div>"
 
-        delta_text = "记录不足，暂不判断趋势"
-        if first_value is not None and last_number is not None and len(points) > 1:
-            delta = float(last_number) - float(first_value)
-            if abs(delta) < 1e-9:
-                delta_text = "与期初持平"
+
+def _hours(minutes, locale: str) -> str:
+    if minutes is None:
+        return "—"
+    return f'{float(minutes)/60:.1f} {COPY[locale]["hours"]}'
+
+
+def _lifestyle_sleep(lifestyle: dict, sleep: dict, locale: str) -> str:
+    c = COPY[locale]
+    diet = lifestyle.get("diet")
+    if diet:
+        intake = f'''<div class="panel intake"><div class="eyebrow">{c["recorded_intake"]}</div>
+          <div class="big blue">{_fmt_number(diet["calories"])} <small>kcal</small></div>
+          <div class="muted">{c["daily_average"]} · {_count_phrase(locale, lifestyle["diet_days"], "个饮食记录日", "food log day")}</div>
+          <div class="macro"><span>{c["protein"]}<b>{_fmt_number(diet["protein"])}g</b></span><span>{c["carbs"]}<b>{_fmt_number(diet["carbs"])}g</b></span><span>{c["fat"]}<b>{_fmt_number(diet["fat"])}g</b></span><span>{c["fiber"]}<b>{_fmt_number(diet["fiber"])}g</b></span></div></div>'''
+    else:
+        intake = f'<div class="panel intake"><div class="eyebrow">{c["recorded_intake"]}</div><div class="empty compact">{c["no_diet"]}</div></div>'
+    activity_bits = []
+    if lifestyle["exercise_count"]:
+        session_noun = "次" if locale == "zh-CN" else ("session" if lifestyle["exercise_count"] == 1 else "sessions")
+        activity_bits.append(f'<div><div class="big green">{lifestyle["exercise_count"]} <small>{session_noun}</small></div><div class="muted">{c["duration"]} {_fmt_number(lifestyle["duration"])} {c["minutes"]} · {c["activity_burn"]} {_fmt_number(lifestyle["calories_burned"])} kcal</div></div>')
+    else:
+        activity_bits.append(f'<div class="empty compact">{c["no_activity"]}</div>')
+    if lifestyle["step_days"]:
+        activity_bits.append(f'<div class="step-box"><span>{c["steps"]}</span><b>{_fmt_number(lifestyle["avg_steps"])}</b><small>{_count_phrase(locale, lifestyle["step_days"], "个步数记录日", "step log day")}</small></div>')
+    else:
+        activity_bits.append(f'<div class="muted top-gap">{c["no_steps"]}</div>')
+    activity = f'<div class="panel activity"><div class="eyebrow">{c["activity"]}</div>{"".join(activity_bits)}</div>'
+    sleep_html = f'<div class="panel sleep"><div class="eyebrow">{c["sleep"]}</div>'
+    if sleep.get("count"):
+        sleep_html += f'<div class="big coral">{_hours(sleep.get("avg_duration"), locale)}</div><div class="muted">{_count_phrase(locale, sleep["count"], "个睡眠记录夜", "sleep record")}</div><div class="sleep-row"><span>{c["avg_score"]}<b>{_fmt_number(sleep.get("avg_score"))}</b></span><span>{c["latest_deep"]}<b>{_fmt_number(sleep.get("latest_deep"))} {c["minutes"]}</b></span><span>{c["latest_rem"]}<b>{_fmt_number(sleep.get("latest_rem"))} {c["minutes"]}</b></span></div>'
+    else:
+        sleep_html += f'<div class="empty compact">{c["no_sleep"]}</div>'
+    sleep_html += '</div>'
+    return f'<section><div class="section-title"><span>02</span><h2>{c["intake_activity"]}</h2></div><div class="wellness-grid">{intake}{activity}{sleep_html}</div><p class="scope-note">{c["not_balance"]}</p></section>'
+
+
+def _care_html(care: dict, locale: str) -> str:
+    c = COPY[locale]
+    def rows(kind):
+        values = care[kind]
+        if not values:
+            return f'<div class="empty compact">{c[{"visits":"no_visits","labs":"no_labs","imaging":"no_imaging"}[kind]]}</div>'
+        output = []
+        for item in values:
+            if kind == "visits":
+                title = item.get("diagnosis") or item.get("department") or item.get("visit_type") or c["unknown"]
+                detail = " · ".join(x for x in (item.get("hospital"), item.get("department")) if x)
+                date = item.get("visit_date", "")[:10]
+            elif kind == "labs":
+                title, date = item.get("test_name") or c["unknown"], item.get("test_date", "")[:10]
+                detail = c["abnormal"].format(count=item["abnormal_count"]) if item["abnormal_count"] else c["no_flagged"]
+                if item.get("abnormal_labels"):
+                    detail += " · " + "; ".join(item["abnormal_labels"])
             else:
-                delta_text = f'较期初 {"+" if delta > 0 else ""}{delta:g}'
-
-        cards.append(
-            '<div class="metric-card">'
-            '<div class="metric-card-head">'
-            f'<span class="metric-name">{_escape(METRIC_DISPLAY.get(metric_type, metric_type))}</span>'
-            f'<span class="metric-count">{len(points)} 条</span>'
-            '</div>'
-            f'<div class="metric-value">{_escape(latest_value)} <small>{_escape(METRIC_UNITS.get(metric_type, ""))}</small></div>'
-            f'<div class="metric-delta">{_escape(delta_text)}</div>'
-            f'{_sparkline_svg(metric_type, points)}'
-            '<div class="metric-meta">'
-            f'<span>最近：{_escape(latest.get("date", ""))}</span>'
-            f'<span>来源：{_escape(_source_display(latest.get("source")))}</span>'
-            '</div></div>'
-        )
-    if not cards:
-        return '<div class="empty-state">最近还没有可展示的健康指标。先记录一项血压、心率、血糖、体重或血氧吧。</div>'
-    return f'<div class="metric-grid" data-days="{days}">' + "".join(cards) + "</div>"
+                title, date = item.get("exam_name") or c["unknown"], item.get("exam_date", "")[:10]
+                detail = item.get("conclusion") or item.get("findings") or c["unknown"]
+            output.append(f'<div class="care-item"><time>{_escape(date)}</time><b>{_escape(title)}</b><p>{_escape(detail)}</p></div>')
+        return "".join(output)
+    return f'''<section><div class="section-title"><span>03</span><h2>{c["recent_care"]}</h2></div>
+      <div class="care-grid"><div class="care-col"><h3>{c["visits"]}</h3>{rows("visits")}</div>
+      <div class="care-col"><h3>{c["labs"]}</h3>{rows("labs")}</div>
+      <div class="care-col"><h3>{c["imaging"]}</h3>{rows("imaging")}</div></div></section>'''
 
 
-def _build_member_section(member_data: dict, trends: dict, medications: list[dict], days: int) -> str:
-    """Build HTML for a single member's section."""
-    name = _escape(member_data.get("member_name", ""))
-    relation = _escape(member_data.get("relation", ""))
-    parts = [f'<div class="member-section"><h2>&#x1F464; {name}（{relation}）</h2>']
-
-    # Due reminders
-    due = member_data.get("due_reminders", [])
-    if due:
-        parts.append('<div class="subsection"><h3>&#x23F0; 待处理提醒</h3><ul class="reminder-list">')
-        for r in due:
-            title = _escape(r.get("title", ""))
-            content = _escape(r.get("content", ""))
-            priority = r.get("priority", "normal")
-            badge_class = f"badge-{priority}"
-            parts.append(
-                f'<li><span class="badge {badge_class}">{_escape(priority)}</span> '
-                f'{title}'
-                + (f' <span class="detail">— {content}</span>' if content else "")
-                + "</li>"
-            )
-        parts.append("</ul></div>")
-
-    # Health tips
-    tips = member_data.get("health_tips", [])
-    if tips:
-        parts.append('<div class="subsection"><h3>&#x1F4CB; 健康建议</h3>')
-        for tip in tips:
-            severity = tip.get("severity", "info")
-            s = SEVERITY_COLORS.get(severity, SEVERITY_COLORS["info"])
-            title = _escape(tip.get("title", ""))
-            detail = _escape(tip.get("detail", ""))
-            suggestion = _escape(tip.get("suggestion", ""))
-            parts.append(
-                f'<div class="tip-card" style="background:{s["bg"]};border-left:4px solid {s["border"]}">'
-                f'<div class="tip-header" style="color:{s["text"]}">{s["icon"]} {title}</div>'
-                f'<div class="tip-detail">{detail}</div>'
-                f'<div class="tip-suggestion">{suggestion}</div>'
-                f"</div>"
-            )
-        parts.append("</div>")
-
-    # Recent metric cards with self-contained SVG trends
-    parts.append(
-        f'<div class="subsection"><h3>&#x1F4C8; 最近 {days} 天健康记录</h3>'
-        f'{_build_metric_cards_html(trends, days)}</div>'
-    )
-
-    # Active medications
-    if medications:
-        parts.append('<div class="subsection"><h3>&#x1F48A; 在用药物</h3>'
-                      '<table class="med-table"><thead><tr>'
-                      '<th>药品名称</th><th>剂量</th><th>频次</th><th>用途</th><th>开始日期</th>'
-                      '</tr></thead><tbody>')
-        for med in medications:
-            parts.append(
-                f'<tr><td>{_escape(med.get("name", ""))}</td>'
-                f'<td>{_escape(med.get("dosage", ""))}</td>'
-                f'<td>{_escape(med.get("frequency", ""))}</td>'
-                f'<td>{_escape(med.get("purpose", ""))}</td>'
-                f'<td>{_escape(med.get("start_date", "")[:10] if med.get("start_date") else "")}</td></tr>'
-            )
-        parts.append("</tbody></table></div>")
-
-    parts.append("</div>")
-
-    return "\n".join(parts)
+def _medications_html(meds: list[dict], locale: str) -> str:
+    c = COPY[locale]
+    if not meds:
+        body = f'<div class="empty">{c["no_meds"]}</div>'
+    else:
+        trs = "".join(f'<tr><td><b>{_escape(m.get("name"))}</b></td><td>{_escape(m.get("dosage"))}</td><td>{_escape(m.get("frequency"))}</td><td>{_escape(m.get("purpose"))}</td><td>{_escape((m.get("start_date") or "")[:10])}</td></tr>' for m in meds)
+        body = f'<div class="table-wrap"><table><thead><tr><th>{c["medicine"]}</th><th>{c["dosage"]}</th><th>{c["frequency"]}</th><th>{c["purpose"]}</th><th>{c["start_date"]}</th></tr></thead><tbody>{trs}</tbody></table></div>'
+    return f'<section><div class="section-title"><span>04</span><h2>{c["active_meds"]}</h2></div>{body}</section>'
 
 
-def generate_report(member_id: str = None, owner_id: str = None, days: int = 7) -> dict:
-    """Generate a self-contained HTML health briefing report.
+def _attention_html(member_data: dict, locale: str) -> str:
+    c = COPY[locale]
+    items = []
+    for tip in member_data.get("health_tips", [])[:3]:
+        severity = tip.get("severity", "info")
+        text = tip.get("title") or tip.get("message") or tip.get("detail")
+        if text:
+            items.append(f'<div class="attention-item {severity}"><span></span><p>{_escape(_system_text(text, locale))}</p></div>')
+    for reminder in member_data.get("due_reminders", [])[:max(0, 3-len(items))]:
+        text = reminder.get("title") or reminder.get("content")
+        if text:
+            items.append(f'<div class="attention-item info"><span></span><p>{_escape(text)}</p></div>')
+    if not items:
+        return f'<div class="clear"><i>✓</i>{c["all_clear"]}</div>'
+    return '<div class="attention-list">'+"".join(items)+'</div>'
 
-    Args:
-        member_id: Optional member ID. If None, generates for all members.
 
-    Returns:
-        dict with status, report_path, and file_size.
-    """
+def _personal_content(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict, care: dict, meds: list[dict], locale: str) -> str:
+    c = COPY[locale]
+    return f'''<section class="attention-block"><div class="section-title"><span>00</span><h2>{c["attention"]}</h2></div>{_attention_html(member_data, locale)}</section>
+    <section><div class="section-title"><span>01</span><h2>{c["metrics"]}</h2></div>{_metric_cards(trends, locale)}</section>
+    {_lifestyle_sleep(lifestyle, sleep, locale)}{_care_html(care, locale)}{_medications_html(meds, locale)}'''
+
+
+def _family_card(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict, care: dict, locale: str) -> str:
+    c = COPY[locale]
+    important_tips = [tip for tip in member_data.get("health_tips", []) if tip.get("severity") in ("alert", "warning")]
+    attention_count = len(important_tips) + len(member_data.get("due_reminders", []))
+    latest_metrics = []
+    for metric_type, points in list(trends.items())[:3]:
+        point = points[-1]
+        if metric_type == "blood_pressure":
+            value = f'{point.get("systolic", "—")}/{point.get("diastolic", "—")}'
+        else:
+            value = _fmt_number(_metric_number(point, metric_type), 1 if metric_type in ("blood_sugar", "weight") else 0)
+        latest_metrics.append(f'<span><small>{_escape(METRIC_NAMES[locale].get(metric_type, metric_type))}</small><b>{_escape(value)} <i>{_escape(METRIC_UNITS.get(metric_type, ""))}</i></b></span>')
+    if not latest_metrics:
+        latest_metrics.append(f'<span class="wide"><small>{c["metrics"]}</small><b>{c["data_missing"]}</b></span>')
+    care_count = sum(len(care[key]) for key in ("visits", "labs", "imaging"))
+    if locale == "en-US":
+        chips = [f'Food {lifestyle["diet_days"]}d', _count_phrase(locale, lifestyle["exercise_count"], "", "activity", "activities"),
+                 _count_phrase(locale, sleep.get("count", 0), "", "sleep record"), _count_phrase(locale, care_count, "", "care item")]
+    else:
+        chips = [c["diet_days_short"].format(count=lifestyle["diet_days"]), c["activity_short"].format(count=lifestyle["exercise_count"]), c["sleep_short"].format(count=sleep.get("count", 0)), c["care_short"].format(count=care_count)]
+    attention = " · ".join(_system_text(tip.get("title") or tip.get("message") or "", locale) for tip in important_tips[:1])
+    if not attention and member_data.get("due_reminders"):
+        attention = member_data["due_reminders"][0].get("title") or member_data["due_reminders"][0].get("content") or ""
+    has_recent_data = bool(trends or lifestyle["diet_days"] or lifestyle["exercise_count"] or
+                           lifestyle["step_days"] or sleep.get("count") or care_count)
+    status = c["needs_attention"] if attention_count else c["stable"]
+    summary = attention if attention else (c["data_present"] if has_recent_data else c["data_missing"])
+    return f'''<article class="family-card"><div class="family-card-head"><div><h3>{_escape(_member_label(member, locale))}</h3><p>{_escape(summary)}</p></div><span class="status {'watch' if attention_count else ''}">{status}</span></div>
+      <div class="family-metrics">{"".join(latest_metrics)}</div><div class="chips">{"".join(f'<span>{_escape(x)}</span>' for x in chips)}</div></article>'''
+
+
+def _family_timeline(all_data: list[dict], locale: str) -> str:
+    c = COPY[locale]
+    events = []
+    for data in all_data:
+        label = _member_label(data["member"], locale)
+        for item in data["care"]["visits"]:
+            events.append((item.get("visit_date", "")[:10], label, c["visit_event"], item.get("diagnosis") or item.get("department") or item.get("visit_type") or c["unknown"]))
+        for item in data["care"]["labs"]:
+            summary = item.get("test_name") or c["unknown"]
+            if item.get("abnormal_count"):
+                summary += " · " + c["abnormal"].format(count=item["abnormal_count"])
+            events.append((item.get("test_date", "")[:10], label, c["lab_event"], summary))
+        for item in data["care"]["imaging"]:
+            events.append((item.get("exam_date", "")[:10], label, c["imaging_event"], item.get("exam_name") or c["unknown"]))
+    events.sort(key=lambda value: value[0], reverse=True)
+    if not events:
+        body = f'<div class="empty">{c["no_timeline"]}</div>'
+    else:
+        body = '<div class="timeline">'+"".join(f'<div class="timeline-item"><time>{_escape(date)}</time><span></span><div><b>{_escape(label)}</b><small>{_escape(kind)}</small><p>{_escape(summary)}</p></div></div>' for date, label, kind, summary in events[:8])+'</div>'
+    return f'<section><div class="section-title"><span>02</span><h2>{c["family_timeline"]}</h2></div>{body}</section>'
+
+
+def _summary_strip(briefing: dict, locale: str, family_data=None) -> str:
+    c = COPY[locale]
+    alert_count = int(briefing.get("total_alerts", 0) or 0)
+    warning_count = int(briefing.get("total_warnings", 0) or 0)
+    reminder_count = int(briefing.get("total_due_reminders", 0) or 0)
+    if family_data is not None:
+        people = sum(1 for d in family_data if any(tip.get("severity") in ("alert", "warning") for tip in d["member_data"].get("health_tips", [])) or d["member_data"].get("due_reminders"))
+        cards = [(str(len(family_data)), c["members"].format(count=len(family_data)), "green"), (str(people), c["attention_people"].format(count=people), "coral"), (str(reminder_count), c["pending"].format(count=reminder_count), "blue")]
+    elif not (alert_count or warning_count or reminder_count):
+        return f'<div class="clear hero-clear"><i>✓</i>{c["all_clear"]}</div>'
+    else:
+        cards = [(str(alert_count), c["alerts"].format(count=alert_count), "coral"), (str(warning_count), c["warnings"].format(count=warning_count), "gold"), (str(reminder_count), c["todos"].format(count=reminder_count), "blue")]
+    return '<div class="summary-strip">'+"".join(f'<div><b class="{color}">{value}</b><span>{label}</span></div>' for value, label, color in cards)+'</div>'
+
+
+def _render_html(title: str, subtitle: str, privacy: str, summary: str, content: str, locale: str) -> str:
+    c = COPY[locale]
+    generated = c["generated"].format(time=datetime.now().strftime("%Y-%m-%d %H:%M"))
+    return f'''<!DOCTYPE html><html lang="{c["lang"]}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{_escape(title)}</title>
+<style>
+*{{box-sizing:border-box}} body{{margin:0;background:#F4F8F7;color:#173B35;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}} .container{{max-width:1040px;margin:auto;padding:26px}}
+.header{{position:relative;overflow:hidden;border-radius:24px;padding:34px 38px;background:linear-gradient(135deg,#123C35,#1A6B5E);color:#fff;box-shadow:0 18px 42px rgba(18,60,53,.18)}} .header:after{{content:"";position:absolute;width:250px;height:250px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-48px;top:-112px;box-shadow:0 0 0 38px rgba(255,255,255,.035)}}
+.brand{{display:flex;align-items:center;gap:13px}} .mark{{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#E1F1ED;color:#17695D;font-weight:800;font-size:22px}} h1{{font-size:28px;line-height:1.2;margin:0;letter-spacing:-.4px}} .subtitle{{margin-top:15px;color:#CCE3DE}} .privacy{{display:inline-block;margin-top:14px;padding:5px 11px;border:1px solid rgba(255,255,255,.22);border-radius:99px;color:#E1EFEC;font-size:12px}}
+.summary-strip{{display:grid;grid-template-columns:repeat(3,1fr);background:white;border:1px solid #DFEAE7;border-radius:18px;margin:18px 0;padding:16px;box-shadow:0 9px 28px rgba(18,60,53,.06)}} .summary-strip>div{{padding:2px 22px;border-right:1px solid #E4ECEA}} .summary-strip>div:last-child{{border:0}} .summary-strip b{{font-size:25px;display:block;line-height:1.1}} .summary-strip span{{font-size:12px;color:#718580}} .green{{color:#167568}} .blue{{color:#2F6FEB}} .coral{{color:#D66548}} .gold{{color:#B7791F}}
+section{{background:#fff;border:1px solid #DFEAE7;border-radius:20px;padding:25px;margin:18px 0;box-shadow:0 10px 30px rgba(18,60,53,.055)}} .section-title{{display:flex;align-items:center;gap:10px;margin-bottom:17px}} .section-title>span{{font-size:10px;font-weight:800;color:#72A69C;border:1px solid #CDE1DC;border-radius:99px;padding:2px 7px}} h2{{font-size:18px;margin:0}} h3{{margin:0;font-size:14px}} .muted{{color:#718580;font-size:11px}} .empty{{padding:24px;text-align:center;border:1px dashed #BFD2CD;border-radius:13px;background:#F8FBFA;color:#718580}} .empty.compact{{padding:18px 10px;margin-top:10px}}
+.metric-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}} .metric-card{{padding:16px;border-radius:15px;background:#F7FAF9;border:1px solid #DCE8E5}} .metric-head,.meta{{display:flex;justify-content:space-between;gap:8px}} .metric-head span{{font-size:10px;background:#E8F0FA;color:#2F6FEB;border-radius:99px;padding:3px 7px}} .metric-value{{font-size:27px;font-weight:760;margin-top:8px}} .metric-value small,.big small{{font-size:11px;color:#718580}} .spark{{display:block;width:100%;height:54px;margin:7px 0}} .meta{{font-size:9px;color:#82938F}}
+.wellness-grid{{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:12px}} .panel{{min-height:190px;border-radius:16px;padding:17px;border:1px solid #DCE8E5;background:#F9FBFB}} .intake{{background:#F5F8FC;border-color:#DCE6F3}} .activity{{background:#F3F9F7;border-color:#D6E9E4}} .sleep{{background:#FCF7F4;border-color:#F1E0D9}} .eyebrow{{font-size:12px;font-weight:750;color:#506D67}} .big{{font-size:27px;font-weight:780;margin-top:9px}} .macro,.sleep-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:14px}} .macro span,.sleep-row span{{font-size:10px;color:#7A8D88}} .macro b,.sleep-row b{{display:block;font-size:12px;color:#284A44}} .step-box{{margin-top:15px;padding-top:12px;border-top:1px solid #D7E8E4;display:grid;grid-template-columns:1fr auto}} .step-box b{{font-size:18px;color:#176F63}} .step-box small{{grid-column:1/3;color:#82938F}} .top-gap{{margin-top:14px}} .scope-note{{margin:13px 2px 0;font-size:10px;color:#82938F}}
+.care-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}} .care-col{{border:1px solid #E1EAE8;border-radius:15px;padding:15px}} .care-col h3{{color:#365B54;margin-bottom:9px}} .care-item{{position:relative;padding:10px 0 10px 15px;border-top:1px solid #EDF2F1}} .care-item:before{{content:"";position:absolute;width:6px;height:6px;background:#D76A4A;border-radius:50%;left:0;top:17px}} .care-item time{{font-size:9px;color:#9B6B5F;display:block}} .care-item b{{font-size:12px}} .care-item p{{font-size:10px;color:#718580;margin:2px 0 0}}
+.table-wrap{{overflow:hidden;border:1px solid #DFE8E6;border-radius:14px}} table{{width:100%;border-collapse:collapse}} th{{background:#EDF4F2;color:#31564F;font-size:11px;text-align:left}} th,td{{padding:9px 12px;border-bottom:1px solid #EDF2F1}} tr:last-child td{{border:0}} td{{font-size:11px}}
+.clear{{display:flex;align-items:center;gap:10px;padding:14px 17px;border-radius:14px;background:#E7F5F1;color:#16665B}} .clear i{{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#1B786B;color:white;font-style:normal}} .hero-clear{{margin:18px 0;background:white;border:1px solid #D7E8E3;box-shadow:0 9px 28px rgba(18,60,53,.05)}} .attention-list{{display:grid;gap:8px}} .attention-item{{display:flex;gap:10px;padding:11px 13px;border-radius:11px;background:#F8FAFA}} .attention-item span{{width:7px;height:7px;border-radius:50%;background:#2F6FEB;margin-top:7px;flex:none}} .attention-item.alert span{{background:#D65F45}} .attention-item.warning span{{background:#D49A30}} .attention-item p{{margin:0}}
+.family-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}} .family-card{{padding:18px;border:1px solid #DCE8E5;border-radius:17px;background:#FAFCFB}} .family-card-head{{display:flex;justify-content:space-between;gap:10px}} .family-card-head p{{margin:3px 0;color:#718580;font-size:10px}} .status{{height:max-content;padding:4px 8px;border-radius:99px;background:#E5F3EF;color:#176B60;font-size:9px;white-space:nowrap}} .status.watch{{background:#FCEBE5;color:#A64C36}} .family-metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}} .family-metrics span{{padding:9px;background:#F0F6F4;border-radius:10px}} .family-metrics span.wide{{grid-column:1/4}} .family-metrics small,.family-metrics b{{display:block}} .family-metrics small{{font-size:9px;color:#718580}} .family-metrics b{{font-size:14px;margin-top:3px}} .family-metrics i{{font-size:8px;font-style:normal;color:#7B8E89}} .chips{{display:flex;flex-wrap:wrap;gap:5px}} .chips span{{font-size:9px;padding:3px 7px;border:1px solid #DCE8E5;border-radius:99px;color:#637C76}}
+.timeline{{padding-left:6px}} .timeline-item{{display:grid;grid-template-columns:78px 12px 1fr;gap:9px;min-height:55px}} .timeline-item time{{font-size:10px;color:#718580;padding-top:2px}} .timeline-item>span{{position:relative}} .timeline-item>span:before{{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#D76A4A;top:5px;left:2px}} .timeline-item>span:after{{content:"";position:absolute;width:1px;background:#DDE8E5;top:15px;bottom:0;left:5px}} .timeline-item:last-child>span:after{{display:none}} .timeline-item b{{font-size:12px}} .timeline-item small{{margin-left:7px;padding:2px 6px;border-radius:99px;background:#F4E9E5;color:#9B5A47;font-size:8px}} .timeline-item p{{font-size:11px;color:#59726C;margin:1px 0}}
+.footer{{text-align:center;color:#758984;font-size:10px;padding:18px 10px 8px}} .footer b{{display:block;color:#385C55;margin:4px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid,.wellness-grid,.care-grid,.family-grid{{grid-template-columns:1fr}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
+</style></head><body><main class="container"><header class="header"><div class="brand"><div class="mark">M</div><h1>{_escape(title)}</h1></div><div class="subtitle">{_escape(subtitle)}</div><div class="privacy">●&nbsp; {_escape(privacy)} · MediWise</div></header>{summary}{content}<footer class="footer"><span>{_escape(generated)}</span><b>MediWise Health Suite</b><span>{_escape(c["disclaimer"])}</span></footer></main></body></html>'''
+
+
+def generate_report(member_id: str | None = None, owner_id: str | None = None, days: int = 7,
+                    locale: str = "zh-CN", view: str = "auto") -> dict:
+    """Generate a personal or family card and return its local HTML path."""
+    if locale not in COPY:
+        return {"status": "error", "message": f"Unsupported locale: {locale}", "supported_locales": list(COPY)}
+    if view not in ("auto", "personal", "family"):
+        return {"status": "error", "message": f"Unsupported view: {view}", "supported_views": ["auto", "personal", "family"]}
+    try:
+        days = max(1, min(int(days), 365))
+    except (TypeError, ValueError):
+        return {"status": "error", "message": f"Invalid days value: {days}"}
     health_db.ensure_db()
-
-    # 1. Get daily briefing data
-    briefing = health_advisor.get_daily_briefing(member_id, owner_id)
-    report_date = briefing.get("date", datetime.now().strftime("%Y-%m-%d"))
-
-    # 2. Get member list for trend queries
-    conn = health_db.get_connection()
+    conn = health_db.get_medical_connection()
     try:
         if member_id:
             if not health_db.verify_member_ownership(conn, member_id, owner_id):
-                return {"status": "error", "message": f"无权访问成员: {member_id}"}
-            members = health_db.rows_to_list(conn.execute(
-                "SELECT id, name, relation FROM members WHERE id=? AND is_deleted=0",
-                (member_id,),
-            ).fetchall())
+                return {"status": "error", "message": f"Member not found or access denied: {member_id}"}
+            members = health_db.rows_to_list(conn.execute("SELECT id,name,relation FROM members WHERE id=? AND is_deleted=0", (member_id,)).fetchall())
         elif owner_id:
-            members = health_db.rows_to_list(conn.execute(
-                "SELECT id, name, relation FROM members WHERE is_deleted=0 AND owner_id=? ORDER BY created_at",
-                (owner_id,),
-            ).fetchall())
+            members = health_db.rows_to_list(conn.execute("SELECT id,name,relation FROM members WHERE owner_id=? AND is_deleted=0 ORDER BY created_at", (owner_id,)).fetchall())
         else:
-            members = health_db.rows_to_list(conn.execute(
-                "SELECT id, name, relation FROM members WHERE is_deleted=0 ORDER BY created_at",
-            ).fetchall())
+            members = health_db.rows_to_list(conn.execute("SELECT id,name,relation FROM members WHERE is_deleted=0 ORDER BY created_at").fetchall())
     finally:
         conn.close()
+    if not members:
+        return {"status": "error", "message": "No member profiles found"}
+    resolved_view = ("personal" if member_id else "family") if view == "auto" else view
+    if resolved_view == "personal" and not member_id:
+        return {"status": "error", "message": "Personal view requires --member-id"}
+    if resolved_view == "family" and member_id:
+        return {"status": "error", "message": "Family view does not accept --member-id"}
 
-    member_count = len(members)
+    briefing = health_advisor.get_daily_briefing(member_id if resolved_view == "personal" else None, owner_id)
+    lookup = {item.get("member_id"): item for item in briefing.get("briefing", [])}
+    all_data = []
+    for member in members:
+        mid = member["id"]
+        member_data = lookup.get(mid, {"member_id": mid, "member_name": member["name"], "relation": member["relation"], "due_reminders": [], "health_tips": []})
+        all_data.append({"member": member, "member_data": member_data, "trends": _query_metric_trends(mid, days),
+                         "lifestyle": _query_lifestyle_summary(mid, days), "sleep": _query_sleep_summary(mid, days),
+                         "care": _query_recent_care(mid, days), "meds": _query_active_medications(mid)})
 
-    # 3. Build briefing-to-member lookup
-    briefing_lookup = {}
-    for b in briefing.get("briefing", []):
-        briefing_lookup[b.get("member_id")] = b
+    # health_advisor's reminder total is global. Recalculate card totals from
+    # the selected member set so a personal card never inherits family tasks.
+    card_briefing = dict(briefing)
+    tips = [tip for data in all_data for tip in data["member_data"].get("health_tips", [])]
+    card_briefing["total_alerts"] = sum(1 for tip in tips if tip.get("severity") == "alert")
+    card_briefing["total_warnings"] = sum(1 for tip in tips if tip.get("severity") == "warning")
+    card_briefing["total_due_reminders"] = sum(len(data["member_data"].get("due_reminders", [])) for data in all_data)
 
-    # 4. Build member sections
-    member_sections = []
-    for m in members:
-        mid = m["id"]
-        # Get or create member briefing data
-        member_data = briefing_lookup.get(mid, {
-            "member_id": mid,
-            "member_name": m["name"],
-            "relation": m["relation"],
-            "due_reminders": [],
-            "health_tips": [],
-        })
-        if "member_name" not in member_data:
-            member_data["member_name"] = m["name"]
-        if "relation" not in member_data:
-            member_data["relation"] = m["relation"]
-
-        trends = _query_metric_trends(mid, days=days)
-        medications = _query_active_medications(mid)
-
-        member_sections.append(_build_member_section(member_data, trends, medications, days))
-
-    # 5. Assemble HTML
-    alert_cards_html = _build_alert_cards_html(briefing)
-    members_html = "\n".join(member_sections)
-    gen_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    period_start = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
-    period_label = f"{period_start} 至 {report_date}"
-
-    html = _HTML_TEMPLATE.safe_substitute(
-        report_date=_escape(report_date),
-        period_label=_escape(period_label),
-        days=days,
-        member_count=member_count,
-        alert_cards=alert_cards_html,
-        members_content=members_html,
-        gen_time=_escape(gen_time),
-    )
-
-    # 6. Write to file
+    c = COPY[locale]
+    end = briefing.get("date") or datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=days-1)).strftime("%Y-%m-%d")
+    if resolved_view == "personal":
+        data = all_data[0]
+        title = c["title"]
+        subtitle = f'{_member_label(data["member"], locale)} · {c["period"].format(start=start, end=end)} · {c["last_days"].format(days=days)}'
+        summary = _summary_strip(card_briefing, locale)
+        content = _personal_content(data["member"], data["member_data"], data["trends"], data["lifestyle"], data["sleep"], data["care"], data["meds"], locale)
+        privacy = c["local_profile"]
+    else:
+        title = c["family_title"]
+        subtitle = f'{c["period"].format(start=start, end=end)} · {c["last_days"].format(days=days)} · {c["members"].format(count=len(all_data))}'
+        summary = _summary_strip(card_briefing, locale, all_data)
+        cards = "".join(_family_card(d["member"], d["member_data"], d["trends"], d["lifestyle"], d["sleep"], d["care"], locale) for d in all_data)
+        content = f'<section><div class="section-title"><span>01</span><h2>{c["family_overview"]}</h2></div><div class="family-grid">{cards}</div></section>'+_family_timeline(all_data, locale)
+        privacy = c["local_family"]
+    html = _render_html(title, subtitle, privacy, summary, content, locale)
     reports_dir = os.path.join(DATA_DIR, "reports")
     os.makedirs(reports_dir, exist_ok=True)
-
-    filename = f"briefing_{report_date}"
-    if member_id:
-        filename += f"_{member_id}"
-    filename += ".html"
-    report_path = os.path.join(reports_dir, filename)
-
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(html)
-
-    # 7. Persist daily health snapshot for each member (memory)
+    locale_slug = "en" if locale == "en-US" else "zh"
+    filename = f'health_card_{resolved_view}_{locale_slug}_{end}' + (f'_{member_id}' if member_id else '') + '.html'
+    path = os.path.join(reports_dir, filename)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(html)
     try:
         import daily_snapshot
-        for m in members:
-            daily_snapshot.save_snapshot(m["id"], owner_id, briefing)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("daily_snapshot save failed: %s", e)
-
-    file_size = os.path.getsize(report_path)
-    return {
-        "status": "ok",
-        "report_path": report_path,
-        "file_size": file_size,
-        "date": report_date,
-        "member_count": member_count,
-        "days": days,
-    }
+        for member in members:
+            daily_snapshot.save_snapshot(member["id"], owner_id, briefing)
+    except Exception as exc:
+        LOG.warning("daily_snapshot save failed: %s", exc)
+    return {"status": "ok", "report_path": path, "file_size": os.path.getsize(path), "date": end,
+            "member_count": len(members), "days": days, "locale": locale, "view": resolved_view}
 
 
-# --- HTML Template ---
+def _parser(command: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--member-id")
+    parser.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
+    parser.add_argument("--days", type=int, default=7)
+    parser.add_argument("--locale", choices=sorted(COPY), default="zh-CN")
+    parser.add_argument("--view", choices=("auto", "personal", "family"), default="auto")
+    if command == "screenshot":
+        parser.add_argument("--width", type=int, default=1040)
+    return parser
 
-_HTML_TEMPLATE = Template("""\
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>健康记录卡片 - $report_date</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
-                 "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background: #F4F8F7;
-    color: #173B35;
-    line-height: 1.6;
-}
-.container { max-width: 960px; margin: 0 auto; padding: 24px; }
-/* Header */
-.header {
-    background: linear-gradient(135deg, #153F38, #1E6A5E);
-    color: white;
-    padding: 30px 32px;
-    border-radius: 20px;
-    margin-bottom: 24px;
-    box-shadow: 0 14px 34px rgba(21,63,56,0.16);
-    position: relative;
-    overflow: hidden;
-}
-.header::after { content: ""; position: absolute; width: 180px; height: 180px; border-radius: 50%; right: -45px; top: -80px; background: rgba(151,201,190,0.18); }
-.header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.brand-mark { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: #E4F1EE; color: #1E7A6E; font-size: 21px; font-weight: 800; }
-.header h1 { font-size: 25px; font-weight: 760; letter-spacing: -0.3px; }
-.header .subtitle { font-size: 14px; color: #C9E2DC; }
-.privacy-pill { display: inline-flex; align-items: center; margin-top: 14px; padding: 5px 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; font-size: 12px; color: #DCEBE8; }
-/* Summary cards */
-.summary-cards {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-}
-.summary-card {
-    flex: 1;
-    min-width: 180px;
-    padding: 16px 20px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(21,63,56,0.06);
-}
-.card-icon { font-size: 28px; }
-.card-count { font-size: 28px; font-weight: 700; }
-.card-label { font-size: 13px; color: #6B7280; }
-/* Member section */
-.member-section {
-    background: white;
-    border-radius: 20px;
-    padding: 26px;
-    margin-bottom: 20px;
-    box-shadow: 0 10px 30px rgba(21,63,56,0.07);
-    border: 1px solid #E1EBE8;
-}
-.member-section h2 {
-    font-size: 19px;
-    color: #173F38;
-    border-bottom: 2px solid #DDEEEA;
-    padding-bottom: 10px;
-    margin-bottom: 16px;
-}
-.subsection { margin-bottom: 20px; }
-.subsection h3 {
-    font-size: 15px;
-    color: #45645E;
-    margin-bottom: 12px;
-}
-/* Reminders */
-.reminder-list { list-style: none; }
-.reminder-list li {
-    padding: 8px 12px;
-    background: #F9FAFB;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    font-size: 14px;
-}
-.badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-right: 6px;
-}
-.badge-urgent { background: #FEE2E2; color: #991B1B; }
-.badge-high { background: #FEF3C7; color: #92400E; }
-.badge-normal { background: #DDEEEA; color: #17665C; }
-.badge-low { background: #E5E7EB; color: #6B7280; }
-.detail { color: #6B7280; font-size: 13px; }
-/* Tips */
-.tip-card {
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 8px;
-}
-.tip-header { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-.tip-detail { font-size: 13px; color: #4B5563; margin-bottom: 2px; }
-.tip-suggestion { font-size: 13px; color: #6B7280; font-style: italic; }
-/* Metric cards */
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 14px;
-}
-.metric-card { background: #F8FBFA; border: 1px solid #DDE8E5; border-radius: 16px; padding: 16px; min-height: 194px; }
-.metric-card-head { display: flex; justify-content: space-between; align-items: center; }
-.metric-name { font-size: 14px; font-weight: 700; color: #31564F; }
-.metric-count { font-size: 11px; padding: 3px 8px; border-radius: 999px; color: #2F6FEB; background: #E8F0FA; }
-.metric-value { margin-top: 8px; font-size: 28px; line-height: 1.2; font-weight: 760; color: #153F38; }
-.metric-value small { font-size: 12px; font-weight: 600; color: #718580; }
-.metric-delta { margin-top: 4px; color: #6A7F79; font-size: 12px; }
-.sparkline { width: 100%; height: 62px; display: block; margin: 8px 0 5px; }
-.metric-meta { display: flex; justify-content: space-between; gap: 8px; color: #80918D; font-size: 10px; }
-.empty-state { padding: 22px; text-align: center; border: 1px dashed #B9CEC8; border-radius: 14px; background: #F8FBFA; color: #6A7F79; font-size: 13px; }
-/* Medication table */
-.med-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-.med-table th {
-    background: #EDF4F2;
-    color: #31564F;
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    border-bottom: 2px solid #E5E7EB;
-}
-.med-table td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #F3F4F6;
-}
-.med-table tr:hover td { background: #F4F8F7; }
-/* Footer */
-.footer {
-    text-align: center;
-    padding: 20px;
-    color: #718580;
-    font-size: 12px;
-    border-top: 1px solid #DDE8E5;
-    margin-top: 24px;
-}
-.footer .disclaimer {
-    color: #9AA9A5;
-    margin-top: 4px;
-}
-/* Print */
-@media print {
-    body { background: white; }
-    .container { max-width: 100%; }
-    .member-section, .header { box-shadow: none; break-inside: avoid; }
-}
-/* Mobile */
-@media (max-width: 640px) {
-    .container { padding: 12px; }
-    .header { padding: 20px; }
-    .header h1 { font-size: 20px; }
-    .summary-cards { flex-direction: column; }
-    .metric-grid { grid-template-columns: 1fr; }
-    .metric-meta { flex-direction: column; }
-}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="header">
-        <div class="header-top"><div class="brand-mark">M</div><h1>健康记录卡片</h1></div>
-        <div class="subtitle">$period_label &middot; 最近 $days 天 &middot; 展示 $member_count 位成员</div>
-        <div class="privacy-pill">&#x1F512;&nbsp; 个人本地档案 · MediWise</div>
-    </div>
-
-    $alert_cards
-
-    $members_content
-
-    <div class="footer">
-        <div>报告生成时间：$gen_time</div>
-        <div>MediWise Health Suite</div>
-        <div class="disclaimer">本报告仅供参考，不构成医疗建议。如有健康问题请咨询专业医生。</div>
-    </div>
-</div>
-
-</body>
-</html>
-""")
-
-
-# --- CLI ---
 
 def main():
-    if len(sys.argv) < 2:
-        health_db.output_json({"error": "用法: briefing_report.py generate [--member-id <id>]"})
+    if len(sys.argv) < 2 or sys.argv[1] not in ("generate", "screenshot"):
+        health_db.output_json({"error": "Usage: briefing_report.py generate|screenshot [options]"})
         return
-
-    cmd = sys.argv[1]
-
-    if cmd == "generate":
-        import argparse
-        p = argparse.ArgumentParser()
-        p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
-        p.add_argument("--days", type=int, default=7)
-        args = p.parse_args(sys.argv[2:])
-        result = generate_report(args.member_id, args.owner_id, max(1, min(args.days, 365)))
-        health_db.output_json(result)
-    elif cmd == "screenshot":
-        import argparse
-        p = argparse.ArgumentParser()
-        p.add_argument("--member-id")
-        p.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"))
-        p.add_argument("--width", type=int, default=960)
-        p.add_argument("--days", type=int, default=7)
-        args = p.parse_args(sys.argv[2:])
-        # Generate HTML first
-        report = generate_report(args.member_id, args.owner_id, max(1, min(args.days, 365)))
-        if report.get("status") != "ok":
-            health_db.output_json(report)
-            return
-        # Convert to PNG
-        import html_screenshot
-        png_result = html_screenshot.screenshot(
-            report["report_path"], width=args.width
-        )
-        png_result["html_path"] = report["report_path"]
-        health_db.output_json(png_result)
-    else:
-        health_db.output_json({"error": f"未知命令: {cmd}", "commands": ["generate", "screenshot"]})
+    command = sys.argv[1]
+    args = _parser(command).parse_args(sys.argv[2:])
+    report = generate_report(args.member_id, args.owner_id, args.days, args.locale, args.view)
+    if command == "generate" or report.get("status") != "ok":
+        health_db.output_json(report)
+        return
+    import html_screenshot
+    png = html_screenshot.screenshot(report["report_path"], width=args.width)
+    png["html_path"] = report["report_path"]
+    png.update({key: report[key] for key in ("locale", "view", "member_count", "days")})
+    health_db.output_json(png)
 
 
 if __name__ == "__main__":

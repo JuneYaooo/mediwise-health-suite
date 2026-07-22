@@ -57,13 +57,21 @@ Ask MediWise to create a health record card for a recent period:
 Create my health record card for the last 7 days.
 ```
 
-The card uses data from the local record. It includes recent values, the number of readings, changes over the selected period, data sources, reminders, and active medication. Trend charts are inline SVG, so card generation does not depend on a chart service or CDN.
+The personal card brings together metric trends, recorded food intake, activity burn, steps, sleep, recent visits, lab results, imaging, and active medication. It is generated in English when the conversation or requested locale is English.
 
 <p align="center">
-  <img src="docs/images/health-card-example.png" width="720" alt="Example seven-day MediWise health record card with blood pressure, heart rate, weight, blood oxygen, and medication">
+  <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with metrics, intake and activity, sleep, recent care, lab results, imaging, and medication">
 </p>
 
-The example uses a fictional member and fictional health data. It was produced by the same card generation code used by the skill.
+Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
+
+MediWise also has a compact family card for one local user who manages several family profiles. It shows each person as `Name (relationship)`, prioritizes members with alerts or pending reminders, and combines recent visits, lab results, and imaging in a family care timeline. Ask for it explicitly:
+
+```text
+Create a family health record card for the last 7 days.
+```
+
+The example uses a fictional member and fictional health data. It was produced by the same local card generation path used by the skill. Its trend charts are inline SVG and do not require a chart service or CDN.
 
 If the local record contains only one self profile, MediWise can select it by default. Once you add another family member, include the person's name:
 
