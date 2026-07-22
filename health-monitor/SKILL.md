@@ -9,20 +9,22 @@ description: >-
   关键词：健康监测、异常告警、指标预警、趋势分析、健康报告、心率异常、血压异常、血氧低、告警管理、全家概览、健康dashboard。
 ---
 
-# MediWise · 健康监测 Skill
+# MediWise · 健康记录提醒 Skill
 
-持续监测健康指标，多级阈值告警 + 趋势分析，发现异常及时通知。支持全家健康 dashboard 一屏总览。
+按已配置阈值检查健康指标并生成多级记录提醒，支持全家 dashboard 一屏总览。所有级别都只表示规则优先级，不是病情严重程度或临床判断；本 Skill 不提供诊断、治疗或用药指导。
 
 ## 告警级别
 
 | 级别 | 含义 | 处理方式 |
 |------|------|----------|
 | info | 信息记录 | 仅记录，不主动推送 |
-| warning | 预警 | 创建 reminder 推送 |
-| urgent | 紧急 | 推送 + 标记高优先级 |
-| emergency | 危急 | 推送 + 建议立即就医或拨打急救电话 |
+| warning | 普通提醒 | 创建 reminder 推送 |
+| urgent | 高优先级 | 推送 + 标记高优先级 |
+| emergency | 最高优先级 | 推送 + 标记最高优先级 |
 
-## 默认阈值
+## 默认规则阈值
+
+这些数值是可修改的内置提醒规则，不代表诊断标准或医疗建议。用户可根据自己的记录需求调整或关闭；如需医学阈值，应由专业医疗人员确定。
 
 | 指标 | warning | urgent | emergency |
 |------|---------|--------|-----------|
@@ -59,12 +61,12 @@ python3 {baseDir}/scripts/dashboard.py show --owner-id <owner_id>
   "family_risk": "warning",
   "family_risk_label": "需关注",
   "total_open_alerts": 3,
-  "summary": "【紧急】张三 有紧急告警；共 3 条未解决告警",
+  "summary": "【高优先级】张三 有高优先级提醒；共 3 条未处理提醒",
   "members": [
     {
       "name": "张三",
       "risk_level": "urgent",
-      "risk_label": "紧急",
+      "risk_label": "高优先级",
       "open_alerts": 2,
       "alerts": [{"level": "urgent", "title": "张三 heart_rate 高于阈值", ...}],
       "latest_metrics": {

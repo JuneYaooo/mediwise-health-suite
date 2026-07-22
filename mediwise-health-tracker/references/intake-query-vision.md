@@ -57,31 +57,21 @@ python3 {baseDir}/scripts/medical_record.py add-medication --member-id <id> --na
 
 ```text
 错误：{"type":"blood_pressure","value":"{\"systolic\":140,\"diastolic\":90}"}
-正确：最近一次血压是 140/90 mmHg，收缩压偏高；最近一周整体略高但相对稳定，建议继续监测。
+正确：最近一次血压是 140/90 mmHg，触发了已配置的收缩压范围提醒；最近一周的已记录数值相对稳定。本项目只展示记录和提醒，不作医学判断。
 ```
 
 ## 图片 / PDF / 文本智能录入
 
 ### 强制规则
 
-**不要在没有受控识别路径时直接解读医疗图片。** 图片和 PDF 必须走以下至少一种已经实际测试通过的路径：
+按以下顺序处理图片和 PDF：
 
-- 能读取图片的多模态模型，并已写入 MediWise 视觉配置、通过 `setup.py test-vision`、`setup.py test-pdf` 和 `setup.py test-intake --input both`。
-- 普通文本模型搭配 PaddleOCR；PaddleOCR 负责提取图片或扫描 PDF 的文字，并已通过 `setup.py test-paddleocr`、`setup.py test-pdf` 和 `setup.py test-intake --input both`。
+1. **当前 Agent 直接读取**：如果本次对话已收到附件且当前 Agent 能读取，直接提取内容，无需 MediWise 视觉配置，也无需运行 `test-vision`。先展示提取结果，用户确认后再写入档案。
+2. **本地 OCR fallback**：当前 Agent 不可读或实际识别失败时，才在后台运行 `python3 {baseDir}/scripts/setup.py check`。若 `pdf_tools.paddleocr: true`，可使用 PaddleOCR；配置 Agent 应通过 `test-paddleocr`、`test-pdf` 和 `test-intake --input both` 验证该 fallback。
+3. **用户已配置的视觉 fallback**：若 `vision_configured: true`，可使用用户已经选择的服务；配置 Agent应通过 `test-vision`、`test-pdf` 和 `test-intake --input both` 验证该 fallback。
+4. **均不可用**：明确提醒用户交给具备本机权限的配置 Agent。不要让普通用户运行命令，也不要在聊天中索要 API Key。
 
-当前对话模型声称“支持视觉”不等于 MediWise 的附件处理脚本已经可用。不要绕过配置和测试，也不要把识别失败的附件悄悄切换到未经用户授权的云端服务。
-
-### 首次使用先检查配置
-
-```bash
-python3 {baseDir}/scripts/setup.py check
-```
-
-按检查结果选择路径：
-
-1. `vision_configured: true`：运行 `test-vision`、`test-pdf` 和 `test-intake --input both`；只有脱敏测试图、扫描 PDF 与结构化结果都通过后才声称两类附件可解析。
-2. `pdf_tools.paddleocr: true`：运行 `test-paddleocr`、`test-pdf` 和 `test-intake --input both`；三者通过后可以使用 OCR + 文本模型处理图片和扫描 PDF。
-3. 两条路径都不可用：交给具备本机权限的配置 Agent。不要让普通用户运行命令，也不要在聊天中索要 API Key。
+不得把识别失败的附件悄悄切换到未经用户授权的新云端服务。无论使用哪条路径，提取内容都只能作为待确认记录；不能根据报告给出诊断、治疗、用药或其他医疗指导。
 
 配置多模态模型时，可参考 SiliconFlow 的 `Qwen/Qwen3.6-35B-A3B`、`zai-org/GLM-4.5V`，或配置 Agent 当时能够验证的其他视觉模型。模型名称不能证明图片输入能力，必须查询当前服务信息并用实际图片测试。凭据只能通过客户端安全本地输入或系统 keyring 处理。
 
@@ -93,7 +83,7 @@ python3 {baseDir}/scripts/setup.py test-pdf
 python3 {baseDir}/scripts/setup.py test-intake --input both
 ```
 
-### 已配置后处理附件
+### fallback 脚本处理附件
 
 ```bash
 python3 {baseDir}/scripts/smart_intake.py extract --image /path/to/image.jpg --member-id <id>

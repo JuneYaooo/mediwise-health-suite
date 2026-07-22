@@ -7,7 +7,9 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 
 ## 概述
 
-提供体重目标设定、进度追踪、趋势分析、热量收支计算、达标预测、BMI/BMR/TDEE 计算、运动记录和身体围度记录功能。体重数据复用 `health_metrics` 表（weight 类型），饮食热量数据来自 `diet_records` 表，运动消耗数据来自 `exercise_records` 表，身体围度数据复用 `health_metrics` 表，形成完整的"饮食 → 运动 → 热量 → 体重 → 身体成分"管理闭环。
+提供体重目标设定、进度追踪、趋势分析、热量估算、BMI/BMR/TDEE 估算、运动记录和身体围度记录功能。体重数据复用 `health_metrics` 表（weight 类型），饮食热量数据来自 `diet_records` 表，运动消耗数据来自 `exercise_records` 表。
+
+本 Skill 只记录和展示数据、用户目标差异与模型估算，不提供减重、增重、饮食、运动或其他健康指导。运动消耗只代表已记录活动；缺少完整基础代谢与日常活动数据时，不得把结果表述为真实热量缺口或预测治疗效果。
 
 ## 数据模型
 
@@ -48,7 +50,7 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 
 | 动作 | 子命令 | 必要参数 | 可选参数 | 说明 |
 |------|--------|----------|----------|------|
-| set-goal | set | --member-id, --goal-type, --start-weight, --target-weight | --start-date, --target-date, --daily-calorie-target, --activity-level, --note | 设定减重/增重/维持目标，未指定热量目标时自动根据 BMR/TDEE 推算 |
+| set-goal | set | --member-id, --goal-type, --start-weight, --target-weight | --start-date, --target-date, --daily-calorie-target, --note | 记录用户自行确定的减重/增重/维持目标；不会自动生成热量目标 |
 | view-goal | view | --member-id | | 查看当前活跃目标 |
 | update-goal | update | --goal-id | --target-weight, --target-date, --daily-calorie-target, --note | 修改目标参数 |
 | complete-goal | complete | --goal-id | | 标记目标完成 |
@@ -60,8 +62,8 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 |------|--------|----------|----------|------|
 | weight-progress | progress | --member-id | | 当前进度（已减/增多少，完成百分比） |
 | weight-trend | trend | --member-id | --days (默认 30) | 体重趋势（N 天变化，平均变化速率） |
-| calorie-balance | calorie-balance | --member-id | --days (默认 7) | 热量收支（含饮食摄入 + 运动消耗 + TDEE 估算） |
-| weekly-report | weekly-report | --member-id | --end-date | 周报（体重变化 + 饮食热量 + 运动统计 + 建议） |
+| calorie-balance | calorie-balance | --member-id | --days (默认 7) | 分别汇总已记录饮食摄入和运动消耗，不计算热量缺口 |
+| weekly-report | weekly-report | --member-id | --end-date | 周报（体重变化 + 饮食热量 + 运动记录 + 目标差异） |
 | weight-projection | projection | --member-id | | 按当前速度预测达标日期 |
 
 ### exercise.py — 运动记录
@@ -79,7 +81,7 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 |------|--------|----------|----------|------|
 | calculate-bmi | bmi | --member-id | | 计算 BMI（中国标准分级） |
 | calculate-bmr-tdee | bmr-tdee | --member-id | --activity-level | 计算 BMR 和 TDEE（Mifflin-St Jeor 公式） |
-| suggest-calories | suggest-calories | --member-id | --activity-level, --goal-type | 根据 TDEE + 目标类型推算每日热量目标 |
+| suggest-calories | suggest-calories | --member-id | | 兼容入口；明确说明 MediWise 不生成每日热量建议 |
 | add-measurement | add-measurement | --member-id, --type, --value | --measured-at, --note | 记录身体围度 |
 | list-measurements | list-measurements | --member-id | --type, --limit | 查看围度记录历史 |
 | body-summary | body-summary | --member-id | | 综合身体报告（BMI + 围度变化 + 体脂率趋势） |
@@ -105,11 +107,9 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 | active | 1.725 | 高度活动（每周6-7次） |
 | very_active | 1.9 | 极高活动（高强度体力劳动） |
 
-### 热量推算规则
-- 减重: TDEE - 500 kcal（约每周减 0.45kg）
-- 增重: TDEE + 300 kcal
-- 维持: TDEE
-- 最低限制: 男 1500 kcal / 女 1200 kcal
+### 热量目标边界
+
+MediWise 不根据 TDEE 自动生成减重、增重或维持所需的每日热量目标。`daily_calorie_target` 只记录用户本人或专业人员已经确定的目标。
 
 ## 身体围度类型
 

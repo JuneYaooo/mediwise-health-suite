@@ -205,17 +205,18 @@ def cmd_daily(args):
 
     comparison = _compare(intake, goal)
 
-    # 生成简短建议
+    # Generate factual differences from the user's saved goal. These are not
+    # nutrition or treatment recommendations.
     issues = []
     for field, data in comparison.items():
         if data["status"] == "low":
             label = {"calories": "热量", "protein": "蛋白质",
                      "fat": "脂肪", "carbs": "碳水", "fiber": "膳食纤维"}.get(field, field)
-            issues.append(f"{label}摄入不足（{data['pct']}%）")
+            issues.append(f"{label}记录值为用户设置目标的 {data['pct']}%（低于目标范围）")
         elif data["status"] == "high":
             label = {"calories": "热量", "protein": "蛋白质",
                      "fat": "脂肪", "carbs": "碳水", "fiber": "膳食纤维"}.get(field, field)
-            issues.append(f"{label}摄入偏高（{data['pct']}%）")
+            issues.append(f"{label}记录值为用户设置目标的 {data['pct']}%（高于目标范围）")
 
     output_json({
         "status": "ok",

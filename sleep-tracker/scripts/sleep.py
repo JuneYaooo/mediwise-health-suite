@@ -64,7 +64,7 @@ def _quality_score(s: dict) -> dict:
     if total < lo:
         deficit = lo - total
         score -= min(30, deficit // 10 * 5)
-        issues.append(f"睡眠不足（{total // 60}h{total % 60}m，建议 7-9 小时）")
+        issues.append(f"记录时长 {total // 60}h{total % 60}m，低于内置参考下限 7 小时")
     elif total > hi + 60:  # >10h
         score -= 10
         issues.append(f"睡眠过长（{total // 60}h{total % 60}m）")
@@ -74,29 +74,29 @@ def _quality_score(s: dict) -> dict:
     lo_d, hi_d = _IDEAL_DEEP_RATIO
     if deep_ratio < lo_d:
         score -= 20
-        issues.append(f"深睡比例偏低（{deep_ratio:.0%}，建议 13-23%）")
+        issues.append(f"深睡比例 {deep_ratio:.0%}，低于内置参考下限 13%")
 
     # REM ratio
     rem_ratio = s["rem_min"] / total if s["rem_min"] > 0 else 0
     if rem_ratio > 0 and rem_ratio < _IDEAL_REM_RATIO[0]:
         score -= 10
-        issues.append(f"REM 比例偏低（{rem_ratio:.0%}，建议 20-25%）")
+        issues.append(f"REM 比例 {rem_ratio:.0%}，低于内置参考下限 20%")
 
     # Awake ratio
     awake_ratio = s["awake_min"] / total
     if awake_ratio > _MAX_AWAKE_RATIO:
         score -= 15
-        issues.append(f"夜间清醒时间过多（{s['awake_min']}min，建议 <10%）")
+        issues.append(f"夜间清醒占比 {awake_ratio:.0%}，高于内置参考上限 10%")
 
     score = max(0, score)
     if score >= 85:
-        label = "优质"
+        label = "高匹配"
     elif score >= 70:
-        label = "良好"
+        label = "较高匹配"
     elif score >= 55:
-        label = "一般"
+        label = "部分匹配"
     else:
-        label = "较差"
+        label = "低匹配"
 
     return {"score": score, "label": label, "issues": issues}
 

@@ -173,22 +173,23 @@ def nutrition_balance(args):
             "carbs_pct": round(carbs / total_macro_g * 100, 1),
         }
 
-    # Reference: Chinese Dietary Guidelines recommendation
+    # Built-in comparison ranges. These are displayed as reference differences,
+    # not interpreted as nutrition therapy or diet advice.
     # Protein 10-15%, Fat 20-30%, Carbs 50-65%
     assessment = []
     if ratio:
         if ratio["protein_pct"] < 10:
-            assessment.append("蛋白质摄入偏低，建议增加鱼肉蛋奶豆类")
+            assessment.append(f"蛋白质占比 {ratio['protein_pct']}%，低于内置参考下限 10%")
         elif ratio["protein_pct"] > 20:
-            assessment.append("蛋白质比例偏高")
+            assessment.append(f"蛋白质占比 {ratio['protein_pct']}%，高于内置参考上限 20%")
         if ratio["fat_pct"] > 35:
-            assessment.append("脂肪摄入偏高，建议减少油炸食物")
+            assessment.append(f"脂肪占比 {ratio['fat_pct']}%，高于内置参考上限 35%")
         elif ratio["fat_pct"] < 15:
-            assessment.append("脂肪摄入偏低")
+            assessment.append(f"脂肪占比 {ratio['fat_pct']}%，低于内置参考下限 15%")
         if ratio["carbs_pct"] > 70:
-            assessment.append("碳水摄入偏高，建议增加蔬菜蛋白质比例")
+            assessment.append(f"碳水占比 {ratio['carbs_pct']}%，高于内置参考上限 70%")
         elif ratio["carbs_pct"] < 40:
-            assessment.append("碳水摄入偏低")
+            assessment.append(f"碳水占比 {ratio['carbs_pct']}%，低于内置参考下限 40%")
 
     output_json({
         "status": "ok",

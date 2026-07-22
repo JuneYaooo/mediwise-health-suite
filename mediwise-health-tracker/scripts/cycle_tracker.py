@@ -1,6 +1,7 @@
-"""Cycle Tracker — 周期追踪（经期/周期性疾病）。
+"""Cycle Tracker — 周期记录与日期提醒（经期/周期性事件）。
 
-支持经期、偏头痛、过敏等周期性事件的记录、历史查看、预测和状态查询。
+支持经期、偏头痛、过敏等周期性事件的记录、历史查看、日期估算和状态查询。
+日期估算只用于记录提醒，不预测疾病发作，也不提供健康或用药建议。
 
 Usage:
   python3 cycle_tracker.py record --member-id <id> --cycle-type menstrual --event-type period_start --date 2025-03-01
@@ -49,51 +50,10 @@ MENSTRUAL_PHASES = {
     "luteal": (17, 28),       # Day 17-28: luteal phase
 }
 
-CARE_TIPS = {
-    "menstrual": {
-        "menstrual": [
-            "注意保暖，避免受凉",
-            "适当休息，避免剧烈运动",
-            "可以喝红糖姜茶缓解不适",
-            "如痛经严重可咨询医生用药",
-        ],
-        "follicular": [
-            "精力较好的时期，适合增加运动量",
-            "注意补充铁质食物（红肉、菠菜等）",
-        ],
-        "ovulation": [
-            "排卵期，如有生育计划可关注",
-            "部分人可能出现排卵痛，属于正常现象",
-        ],
-        "luteal": [
-            "可能出现经前综合征（PMS）症状",
-            "注意调节情绪，保持充足睡眠",
-            "减少咖啡因和盐分摄入",
-            "适当运动有助于缓解不适",
-        ],
-        "premenstrual": [
-            "经期即将到来，请提前准备",
-            "注意保暖和休息",
-            "如有痛经史，可提前咨询医生准备用药",
-        ],
-    },
-    "migraine": {
-        "warning": [
-            "根据历史规律，偏头痛可能即将发作",
-            "注意避免已知诱因（如强光、噪音、特定食物）",
-            "保持规律作息，避免熬夜",
-            "如有预防性用药，请按时服用",
-        ],
-    },
-    "allergy": {
-        "warning": [
-            "根据历史规律，过敏症状可能即将出现",
-            "提前准备抗过敏药物",
-            "注意减少过敏原接触",
-            "外出戴口罩，回家后清洗面部和鼻腔",
-        ],
-    },
-}
+# Retained as an empty compatibility mapping. Earlier releases returned
+# lifestyle and medication suggestions here; the project now only records,
+# displays, and reminds.
+CARE_TIPS = {}
 
 
 # ---------------------------------------------------------------------------

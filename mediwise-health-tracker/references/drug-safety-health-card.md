@@ -5,8 +5,8 @@
 - 药物安全查询规则
 - DDInter / openFDA / 网页搜索
 - 结果呈现
-- 健康建议与健康记录卡片
-- 数据导出与在线计算器
+- 状态提醒与健康记录卡片
+- 数据导出
 
 ## 药物安全查询规则
 
@@ -52,20 +52,20 @@ python3 {baseDir}/scripts/openfda_query.py search --name "metformin"
 
 ## 结果呈现
 
-- **严重**：明确警告，不建议自行合用
-- **中等**：提示注意，建议咨询药师或医生
-- **轻微**：说明风险较低，但仍需遵医嘱
+- 按权威来源原有等级展示严重、中等或轻微等风险标签，不自行升级或降低等级。
+- 明确区分“来源中记录的风险”与 MediWise 的提醒，不能把查询结果表述成处方或临床判断。
+- 不回答“可以吃/不可以吃”，不指示开始、停用、更换、合用或调整药物；相关决定由医生或药师判断。
 
 每次药物安全类回复都要：
 
-1. 给出直接结论
+1. 展示查询到的风险标签和来源原文要点
 2. 说明依据并标注编号引用
 3. 列出真实来源链接
-4. 追加免责声明
+4. 明确说明本项目不提供用药建议，具体用药决定应咨询医生或药师
 
-查不到时，直接说“未查到标准交互数据，建议咨询药师确认”。
+查不到时，直接说“未查到标准交互数据；MediWise 无法据此判断是否适合合用，请咨询医生或药师”。
 
-## 健康建议与健康记录卡片
+## 状态提醒与健康记录卡片
 
 ```bash
 python3 {baseDir}/scripts/health_advisor.py tips --member-id <id>
@@ -121,7 +121,7 @@ python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 python3 {baseDir}/scripts/html_screenshot.py <input.html> [output.png] [--width 960]
 ```
 
-## 数据导出与在线计算器
+## 数据导出
 
 ### 导出
 
@@ -130,10 +130,4 @@ python3 {baseDir}/scripts/export.py fhir --member-id <id>
 python3 {baseDir}/scripts/export.py statistics
 ```
 
-### 在线计算器
-
-需要 BMI、eGFR、CHA₂DS₂-VASc、CURB-65、MELD 等计算时，优先给权威在线工具链接，而不是在本地手算：
-
-- 医脉通：`https://cals.medlive.cn/`
-- MSD 临床计算器：`https://www.msdmanuals.cn/professional/pages-with-widgets/clinical-calculators`
-- MDCalc：`https://www.mdcalc.com/`
+MediWise 不代替专业人员计算或解读 eGFR、CHA₂DS₂-VASc、CURB-65、MELD 等临床评分。

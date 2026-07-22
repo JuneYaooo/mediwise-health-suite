@@ -220,97 +220,16 @@ def bmr_tdee(args):
 
 
 def suggest_calories(args):
-    """根据 TDEE + 目标类型自动推算每日热量目标。"""
-    ensure_db()
-    conn = get_medical_connection()
-    try:
-        if not _verify_member_access(conn, args):
-            return
-        m = _get_member_info(conn, args.member_id)
-        if not m:
-            output_json({"status": "error", "message": f"未找到成员: {args.member_id}"})
-            return
-
-        weight_data = _get_latest_metric(conn, args.member_id, "weight")
-        height_data = _get_latest_metric(conn, args.member_id, "height")
-
-        if not weight_data:
-            output_json({"status": "error", "message": f"{m['name']}尚无体重记录"})
-            return
-        if not height_data:
-            output_json({"status": "error", "message": f"{m['name']}尚无身高记录"})
-            return
-
-        gender = m["gender"]
-        if not gender or gender not in ("male", "female"):
-            output_json({"status": "error", "message": f"{m['name']}未设置性别或性别无效"})
-            return
-
-        birth_date = m["birth_date"]
-        if not birth_date:
-            output_json({"status": "error", "message": f"{m['name']}未设置出生日期"})
-            return
-
-        age = calculate_age(birth_date)
-        weight_kg = weight_data["value"]
-        height_cm = height_data["value"]
-
-        bmr_value = calculate_bmr(weight_kg, height_cm, age, gender)
-
-        activity_level = args.activity_level or "sedentary"
-        if activity_level not in ACTIVITY_LEVELS:
-            output_json({
-                "status": "error",
-                "message": f"不支持的活动水平: {activity_level}，支持: {', '.join(ACTIVITY_LEVELS.keys())}"
-            })
-            return
-
-        tdee_value = round(calculate_tdee(bmr_value, activity_level), 1)
-
-        # Check active goal
-        lifestyle_conn = get_lifestyle_connection()
-        try:
-            goal = lifestyle_conn.execute(
-                "SELECT * FROM weight_goals WHERE member_id=? AND status='active' AND is_deleted=0",
-                (args.member_id,)
-            ).fetchone()
-        finally:
-            lifestyle_conn.close()
-        goal_type = args.goal_type
-        if not goal_type and goal:
-            goal_type = goal["goal_type"]
-        if not goal_type:
-            goal_type = "maintain"
-
-        if goal_type == "lose":
-            suggested = tdee_value - 500
-        elif goal_type == "gain":
-            suggested = tdee_value + 300
-        else:
-            suggested = tdee_value
-
-        # Apply minimum clamp
-        min_calories = 1500 if gender == "male" else 1200
-        suggested = max(suggested, min_calories)
-        suggested = round(suggested)
-
-        output_json({
-            "status": "ok",
-            "member_name": m["name"],
-            "bmr": round(bmr_value, 1),
-            "tdee": tdee_value,
-            "activity_level": activity_level,
-            "goal_type": goal_type,
-            "suggested_daily_calories": suggested,
-            "min_calories": min_calories,
-            "explanation": {
-                "lose": f"TDEE({tdee_value}) - 500 = {tdee_value - 500}，约每周减 0.45kg",
-                "gain": f"TDEE({tdee_value}) + 300 = {tdee_value + 300}",
-                "maintain": f"TDEE({tdee_value})",
-            }.get(goal_type, ""),
-        })
-    finally:
-        conn.close()
+    """Compatibility endpoint that declines to prescribe a calorie target."""
+    output_json({
+        "status": "unsupported",
+        "member_id": args.member_id,
+        "suggested_daily_calories": None,
+        "message": (
+            "MediWise 不生成减重、增重或维持所需的每日热量建议。"
+            "如需记录由用户或专业人员确定的目标，请在设置体重目标时明确填写。"
+        ),
+    })
 
 
 def add_measurement(args):

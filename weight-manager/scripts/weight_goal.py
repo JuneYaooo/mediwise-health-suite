@@ -100,7 +100,6 @@ def set_goal(args):
             return
 
     daily_calorie_target = None
-    auto_calorie_target = None
     if args.daily_calorie_target is not None:
         try:
             daily_calorie_target = int(args.daily_calorie_target)
@@ -110,50 +109,6 @@ def set_goal(args):
         except (ValueError, TypeError):
             output_json({"status": "error", "message": "每日热量目标必须为整数"})
             return
-    else:
-        # Auto-calculate from BMR/TDEE if member has enough data
-        medical_conn = get_medical_connection()
-        try:
-            member = medical_conn.execute(
-                "SELECT gender, birth_date FROM members WHERE id=? AND is_deleted=0",
-                (args.member_id,)
-            ).fetchone()
-            if member and member["gender"] in ("male", "female") and member["birth_date"]:
-                weight_data = medical_conn.execute(
-                    """SELECT value FROM health_metrics WHERE member_id=? AND metric_type='weight' AND is_deleted=0
-                       ORDER BY measured_at DESC LIMIT 1""",
-                    (args.member_id,)
-                ).fetchone()
-                height_data = medical_conn.execute(
-                    """SELECT value FROM health_metrics WHERE member_id=? AND metric_type='height' AND is_deleted=0
-                       ORDER BY measured_at DESC LIMIT 1""",
-                    (args.member_id,)
-                ).fetchone()
-                if weight_data and height_data:
-                    try:
-                        w = float(weight_data["value"])
-                        h = float(height_data["value"])
-                        age = calculate_age(member["birth_date"])
-                        bmr = calculate_bmr(w, h, age, member["gender"])
-
-                        activity_level = getattr(args, 'activity_level', None) or "sedentary"
-                        tdee = calculate_tdee(bmr, activity_level)
-
-                        if args.goal_type == "lose":
-                            suggested = tdee - 500
-                        elif args.goal_type == "gain":
-                            suggested = tdee + 300
-                        else:
-                            suggested = tdee
-
-                        min_cal = 1500 if member["gender"] == "male" else 1200
-                        suggested = max(suggested, min_cal)
-                        auto_calorie_target = round(suggested)
-                        daily_calorie_target = auto_calorie_target
-                    except (ValueError, TypeError):
-                        pass
-        finally:
-            medical_conn.close()
 
     with transaction(domain="lifestyle") as conn:
         goal_id = generate_id()
@@ -177,9 +132,6 @@ def set_goal(args):
         "message": f"已为{m['name']}设定{type_name}目标: {start_weight}kg → {target_weight}kg（{diff:.1f}kg）",
         "goal": goal
     }
-    if auto_calorie_target is not None:
-        result["auto_calorie_target"] = auto_calorie_target
-        result["message"] += f"，已自动设定每日热量目标 {auto_calorie_target} kcal"
     output_json(result)
 
 

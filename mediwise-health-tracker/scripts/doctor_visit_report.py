@@ -406,16 +406,16 @@ def _doctor_notes(context: dict) -> list[str]:
     if highlights:
         notes.append("本次主要不适：" + "；".join(highlights[:3]))
     if context.get("allergies"):
-        notes.append("请主动告知过敏史：" + context["allergies"])
+        notes.append("档案中的过敏史：" + context["allergies"])
     if context.get("active_medications"):
         med_names = [m.get("name") for m in context["active_medications"] if m.get("name")]
         if med_names:
-            notes.append("请主动告知当前在用药：" + "、".join(med_names[:5]))
+            notes.append("档案中的当前在用药：" + "、".join(med_names[:5]))
     alert_titles = [t.get("title") for t in context.get("tips", []) if t.get("severity") in {"alert", "warning"} and t.get("title")]
     if alert_titles:
         notes.append("近期需要重点说明：" + "；".join(alert_titles[:3]))
     if context.get("related_history"):
-        notes.append("相关既往史建议一并告诉医生")
+        notes.append("可供就诊沟通的相关既往史已列入本摘要")
     return notes[:5]
 
 
@@ -582,7 +582,7 @@ def render_visit_summary_html(data: dict) -> str:
     recent_imaging_html = _render_recent_imaging(data.get("recent_imaging") or [])
     meds_html = _render_medications(data.get("active_medications") or [])
     interactions_html = _render_interactions(data.get("medication_interactions") or [], data.get("interaction_uncovered_meds") or [])
-    doctor_notes_html = _render_bullets(data.get("doctor_notes") or [], "建议就诊时直接展示本图，并主动补充症状起始时间和加重缓解因素")
+    doctor_notes_html = _render_bullets(data.get("doctor_notes") or [], "本图只整理已有记录；未记录的信息可由用户自行补充")
     alert_items = [f"{tip.get('title')}：{tip.get('detail') or tip.get('suggestion') or ''}" for tip in data.get("tips") or []]
     alerts_html = _render_bullets(alert_items, "最近未发现高优先级异常提醒")
     allergies = data.get("allergies") or "未记录"
@@ -875,7 +875,7 @@ li { margin-bottom: 8px; font-size: 14px; }
         <div class="card">
             <h2>最近就诊与病情变化</h2>
             <ul>$recent_visits</ul>
-            <h3>就诊时建议主动告诉医生</h3>
+            <h3>就诊沟通信息清单</h3>
             <ul>$doctor_notes</ul>
         </div>
     </div>

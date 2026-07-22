@@ -9,6 +9,8 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 提供每餐饮食记录、食物条目管理、每日/每周营养摘要、热量趋势分析等功能。与 `mediwise-health-tracker` 共享数据库，可与 `weight-manager` 联动形成"饮食 → 热量 → 体重"完整闭环。
 
+本 Skill 只记录和展示饮食数据、数据来源、用户目标差异与记录完整度，不提供营养治疗或饮食指导。内置参考区间只用于客观对比，不据此推荐用户增加、减少或替换食物。
+
 ## 数据模型
 
 ### diet_records（一餐记录）

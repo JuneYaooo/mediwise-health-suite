@@ -16,7 +16,7 @@ description: Family health and medical record management. Tracks members, visits
 - 记录日常健康指标（血压/血糖/心率/体温等）
 - 查询病程历史或用药记录、生成健康时间线或摘要、查看全家健康概况
 - 发送体检报告图片或化验单需要识别录入
-- 设置用药提醒、健康指标测量提醒、复查提醒，或获取主动健康建议、健康记录卡片、就医前摘要图
+- 设置用药提醒、健康指标测量提醒、复查提醒，或获取状态汇总、健康记录卡片、就医前资料摘要图
 - 规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）
 - 随口提到健康问题（如”最近膝盖有点疼”）需要记录并定期跟进
 
@@ -144,26 +144,22 @@ python3 {baseDir}/scripts/health_memory.py log --member-id <id> --content “最
 python3 {baseDir}/scripts/health_memory.py list --member-id <id>
 
 # 标记已解决
-python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-note “医生建议减少咖啡因摄入，已执行”
+python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-note “已按医生原有交代完成处理”
 ```
 
 待跟进的健康备注会自动出现在下一张健康记录卡片（`health_advisor.py briefing`）中，确保不遗漏。
 
 ## 初始配置引导
 
-当用户首次使用、或表示"图片识别不工作""无法识别报告"时，先在后台运行配置检查：
+处理图片或 PDF 时，先判断当前 Agent 是否已经能读取本次附件：
 
-```bash
-python3 {baseDir}/scripts/setup.py check
-```
+- 能读取：直接提取内容，向用户展示结构化结果，确认后再写入档案。不运行 `setup.py check`，也不要求单独配置视觉模型。
+- 不能读取或实际识别失败：再在后台运行 `python3 {baseDir}/scripts/setup.py check`，检查本地 PaddleOCR 或用户已经配置的视觉 fallback。
+- 两种 fallback 都不可用：明确说明需要交给具备本机权限的配置 Agent，不要求普通用户运行命令。
 
-先检查 `pdf_tools.paddleocr`。PaddleOCR 是图片和扫描 PDF 的首选本地文字识别能力，不需要把原图上传到云端；由具备本机权限的配置 Agent 安装、设置并运行 `test-paddleocr` 和 `test-pdf`，不得要求普通用户运行命令。
+### 可选 fallback 配置流程
 
-若用户需要复杂版面、图表理解或自动结构化，再检查 `vision_configured`。**不要在聊天中索要 API Key**，也不要把安装或配置命令转交给普通用户。
-
-### 配置流程
-
-**第一步：询问地区/偏好**
+只在直接读取不可用或用户主动要求独立识别路径时进入本流程。优先说明本地 OCR 与云端视觉服务的隐私差异，并询问地区/偏好：
 
 > 本地 PaddleOCR 可以先处理图片和扫描 PDF 的文字。如果你还需要理解复杂表格或图表，我可以继续配置视觉模型。
 >
@@ -174,11 +170,9 @@ python3 {baseDir}/scripts/setup.py check
 - 海外 → **Google Gemini**（免费，在 https://aistudio.google.com/apikey 获取）
 - 离线 → **本地 Ollama**（需提前安装 Ollama 并下载模型）
 
-**第二步：由配置 Agent 完成设置**
+由配置 Agent 完成设置。使用客户端提供的安全本地凭据输入或系统 keyring。当前客户端没有安全输入能力时停止配置；不得要求用户在聊天中粘贴 Key，也不得让普通用户复制配置命令。
 
-使用客户端提供的安全本地凭据输入或系统 keyring。当前客户端没有安全输入能力时停止配置；不得要求用户在聊天中粘贴 Key，也不得让普通用户复制配置命令。
-
-**第三步：配置 Agent 验证能力**
+配置完成后，由配置 Agent 验证 fallback：
 
 ```bash
 python3 {baseDir}/scripts/setup.py test-vision
@@ -186,28 +180,31 @@ python3 {baseDir}/scripts/setup.py test-pdf
 python3 {baseDir}/scripts/setup.py test-intake --input both
 ```
 
-- 图片、扫描 PDF 与结构化解析测试都通过 → "配置好了！现在可以直接把报告图片或 PDF 发给我来识别。"
-- 测试失败 → 根据错误信息提示用户检查 API Key 是否正确，或网络是否可用。
+- 图片、扫描 PDF 与结构化解析测试都通过 → 报告该 fallback 已可用。
+- 测试失败 → 报告具体失败环节；基础文字记录功能仍然可用。
 
 ### 原则
 
 - **不在聊天中收集凭据**：API Key 属于敏感信息，只能通过客户端安全本地输入或系统 keyring，不得经过对话传递。
+- **不重复配置**：当前 Agent 已能读取附件时，不再配置 MediWise 视觉模型或 OCR。
+- **不静默切换云服务**：直接读取或本地 OCR 失败时，不得自动把附件发送给新的云端视觉服务。
 - **后台静默执行**：`setup.py test-vision`、`setup.py test-paddleocr`、`setup.py test-pdf` 和 `setup.py test-intake` 等验证命令在后台完成，不要把 JSON 输出贴给用户。
 - **配置失败友好提示**：失败时给出具体原因和可操作的修复建议，不要直接贴报错。
 
 ## 不可跳过的规则
 
 1. **不要直接展示 JSON**：查询结果必须转成自然中文。
-2. **医疗图片走受控识别链路**：优先本地 PaddleOCR；复杂版面再使用用户明确启用的视觉模型。PaddleOCR 返回的文字仍需展示给用户确认后才能写库。
-   - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；调用前应确认用户已选择并信任该提供商。敏感材料优先使用本地能力。
-3. **药物安全问题必须先搜**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答。
-4. **近期健康记录默认发图片卡片**：优先调用 `generate-report`，传入用户要求的 `days`（默认 7）、语言和个人/家庭视图，不是把 JSON 或 HTML 发给用户。
-5. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
-6. **只用于个人本地档案**：不要引导群聊或多人共享部署；安装配置异常时交给具备本机权限的 Agent 修复，不让普通用户处理身份参数。
-7. **就医前摘要默认先短文版**：先用 `doctor_visit_report.py text` 生成；用户需要时，再导出图片或 PDF。
-8. **成员按姓名和身份解析**：只有唯一“本人”档案时允许默认本人；出现多位家庭成员后，写入必须明确姓名。每次写入前复述“姓名（身份）”，同名时必须进一步消歧。
-9. **记录饮食前必须先查食物数据库**：通过 diet-tracker 的 `food_lookup.py search` 查每种食物的营养数据，用查询结果填写 `--items`。禁止凭 AI 自身知识估算营养值后直接写入。
-10. **对话中的健康提及必须实时记录（强制）**：用户在对话中随口提到任何健康相关内容（症状、不适、用药感受、睡眠、情绪等），**必须在当次对话结束前**调用 `health_memory.py log` 将其写入健康备注。这是夜间做梦机制的原始素材来源——`dream.py gather` 会专门读取当日记录的对话提及，未被记录的提及将永久丢失。
+2. **附件直接读取优先，写入必须确认**：当前 Agent 已收到并能读取图片或 PDF 时可直接提取；不可读时才走本地 OCR 或用户已配置的视觉 fallback。任何路径的提取结果都必须先展示给用户确认，再写入档案。
+   - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；不得未经用户明确同意启用新的云端服务。敏感材料优先使用本地能力。
+3. **不提供医疗指导**：只记录、整理、查询、展示和提醒。不得根据健康数据给出诊断、治疗建议、用药建议、营养治疗建议、临床判断或其他医疗指导；只可转述已有诊断、处方、报告明确标记、用户阈值和既有提醒。如需医学判断，只能提示用户咨询专业医疗人员。
+4. **药物安全问题必须先搜且只展示来源信息**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答；不得据此指示用户开始、停止、更换或调整药物。
+5. **近期健康记录默认发图片卡片**：优先调用 `generate-report`，传入用户要求的 `days`（默认 7）、语言和个人/家庭视图，不是把 JSON 或 HTML 发给用户。
+6. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
+7. **只用于个人本地档案**：不要引导群聊或多人共享部署；安装配置异常时交给具备本机权限的 Agent 修复，不让普通用户处理身份参数。
+8. **就医前摘要只整理资料**：默认先用 `doctor_visit_report.py text` 生成短文版；用户需要时，再导出图片或 PDF。摘要不得包含诊断判断或诊疗建议。
+9. **成员按姓名和身份解析**：只有唯一“本人”档案时允许默认本人；出现多位家庭成员后，写入必须明确姓名。每次写入前复述“姓名（身份）”，同名时必须进一步消歧。
+10. **记录饮食前必须先查食物数据库**：通过 diet-tracker 的 `food_lookup.py search` 查每种食物的营养数据，用查询结果填写 `--items`。禁止凭 AI 自身知识估算营养值后直接写入，也不得把营养数据解释为治疗建议。
+11. **对话中的健康提及必须实时记录（强制）**：用户在对话中随口提到任何健康相关内容（症状、不适、用药感受、睡眠、情绪等），**必须在当次对话结束前**调用 `health_memory.py log` 将其写入健康备注。这是夜间做梦机制的原始素材来源——`dream.py gather` 会专门读取当日记录的对话提及，未被记录的提及将永久丢失。
 
     **触发关键词示例**（不限于此）：
     - "最近/今天/昨天有点…"、"感觉…"、"一直…"、"偶尔…"
@@ -225,7 +222,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 ```
 1. wearable-sync: sync-all          → 同步手表数据（若有绑定设备）
 2. health-monitor: check-all        → 检测异常指标，写入 alerts 表
-3. health_advisor.py briefing       → 获取卡片数据（提醒 + 建议 + 风险等级）
+3. health_advisor.py briefing       → 获取卡片数据（提醒 + 明确标记 + 状态汇总）
 4. briefing_report.py screenshot    → 生成健康记录卡片（PNG），同时自动保存当日快照
 5. 推送给用户（见下方推送规则）
 ```
@@ -352,7 +349,7 @@ python3 {baseDir}/scripts/setup.py restore --input mediwise-backup.tar.gz
 按需读取，不要一次全读：
 
 - 录入、查询自然语言化、视觉处理：`mediwise-health-tracker/references/intake-query-vision.md:1`
-- 药物安全、健康建议、健康记录卡片：`mediwise-health-tracker/references/drug-safety-health-card.md:1`
+- 药物来源信息、状态提醒、健康记录卡片：`mediwise-health-tracker/references/drug-safety-health-card.md:1`
 - 周期追踪、附件与个人本地边界：`mediwise-health-tracker/references/cycle-attachments-local-scope.md:1`
 - 就医前摘要图：`mediwise-health-tracker/references/visit-prep.md:1`
 

@@ -1,11 +1,15 @@
-"""Health Advisor - proactive health analysis and recommendations.
+"""Rule-based health record reminders and status summaries.
 
-Analyzes existing health data to generate actionable advice:
+Reviews existing records to generate informational notices:
 - Medication adherence monitoring
 - Metric anomaly detection (blood pressure, blood sugar, etc.)
 - Overdue checkup alerts
 - Measurement gap detection
 - Daily health briefings
+
+This module does not provide diagnosis, treatment, medication, or other
+medical guidance. The ``suggestion`` field is retained for compatibility, but
+contains record/reminder context only.
 """
 from __future__ import annotations
 
@@ -44,7 +48,7 @@ METRIC_VALUE_DISPLAY = {
 }
 
 
-# --- Metric normal ranges ---
+# --- Default display/reminder ranges ---
 
 METRIC_RANGES = {
     "blood_pressure": {
@@ -73,7 +77,7 @@ _AGE_ADJUSTMENTS = {
     },
 }
 
-# How often each metric should ideally be measured (days)
+# Default intervals for record-gap reminders (days), not medical instructions.
 METRIC_MEASURE_INTERVALS = {
     "blood_pressure": 3,
     "blood_sugar": 7,
@@ -83,7 +87,9 @@ METRIC_MEASURE_INTERVALS = {
     "blood_oxygen": 7,
 }
 
-# Checkup intervals by diagnosis keywords (days)
+# Rule intervals for record reminders by stored diagnosis keyword (days).
+# These are not clinical recommendations; the output states that a professional
+# must determine whether follow-up is appropriate.
 CHECKUP_INTERVALS = {
     "高血压": {"interval": 90, "aliases": ["高血压", "血压高", "血压偏高", "hypertension", "hbp", "高血压病"]},
     "糖尿病": {"interval": 90, "aliases": ["糖尿病", "血糖高", "血糖偏高", "diabetes", "dm", "2型糖尿病", "1型糖尿病"]},
@@ -155,7 +161,7 @@ def get_metric_ranges(member_id: str) -> dict:
 
 
 def check_metric_anomalies(member_id: str) -> list[dict]:
-    """Check recent metrics for values outside normal ranges."""
+    """Check recent metrics against configured display/reminder ranges."""
     conn = health_db.get_connection()
     try:
         alerts = []
@@ -190,9 +196,9 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_anomaly",
                         "severity": "alert" if val > bounds["high"] * _ANOMALY_ALERT_RATIO_HIGH else "warning",
                         "member_id": member_id,
-                        "title": f"{metric_name}偏高",
+                        "title": f"{metric_name}高于配置范围",
                         "detail": f"{METRIC_VALUE_DISPLAY.get(key, key)}：{val} {bounds['unit']}（参考范围 {bounds['low']}-{bounds['high']}）",
-                        "suggestion": f"建议关注{metric_name}，如持续偏高请咨询医生",
+                        "suggestion": "该记录触发了已配置的范围提醒；如需医学判断，请咨询专业医疗人员",
                         "measured_at": latest["measured_at"],
                     })
                 elif val < bounds["low"]:
@@ -201,9 +207,9 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_anomaly",
                         "severity": "alert" if val < bounds["low"] * _ANOMALY_ALERT_RATIO_LOW else "warning",
                         "member_id": member_id,
-                        "title": f"{metric_name}偏低",
+                        "title": f"{metric_name}低于配置范围",
                         "detail": f"{METRIC_VALUE_DISPLAY.get(key, key)}：{val} {bounds['unit']}（参考范围 {bounds['low']}-{bounds['high']}）",
-                        "suggestion": f"建议关注{metric_name}，如持续偏低请咨询医生",
+                        "suggestion": "该记录触发了已配置的范围提醒；如需医学判断，请咨询专业医疗人员",
                         "measured_at": latest["measured_at"],
                     })
 
@@ -227,9 +233,9 @@ def check_metric_anomalies(member_id: str) -> list[dict]:
                         "type": "metric_trend",
                         "severity": "alert",
                         "member_id": member_id,
-                        "title": f"{metric_name}持续异常",
-                        "detail": f"最近 {len(rows[:3])} 次测量均不在正常范围内",
-                        "suggestion": "建议尽快就医复查",
+                        "title": f"{metric_name}连续触发范围提醒",
+                        "detail": f"最近 {len(rows[:3])} 次测量均在已配置范围之外",
+                        "suggestion": "仅展示已记录数值和范围提醒，不作诊断或处理建议",
                     })
         return alerts
     finally:
@@ -263,8 +269,8 @@ def check_metric_gaps(member_id: str) -> list[dict]:
                         "severity": "info",
                         "member_id": member_id,
                         "title": f"尚未记录{metric_name}",
-                        "detail": f"如有管理需要，可以定期测量{metric_name}",
-                        "suggestion": f"如需持续管理，可按每 {interval_days} 天一次的计划测量",
+                        "detail": f"当前档案尚无{metric_name}记录",
+                        "suggestion": f"系统的记录缺口提醒间隔为 {interval_days} 天，可按个人需要调整或关闭",
                     })
             else:
                 last_date = datetime.strptime(row["measured_at"][:10], "%Y-%m-%d").date()
@@ -275,8 +281,8 @@ def check_metric_gaps(member_id: str) -> list[dict]:
                         "severity": "warning" if days_since > interval_days * 2 else "info",
                         "member_id": member_id,
                         "title": f"{metric_name}已 {days_since} 天未测量",
-                        "detail": f"上次测量: {row['measured_at'][:10]}，建议间隔 {interval_days} 天",
-                        "suggestion": f"如在持续管理该指标，请安排测量{metric_name}",
+                        "detail": f"上次测量: {row['measured_at'][:10]}；系统记录提醒间隔: {interval_days} 天",
+                        "suggestion": "这是记录缺口提醒，不代表医学上的测量频率要求",
                     })
         return gaps
     finally:
@@ -284,7 +290,7 @@ def check_metric_gaps(member_id: str) -> list[dict]:
 
 
 def check_overdue_checkups(member_id: str) -> list[dict]:
-    """Check if follow-up visits are overdue based on diagnosis history."""
+    """Create rule-based follow-up record reminders from diagnosis history."""
     conn = health_db.get_connection()
     now_date = datetime.now().date()
     alerts = []
@@ -318,9 +324,9 @@ def check_overdue_checkups(member_id: str) -> list[dict]:
                     "type": "overdue_checkup",
                     "severity": "warning" if days_since > interval * 1.5 else "info",
                     "member_id": member_id,
-                    "title": f"{keyword} 复查逾期",
-                    "detail": f"上次就诊: {last_date_str}（{days_since} 天前），建议每 {interval} 天复查",
-                    "suggestion": f"建议预约 {keyword} 相关复查",
+                    "title": f"{keyword} 记录触发复查提醒",
+                    "detail": f"上次相关就诊: {last_date_str}（{days_since} 天前）；系统提醒间隔: {interval} 天",
+                    "suggestion": "是否需要复查及复查时间应由专业医疗人员判断",
                     "diagnosis": full_diag,
                 })
         return alerts
@@ -329,10 +335,10 @@ def check_overdue_checkups(member_id: str) -> list[dict]:
 
 
 def check_medication_adherence(member_id: str) -> list[dict]:
-    """Check medication adherence by looking at reminder trigger logs.
+    """Check medication reminder trigger coverage.
 
-    If a medication reminder has been missed (no trigger log in expected window),
-    flag it.
+    Trigger logs show reminder delivery activity, not whether medication was
+    actually taken.
     """
     conn = health_db.get_connection()
     now = datetime.now()
@@ -366,9 +372,9 @@ def check_medication_adherence(member_id: str) -> list[dict]:
                     "type": "medication_adherence",
                     "severity": "warning",
                     "member_id": member_id,
-                    "title": f"用药提醒响应不足：{rem['title']}",
+                    "title": f"用药提醒触发记录不足：{rem['title']}",
                     "detail": f"过去 7 天预期 {expected} 次提醒，实际触发 {actual} 次",
-                    "suggestion": "请注意按时服药，如有疑问请咨询医生",
+                    "suggestion": "请核对提醒设置与触发记录；不要据此开始、停止或调整用药",
                 })
         return alerts
     finally:
@@ -415,9 +421,8 @@ def check_cycle_alerts(member_id: str) -> list[dict]:
                     "severity": "info",
                     "member_id": member_id,
                     "title": f"经期将至（{days_until}天后）",
-                    "detail": f"预计 {status.get('next_predicted_start', '未知')} 来经，请提前准备",
-                    "suggestion": "注意保暖和休息，准备好必需用品",
-                    "care_tips": status.get("care_tips", []),
+                    "detail": f"根据历史记录预计开始日期为 {status.get('next_predicted_start', '未知')}",
+                    "suggestion": "这是基于历史记录的日期提醒，不作健康判断",
                 })
             elif phase == "menstrual":
                 alerts.append({
@@ -426,8 +431,7 @@ def check_cycle_alerts(member_id: str) -> list[dict]:
                     "member_id": member_id,
                     "title": "当前处于经期",
                     "detail": f"经期第 {status.get('days_since_last_start', '?')} 天",
-                    "suggestion": "注意保暖，适当休息，避免剧烈运动",
-                    "care_tips": status.get("care_tips", []),
+                    "suggestion": "仅展示已记录的周期状态，不提供健康处理建议",
                 })
 
         elif cycle_type == "migraine":
@@ -437,10 +441,9 @@ def check_cycle_alerts(member_id: str) -> list[dict]:
                     "type": "cycle_alert",
                     "severity": "info",
                     "member_id": member_id,
-                    "title": f"偏头痛发作预警（约{days_until}天后）",
-                    "detail": "根据历史规律，偏头痛可能即将发作",
-                    "suggestion": "避免已知诱因，保持规律作息",
-                    "care_tips": status.get("care_tips", []),
+                    "title": f"偏头痛历史周期提醒（约{days_until}天后）",
+                    "detail": "历史记录中的相似事件间隔接近该日期",
+                    "suggestion": "这是基于历史记录的时间提醒，不预测实际发作，也不提供处理建议",
                 })
 
         elif cycle_type == "allergy":
@@ -450,17 +453,16 @@ def check_cycle_alerts(member_id: str) -> list[dict]:
                     "type": "cycle_alert",
                     "severity": "info",
                     "member_id": member_id,
-                    "title": f"过敏发作预警（约{days_until}天后）",
-                    "detail": "根据历史规律，过敏症状可能即将出现",
-                    "suggestion": "提前准备抗过敏药物，减少过敏原接触",
-                    "care_tips": status.get("care_tips", []),
+                    "title": f"过敏历史周期提醒（约{days_until}天后）",
+                    "detail": "历史记录中的相似事件间隔接近该日期",
+                    "suggestion": "这是基于历史记录的时间提醒，不预测实际发作，也不提供用药建议",
                 })
 
     return alerts
 
 
 def generate_health_tips(member_id: str) -> dict:
-    """Generate comprehensive health tips for a member by running all checks."""
+    """Generate informational health record reminders for a member."""
     health_db.ensure_db()
 
     conn = health_db.get_connection()
@@ -501,7 +503,7 @@ def generate_health_tips(member_id: str) -> dict:
 
 
 def get_daily_briefing(member_id: str = None, owner_id: str = None) -> dict:
-    """Generate a daily health briefing with due reminders + health tips.
+    """Generate a daily health briefing with due and record reminders.
 
     If member_id is None, generates briefing for all family members.
     If owner_id is provided (and member_id is None), only includes that owner's members.
@@ -535,7 +537,7 @@ def get_daily_briefing(member_id: str = None, owner_id: str = None) -> dict:
     # Due reminders
     due = reminder_mod.get_due_reminders()
 
-    # Health tips per member
+    # Informational record reminders per member (legacy response key: health_tips)
     member_briefings = []
     total_alerts = 0
     total_warnings = 0

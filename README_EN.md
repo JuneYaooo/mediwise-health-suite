@@ -32,7 +32,7 @@ Create profiles → Record by chat or image → Track changes → Review alerts 
 
 You can record blood pressure, blood glucose, medication, meals, weight, sleep, and exercise in natural language. MediWise can also import Apple Health and Gadgetbridge exports. Medical data and lifestyle data are stored in separate local SQLite databases.
 
-MediWise organizes health information and shows trends. It does not diagnose conditions, prescribe treatment, or replace a doctor or dietitian.
+MediWise only records, organizes, searches, displays, summarizes, and reminds you about health information. It does not provide diagnoses, treatment advice, medication advice, nutrition therapy, clinical judgment, or any other medical guidance.
 
 ## Screenshots
 
@@ -65,7 +65,7 @@ The personal card keeps metric trends, recorded food intake, activity burn, step
   <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with compact metrics, intake and activity, sleep, a personal health timeline, and medication">
 </p>
 
-The timeline shows up to ten recent events in reverse chronological order. Medical records come first when several events share a date. The card is not locked to one layout: explicit abnormalities and due reminders take priority, then recorded data volume determines section order and which metric or lifestyle panel receives more space. A direct request about metrics, lifestyle, care, or medication overrides the automatic focus. Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
+The card highlights recent records and reminders. Food averages use logged days only, activity burn shows recorded activity rather than a calorie deficit, and lab flags are shown only when the original report explicitly marks them.
 
 MediWise also has a compact family card for one local user who manages several family profiles. It shows each person's current status, active medications and medication schedules, due or upcoming reminders, and explicit attention items. It does not include a family timeline. Members with alerts, flagged results, or due reminders appear first. Ask for it explicitly:
 
@@ -89,7 +89,7 @@ Missing measurements are shown as missing. MediWise does not invent values to fi
 |---|---|---|
 | Health records | Member profiles, visits, symptoms, diagnoses, medication, lab results, and imaging notes | Implemented |
 | Health metrics | Blood pressure, blood glucose, heart rate, temperature, weight, blood oxygen, and trends | Implemented |
-| Image and PDF intake | Local text extraction with PaddleOCR, plus optional vision models for complex layouts and charts | Implemented |
+| Image and PDF intake | Direct attachment reading by the current Agent, with optional local OCR or vision fallback | Implemented |
 | Medication and reminders | Active medication, medication logs, measurement reminders, follow-up reminders, and interaction lookup | Implemented |
 | Diet | Meal records, traceable nutrition sources, daily totals, and nutrition goals | Implemented |
 | Weight and exercise | Weight trends, BMI, BMR, TDEE, body measurements, activity, and goals | Implemented |
@@ -146,11 +146,10 @@ This is the only setup method recommended for regular users. Send the repository
 ```text
 Please install and configure MediWise Health Suite from this repository:
 https://github.com/JuneYaooo/mediwise-health-suite
-
-Please also enable image and PDF intake. Prefer a multimodal model that can read images; if the current model is text-only, pair it with OCR. Test that the installation works when you finish.
+When you finish, verify that the Skill loads and its basic features work.
 ```
 
-The repository already contains the detailed instructions an installation assistant needs. It chooses the correct directory, installs dependencies, enables personal local mode and image/PDF intake, and runs the checks. You do not need to repeat implementation details, copy terminal commands, or edit configuration files.
+The repository already contains the detailed instructions an installation assistant needs. It chooses the correct directory, installs dependencies, enables personal local mode, and runs the basic checks. You do not need to repeat implementation details, copy terminal commands, or edit configuration files.
 
 MediWise currently supports one local user who may maintain records for themselves and several family members. It is not intended to serve several people from the same data directory.
 
@@ -164,28 +163,19 @@ Show Zhang Jianguo's health records from the last 7 days.
 
 ### Image and PDF recognition
 
-Image and PDF intake is best configured during installation. MediWise can use a multimodal model that reads images directly, or a text model paired with OCR. PaddleOCR is the built-in local OCR path. The feature is available only after a redacted test image, scanned PDF, and structured extraction all pass on that machine.
+If the current Agent can read image or PDF attachments, upload the file and ask MediWise to extract it. No separate MediWise vision configuration is required. MediWise shows the extracted information for confirmation before saving it.
 
-Ask a configuration assistant to set it up:
+If the current Agent cannot read the attachment, ask a configuration assistant to add a fallback:
 
 ```text
-Enable image and PDF intake for MediWise and test it with a redacted file. Configure multimodal intake if the model can read images; otherwise pair the text model with OCR.
+The current Agent cannot read this attachment. Configure a local OCR or optional vision fallback for MediWise and test it with a redacted file.
 ```
 
-PaddleOCR can extract Chinese text from ordinary images and scanned PDFs without uploading the source file, then a text model can turn the OCR output into structured records. Multimodal models are better suited to complex layouts, tables, and charts.
+Local OCR can be used as a fallback for ordinary images and scanned PDFs. A separately configured vision service is optional and is mainly useful when the current Agent cannot handle complex layouts, tables, or charts.
 
 A cloud vision provider receives the full image or PDF page. Medical documents often contain names, government identifiers, and record numbers. Remove identifying information first or use a local model.
 
-Current configuration examples use newer model names:
-
-| Option | Example | Notes |
-|---|---|---|
-| Local OCR | PaddleOCR | Extracts text locally and does not upload the source image |
-| SiliconFlow | `Qwen/Qwen3.6-35B-A3B` | Confirm that the current service entry accepts image input before saving the configuration |
-| SiliconFlow | `zai-org/GLM-4.5V` | An alternative that also requires a live image input check |
-| Local vision | A Qwen3-VL model available in the local Ollama library | The exact model tag and hardware requirements depend on the machine |
-
-Model availability changes. A configuration assistant must inspect the current provider listing and test with a redacted image. A model name alone is not evidence that image input works.
+When a fallback is configured, the configuration assistant should test it with redacted image and PDF samples. It must not enable a new cloud service without the user's explicit consent.
 
 See [the installation guide](docs/INSTALLATION.md) for setup checks and troubleshooting.
 
@@ -248,7 +238,7 @@ Family members are records managed by the current local user. They are not separ
 
 Normal local record keeping does not contact these services when they are disabled.
 
-If the OCR engine is explicitly set to PaddleOCR, a local recognition failure does not silently send the image or PDF to a cloud vision model.
+The current Agent reads attachments directly when it can; separate MediWise vision configuration is not required. If direct reading is unavailable, no recognition failure silently sends an image or PDF to a new cloud vision model.
 
 ## Data location and backup
 
@@ -319,7 +309,7 @@ Bug reports, data source adapters, and documentation improvements are welcome. D
 
 The code is available under the [MIT License](LICENSE).
 
-MediWise Health Suite records, organizes, and summarizes health information. It does not provide a diagnosis, treatment plan, or emergency medical service. Contact a qualified medical professional for health concerns and local emergency services for urgent symptoms.
+MediWise Health Suite only records, organizes, searches, displays, summarizes, and reminds you about health information. It does not provide diagnoses, treatment advice, medication advice, nutrition therapy, clinical judgment, any other medical guidance, or emergency medical services. Report flags and threshold reminders are informational only. Contact a qualified medical professional for medical judgment and local emergency services for urgent symptoms.
 
 ---
 

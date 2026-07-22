@@ -95,7 +95,7 @@ def _get_latest_metrics(conn, member_id: str) -> dict:
 
 
 def _member_risk_level(alerts: list[dict], trend_warnings: list[str]) -> str:
-    """根据告警和趋势警告评估成员整体风险级别。"""
+    """Return the highest configured reminder priority for a member."""
     if any(a["level"] == "emergency" for a in alerts):
         return "emergency"
     if any(a["level"] == "urgent" for a in alerts):
@@ -106,7 +106,12 @@ def _member_risk_level(alerts: list[dict], trend_warnings: list[str]) -> str:
 
 
 def _risk_label(level: str) -> str:
-    return {"normal": "正常", "warning": "需关注", "urgent": "紧急", "emergency": "危急"}.get(level, level)
+    return {
+        "normal": "无阈值提醒",
+        "warning": "普通提醒",
+        "urgent": "高优先级",
+        "emergency": "最高优先级",
+    }.get(level, level)
 
 
 def generate_dashboard(owner_id: str | None = None) -> dict:
@@ -138,7 +143,7 @@ def generate_dashboard(owner_id: str | None = None) -> dict:
             "summary": "暂无家庭成员，请先添加成员。",
             "members": [],
             "family_risk": "normal",
-            "family_risk_label": "正常",
+            "family_risk_label": "无阈值提醒",
         }
 
     # 2. 逐成员聚合数据（每次用独立连接，与 trend_report 隔离）
@@ -188,13 +193,13 @@ def generate_dashboard(owner_id: str | None = None) -> dict:
 
     summary_parts = []
     if emergency_members:
-        summary_parts.append(f"【危急】{', '.join(emergency_members)} 需立即关注")
+        summary_parts.append(f"【最高优先级】{', '.join(emergency_members)} 触发最高优先级阈值提醒")
     if urgent_members:
-        summary_parts.append(f"【紧急】{', '.join(urgent_members)} 有紧急告警")
+        summary_parts.append(f"【高优先级】{', '.join(urgent_members)} 触发高优先级阈值提醒")
     if total_alerts == 0:
-        summary_parts.append("全家健康状态良好，无未解决告警")
+        summary_parts.append("当前没有未处理的阈值提醒")
     else:
-        summary_parts.append(f"共 {total_alerts} 条未解决告警")
+        summary_parts.append(f"共 {total_alerts} 条未处理阈值提醒")
 
     return {
         "status": "ok",

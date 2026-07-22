@@ -15,7 +15,7 @@ MediWise Health Suite 是面向 OpenClaw 的个人本地健康助手，包含健
 - 不覆盖已有目录中的本地改动。
 - 只配置个人本地模式，不把这一数据目录部署到群聊机器人或多人共享服务。
 - 由 Agent 完成命令执行，不要求普通用户复制或运行安装、配置、检查脚本。
-- 用户在安装请求中要求图片/PDF 识别时，同步配置多模态视觉或 OCR 路径；USDA、Open Food Facts 等联网数据源仍留给用户之后显式启用。
+- 默认不为图片/PDF 另配识别服务：当前 Agent 能直接读取附件时使用其已有能力；只有明确无法读取或用户主动要求时，才配置 OCR 或可选视觉 fallback。USDA、Open Food Facts 等联网数据源仍留给用户之后显式启用。
 
 ## 前置依赖
 
@@ -79,9 +79,11 @@ python3 -m pip install -r requirements.txt
 
 优先使用用户已有的虚拟环境；没有虚拟环境时，不要擅自用 `sudo pip`。
 
-### 4. 配置图片/PDF 识别
+### 4. 可选：配置图片/PDF fallback
 
-优先复用或配置能够接入 MediWise 视觉配置、且经 `setup.py test-vision` 验证支持图片输入的多模态模型。不能确认图片输入能力，或当前模型只能处理文本时，配置 OCR 路径：优先使用本地 PaddleOCR 提取图片和扫描 PDF 文字，再交给文本模型结构化。不要因为当前 OpenClaw 对话模型能看图，或模型名称中带有 VL、Vision 等字样，就跳过 MediWise 自身的配置和实际附件测试。
+当前 OpenClaw/Agent 能直接读取用户上传的图片或 PDF 时，不配置 MediWise 视觉服务，也不以 `setup.py test-vision` 是否通过作为安装标准。Skill 可直接提取附件内容，但必须先让用户确认提取结果，再写入档案。
+
+只有当前 Agent 明确无法读取附件、实际读取失败，或用户主动要求独立识别路径时，才配置 fallback。优先使用本地 PaddleOCR 提取图片和扫描 PDF 文字；复杂版面确需云端视觉服务时，先说明隐私影响并取得用户明确同意。不得静默启用新的云端服务。
 
 云端视觉凭据通过客户端受保护输入、`set-vision --api-key-stdin` 或 `MEDIWISE_VISION_API_KEY` 注入。不要把 Key 放进聊天、命令参数、shell 历史或仓库；系统 keyring 可用时 MediWise 会优先存入 keyring。
 
@@ -101,7 +103,7 @@ python3 mediwise-health-tracker/scripts/setup.py test-pdf
 python3 mediwise-health-tracker/scripts/setup.py test-intake --input both
 ```
 
-多模态路径也必须依次运行 `test-vision`、`test-pdf` 和 `test-intake --input both`。图片测试与 `test-pdf` 证明文字识别链路，`test-intake` 再证明图片和 PDF 能够进入结构化记录结果；它们都返回 `status: ok` 时，才可以告诉用户“可以上传并解析图片和 PDF”。测试默认使用内置脱敏图片，并在临时目录生成图像型 PDF，不会写入健康数据库或仓库；也可以由 Agent 使用用户授权的脱敏附件。若当前平台没有兼容轮子、模型初始化失败或任一测试失败：
+若配置多模态 fallback，也必须依次运行 `test-vision`、`test-pdf` 和 `test-intake --input both`。图片测试与 `test-pdf` 证明 fallback 识别链路，`test-intake` 再证明结果能够进入结构化提取流程；它们都返回 `status: ok` 时，才可以声称该 fallback 可用。测试默认使用内置脱敏图片，并在临时目录生成图像型 PDF，不会写入健康数据库或仓库；也可以由 Agent 使用用户授权的脱敏附件。若当前平台没有兼容轮子、模型初始化失败或任一测试失败：
 
 - 不破坏基础安装，也不使用 `sudo pip`。
 - 把 OCR 引擎恢复为 `auto`。
@@ -138,7 +140,7 @@ bash install-check.sh
 - Python 和 Node.js 版本
 - `install-check.sh` 是否通过
 - 个人本地模式是否已经生效
-- 图片/PDF 识别采用多模态模型还是 OCR 路径、图片识别、扫描 PDF 提取和结构化解析测试是否分别通过；未启用时给出原因
+- 如果本次配置了图片/PDF fallback：说明采用 OCR 还是视觉服务，以及图片、扫描 PDF 和结构化解析测试是否分别通过
 
 ## 重启后的冒烟对话
 
@@ -154,7 +156,7 @@ bash install-check.sh
 
 可选功能不属于基础安装：
 
-- 图片/PDF 复杂理解：由配置 Agent 说明本地模型和云端模型的隐私差异，再通过安全本地输入配置 `MEDIWISE_VISION_*`；不得让用户在聊天中发送 Key。
+- 图片/PDF fallback：仅在当前 Agent 无法直接读取附件或用户主动要求时配置。由配置 Agent 说明本地模型和云端模型的隐私差异，再通过安全本地输入配置；不得让用户在聊天中发送 Key。
 - USDA：用户明确同意后，由配置 Agent 安全设置 `USDA_API_KEY`。
 - Open Food Facts：用户明确同意后，由配置 Agent 启用；不能因为免 Key 就默认联网。
 - 可穿戴导入：当前只把 Apple Health 与 Gadgetbridge 作为已验证用户流程；详细规则见 [`docs/WEARABLES.md`](./WEARABLES.md)。
@@ -169,7 +171,8 @@ bash install-check.sh
 1. 目标目录中存在根 `SKILL.md` 和六个领域 Skill 目录。
 2. `python3 -m pip install -r requirements.txt` 成功，或依赖已由用户环境满足。
 3. `bash install-check.sh` 返回 0。
-4. 已配置并实际测试一种图片/PDF 识别路径：多模态模型的 `test-vision` 或 PaddleOCR 的 `test-paddleocr` 先通过，随后 `test-pdf` 与 `test-intake --input both` 也通过；任一环节失败时明确报告对应能力未启用，没有声称图片和 PDF 都能自动解析。
-5. `MEDIWISE_SINGLE_USER=1` 已写入当前 OpenClaw 实际加载的个人 Agent 运行环境，并在重载后验证生效。
-6. 已告诉用户重启或重新加载 OpenClaw。
-7. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。
+4. `MEDIWISE_SINGLE_USER=1` 已写入当前 OpenClaw 实际加载的个人 Agent 运行环境，并在重载后验证生效。
+5. 已告诉用户重启或重新加载 OpenClaw。
+6. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。
+
+图片/PDF fallback 不属于基础安装完成标准。若本次明确配置了 fallback，则相应的 `test-vision` 或 `test-paddleocr`、`test-pdf` 与 `test-intake --input both` 必须通过；失败时只能报告该可选能力未启用，不能影响已经通过的基础安装结论。
