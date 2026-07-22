@@ -14,7 +14,7 @@
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[常用场景](#三个常用场景) · [一张图看懂](#一张图看懂-mediwise) · [5 分钟上手](#5-分钟上手) · [功能全览](#功能全览) · [隐私与安全](#隐私与安全) · [文档中心](docs/README.md)
+[一张图看懂](#一张图看懂-mediwise) · [常用场景](#三个常用场景) · [5 分钟上手](#5-分钟上手) · [功能全览](#功能全览) · [隐私与安全](#隐私与安全) · [文档中心](docs/README.md)
 
 </div>
 
@@ -25,6 +25,12 @@ MediWise Health Suite（简称 **MediWise**）适合在自己的 OpenClaw 中长
 把 OpenClaw（龙虾）接入飞书或微信私聊后，就可以在聊天窗口里使用。Hermes 等其他 Agent 如果支持加载本 Skill，也可以作为入口。当前版本的安装和测试以个人本地 OpenClaw 为准。
 
 > MediWise 只提供健康信息的记录、整理、查询、展示和提醒，不提供诊断、治疗建议、用药建议、营养治疗建议、临床判断或其他医疗指导。
+
+## 一张图看懂 MediWise
+
+![从生活片段到本地健康记录：MediWise 使用流程与产品边界](docs/images/architecture.svg)
+
+你只需要通过聊天、照片、PDF 或设备文件提供信息。MediWise 会按成员整理成本地健康档案，并在需要时帮你查询记录、查看健康记录卡片或接收用药和复查提醒。
 
 ## 三个常用场景
 
@@ -88,12 +94,6 @@ MediWise Health Suite（简称 **MediWise**）适合在自己的 OpenClaw 中长
 ```
 
 目前 Apple Health 和 Gadgetbridge 文件导入已经验证可用；Garmin Connect 仍为实验性接入。其他设备的最新状态和导出方法见 [可穿戴数据导入指南](docs/WEARABLES.md)。
-
-## 一张图看懂 MediWise
-
-![从生活片段到本地健康记录：MediWise 使用流程与产品边界](docs/images/architecture.svg)
-
-你只需要通过聊天、照片、PDF 或设备文件提供信息。MediWise 会按成员整理成本地健康档案，并在需要时帮你查询记录、查看健康记录卡片或接收用药和复查提醒。
 
 ## 5 分钟上手
 
