@@ -120,6 +120,21 @@ https://github.com/JuneYaooo/mediwise-health-suite
 帮我添加一位家庭成员：张建国，是我的父亲，65 岁。
 ```
 
+下面是在飞书中安装并使用 MediWise 的实际界面。其他 OpenClaw 客户端的样式可能不同，但对话方式相同。
+
+<table>
+  <tr>
+    <td width="33%" align="center"><img src="docs/images/install-in-chat.jpg" alt="在聊天中请求安装 MediWise Health Suite"></td>
+    <td width="33%" align="center"><img src="docs/images/skill-overview.jpg" alt="安装后查看 MediWise 可以使用的健康管理能力"></td>
+    <td width="33%" align="center"><img src="docs/images/create-member.jpg" alt="通过自然语言创建家庭成员健康档案"></td>
+  </tr>
+  <tr>
+    <td align="center">① 对话安装</td>
+    <td align="center">② 查看可用能力</td>
+    <td align="center">③ 创建成员档案</td>
+  </tr>
+</table>
+
 ### 3. 开始用照片和文件记录
 
 ```text
