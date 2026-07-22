@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product and Skill boundaries now explicitly limit MediWise to recording, organizing, displaying, summarizing, and reminding. Health, nutrition, weight, sleep, cycle, and monitoring outputs no longer generate treatment, medication, diet, exercise, or lifestyle instructions.
 - Added a documentation center with audience-based navigation, a maintained project directory map, and clearer ownership for README, installation, Agent, and module documentation.
 - Added an explicit acknowledgement of the LINUX DO (linux.do) community to the Chinese and English README files.
+- Reworked the project architecture illustration as a user-facing visual abstract and restored it to the main reading path in both README files.
 
 ### Planned
 - Integration with more wearable devices

@@ -1,147 +1,276 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="860" viewBox="0 0 1440 860" role="img" aria-labelledby="title desc">
-  <title id="title">MediWise Health Suite 架构与数据边界</title>
-  <desc id="desc">个人本地用户请求经过运行模式检查和 Node.js 路由进入六个健康领域 Skill，再由 Python 数据层写入本地 medical.db 与 lifestyle.db。视觉、食物和设备外部服务只有在显式配置后访问。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">一张图看懂 MediWise Health Suite</title>
+  <desc id="desc">用户通过聊天、照片、PDF 或健康设备导出记录本人和家人的健康信息。MediWise 在本地按成员整理健康档案、饮食、运动、睡眠、提醒和设备记录，最终提供查询、提醒、个人记录卡片和家庭状态卡片。项目不提供医疗指导。</desc>
   <defs>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#163A34" flood-opacity="0.08"/>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#294842" flood-opacity="0.10"/>
     </filter>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L9,5 L0,10 Z" fill="#5D7B75"/>
+    <pattern id="paperDots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#2A6158" opacity="0.055"/>
+    </pattern>
+    <marker id="arrowGreen" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#397A6D"/>
     </marker>
-    <marker id="arrowExternal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L9,5 L0,10 Z" fill="#C0644B"/>
+    <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#4B7294"/>
     </marker>
     <style>
-      .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
-      .eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 2.4px; fill: #1E7A6E; }
-      .title { font-size: 42px; font-weight: 760; letter-spacing: -1px; fill: #153832; }
-      .subtitle { font-size: 18px; font-weight: 450; fill: #5D716D; }
-      .label { font-size: 14px; font-weight: 750; letter-spacing: 1.5px; fill: #1E7A6E; }
-      .nodeTitle { font-size: 23px; font-weight: 720; fill: #173B35; }
-      .nodeBody { font-size: 15px; font-weight: 450; fill: #60746F; }
-      .smallTitle { font-size: 16px; font-weight: 680; fill: #21443E; }
-      .smallBody { font-size: 13px; font-weight: 450; fill: #6B7D79; }
-      .dbTitle { font-size: 18px; font-weight: 720; fill: #FFFFFF; }
-      .dbBody { font-size: 12px; font-weight: 500; fill: #DCEBE8; }
-      .externalTitle { font-size: 16px; font-weight: 700; fill: #7C3929; }
-      .externalBody { font-size: 13px; font-weight: 470; fill: #8A5A4E; }
+      .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; }
+      .figure { font-size: 14px; font-weight: 750; letter-spacing: 2.3px; fill: #397A6D; }
+      .mainTitle { font-size: 39px; font-weight: 780; letter-spacing: -0.8px; fill: #193C35; }
+      .mainSub { font-size: 17px; font-weight: 450; fill: #667772; }
+      .stepNo { font-size: 15px; font-weight: 800; fill: #FFFFFF; }
+      .stepEyebrow { font-size: 13px; font-weight: 760; letter-spacing: 1.8px; fill: #7A5B46; }
+      .stepEyebrowGreen { font-size: 13px; font-weight: 760; letter-spacing: 1.8px; fill: #397A6D; }
+      .stepEyebrowBlue { font-size: 13px; font-weight: 760; letter-spacing: 1.8px; fill: #4B7294; }
+      .panelTitle { font-size: 25px; font-weight: 760; fill: #203E38; }
+      .panelSub { font-size: 14px; font-weight: 450; fill: #6D7774; }
+      .cardTitle { font-size: 16px; font-weight: 700; fill: #29453F; }
+      .cardBody { font-size: 13px; font-weight: 470; fill: #6A7773; }
+      .tiny { font-size: 11.5px; font-weight: 520; fill: #71807C; }
+      .drawer { font-size: 14px; font-weight: 690; fill: #29453F; }
+      .outputTitle { font-size: 15px; font-weight: 720; fill: #29453F; }
+      .outputBody { font-size: 12.5px; font-weight: 470; fill: #6A7773; }
+      .boundary { font-size: 12px; font-weight: 760; letter-spacing: 1.4px; fill: #397A6D; }
+      .bottomLabel { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; }
+      .bottomMain { font-size: 15px; font-weight: 690; }
+      .bottomSub { font-size: 11.5px; font-weight: 480; }
     </style>
   </defs>
 
-  <rect width="1440" height="860" fill="#F4F8F7"/>
-  <circle cx="1320" cy="92" r="102" fill="#E4F1EE" opacity="0.72"/>
-  <circle cx="1375" cy="42" r="34" fill="#D8EAF7" opacity="0.85"/>
+  <rect width="1440" height="900" fill="#FBF9F4"/>
+  <rect width="1440" height="900" fill="url(#paperDots)"/>
+  <path d="M0 135 C270 105 424 166 670 130 C932 92 1122 146 1440 108 V0 H0 Z" fill="#EEF5F2" opacity="0.8"/>
+  <circle cx="1340" cy="58" r="78" fill="#E6EFF6" opacity="0.74"/>
+  <path d="M1280 111 q36 -16 70 0" fill="none" stroke="#D7A26E" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
 
   <g class="sans">
-    <text x="64" y="62" class="eyebrow">LOCAL-FIRST HEALTH DATA FLOW</text>
-    <text x="64" y="112" class="title">MediWise 架构与数据边界</text>
-    <text x="64" y="145" class="subtitle">身份先于数据 · 医疗与生活方式分域存储 · 外部能力按需开启</text>
+    <text x="58" y="46" class="figure">FIGURE 01 · HOW MEDIWISE WORKS</text>
+    <text x="58" y="93" class="mainTitle">从生活片段，到清晰的本地健康记录</text>
+    <text x="58" y="123" class="mainSub">说一句、拍一张或导入一份文件，MediWise 帮你把本人和家人的信息整理好，在需要时找得到、看得懂、记得住。</text>
 
-    <g transform="translate(1010 68)">
-      <rect width="104" height="34" rx="17" fill="#E4F1EE"/>
-      <text x="52" y="22" text-anchor="middle" class="smallTitle" fill="#1E7A6E">SQLite</text>
-      <rect x="114" width="132" height="34" rx="17" fill="#E3EDF8"/>
-      <text x="180" y="22" text-anchor="middle" class="smallTitle" fill="#2F6FEB">本地档案</text>
-      <rect x="256" width="126" height="34" rx="17" fill="#F6E8E2"/>
-      <text x="319" y="22" text-anchor="middle" class="smallTitle" fill="#A94F38">云端可选</text>
+    <!-- Panel 1: input -->
+    <g filter="url(#softShadow)">
+      <rect x="54" y="174" width="338" height="554" rx="12" fill="#FFF7ED" stroke="#E8D5BE" stroke-width="1.5"/>
+    </g>
+    <circle cx="83" cy="205" r="16" fill="#C77A45"/>
+    <text x="83" y="210" text-anchor="middle" class="stepNo">1</text>
+    <text x="109" y="210" class="stepEyebrow">CAPTURE · 随手记录</text>
+    <text x="82" y="250" class="panelTitle">说一句，拍一张，导入一份</text>
+    <text x="82" y="276" class="panelSub">日常对话就是入口，不用先整理成表格</text>
+
+    <!-- phone -->
+    <rect x="87" y="310" width="218" height="304" rx="30" fill="#243F3A"/>
+    <rect x="96" y="319" width="200" height="286" rx="23" fill="#FFFCF7"/>
+    <rect x="158" y="327" width="76" height="7" rx="3.5" fill="#D2DDD9"/>
+    <circle cx="196" cy="588" r="8" fill="#E2E9E6"/>
+
+    <rect x="113" y="354" width="130" height="53" rx="13" fill="#E3F0EC"/>
+    <text x="126" y="376" class="cardBody">今天快走 45 分钟</text>
+    <text x="126" y="394" class="tiny">帮我记录一下</text>
+    <path d="M116 407 l-8 9 19-7" fill="#E3F0EC"/>
+
+    <rect x="138" y="428" width="140" height="102" rx="14" fill="#F3E2CE"/>
+    <rect x="147" y="437" width="122" height="64" rx="10" fill="#FAF0E2"/>
+    <ellipse cx="208" cy="470" rx="41" ry="22" fill="#FFFFFF" stroke="#D4B993" stroke-width="2"/>
+    <path d="M177 470 q15 -25 30 0 q14 -25 30 0 q11 -18 23 0" fill="#94B77A"/>
+    <circle cx="195" cy="465" r="9" fill="#D98259"/>
+    <path d="M138 530 l-8 9 19-7" fill="#F3E2CE"/>
+    <text x="155" y="519" class="tiny">午餐照片</text>
+
+    <!-- floating inputs -->
+    <g transform="rotate(-4 313 367)">
+      <rect x="284" y="324" width="83" height="108" rx="7" fill="#FFFFFF" stroke="#DABF9D" stroke-width="1.5"/>
+      <path d="M346 324 v21 h21" fill="#F3E2CE"/>
+      <rect x="298" y="344" width="20" height="20" rx="4" fill="#E9F2EF"/>
+      <path d="M308 348 v12 M302 354 h12" stroke="#397A6D" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="298" y1="377" x2="351" y2="377" stroke="#C9D3CF" stroke-width="3" stroke-linecap="round"/>
+      <line x1="298" y1="389" x2="343" y2="389" stroke="#C9D3CF" stroke-width="3" stroke-linecap="round"/>
+      <line x1="298" y1="401" x2="354" y2="401" stroke="#D98B69" stroke-width="3" stroke-linecap="round"/>
+      <text x="325" y="422" text-anchor="middle" class="tiny">报告 / PDF</text>
     </g>
 
-    <rect x="42" y="180" width="1356" height="476" rx="26" fill="#FFFFFF" stroke="#79A99F" stroke-width="2" stroke-dasharray="10 9"/>
-    <rect x="66" y="164" width="238" height="34" rx="17" fill="#1E7A6E"/>
-    <text x="185" y="186" text-anchor="middle" font-size="14" font-weight="750" letter-spacing="1.5" fill="#FFFFFF">LOCAL / PRIVATE BOUNDARY</text>
-
-    <g filter="url(#shadow)">
-      <rect x="78" y="288" width="194" height="148" rx="20" fill="#F8FBFA" stroke="#D7E5E1"/>
-    </g>
-    <circle cx="126" cy="334" r="22" fill="#DDEEEA"/>
-    <circle cx="126" cy="328" r="7" fill="#1E7A6E"/>
-    <path d="M112 348 C114 335 138 335 140 348" fill="#1E7A6E"/>
-    <text x="160" y="331" class="nodeTitle">用户</text>
-    <text x="160" y="354" class="nodeBody">OpenClaw / 私聊</text>
-    <line x1="102" y1="380" x2="246" y2="380" stroke="#D8E4E1"/>
-    <text x="102" y="405" class="nodeBody">自然语言 · 图片 · PDF</text>
-
-    <path d="M278 362 H326" fill="none" stroke="#5D7B75" stroke-width="2" marker-end="url(#arrow)"/>
-
-    <g filter="url(#shadow)">
-      <rect x="336" y="246" width="242" height="232" rx="20" fill="#F8FBFA" stroke="#D7E5E1"/>
-    </g>
-    <text x="364" y="284" class="label">REQUEST GATE</text>
-    <text x="364" y="322" class="nodeTitle">请求与路由</text>
-    <rect x="364" y="346" width="186" height="44" rx="10" fill="#E4F1EE"/>
-    <text x="382" y="374" class="smallTitle">个人本地运行模式</text>
-    <rect x="364" y="400" width="186" height="44" rx="10" fill="#E3EDF8"/>
-    <text x="382" y="428" class="smallTitle">Node.js action 路由</text>
-    <text x="364" y="464" class="smallBody">日志不记录健康参数与凭据</text>
-
-    <path d="M584 362 H630" fill="none" stroke="#5D7B75" stroke-width="2" marker-end="url(#arrow)"/>
-
-    <g filter="url(#shadow)">
-      <rect x="640" y="218" width="354" height="288" rx="20" fill="#F8FBFA" stroke="#D7E5E1"/>
-    </g>
-    <text x="668" y="256" class="label">DOMAIN SKILLS</text>
-    <text x="668" y="290" class="nodeTitle">六个健康领域</text>
-
-    <g>
-      <rect x="668" y="316" width="142" height="54" rx="12" fill="#E4F1EE"/>
-      <text x="739" y="339" text-anchor="middle" class="smallTitle">健康档案</text>
-      <text x="739" y="358" text-anchor="middle" class="smallBody">就诊 · 用药 · 指标</text>
-
-      <rect x="824" y="316" width="142" height="54" rx="12" fill="#EDF3FA"/>
-      <text x="895" y="339" text-anchor="middle" class="smallTitle">饮食追踪</text>
-      <text x="895" y="358" text-anchor="middle" class="smallBody">来源 · 餐次 · 营养</text>
-
-      <rect x="668" y="382" width="142" height="54" rx="12" fill="#EDF3FA"/>
-      <text x="739" y="405" text-anchor="middle" class="smallTitle">体重运动</text>
-      <text x="739" y="424" text-anchor="middle" class="smallBody">趋势 · 目标 · 围度</text>
-
-      <rect x="824" y="382" width="142" height="54" rx="12" fill="#E4F1EE"/>
-      <text x="895" y="405" text-anchor="middle" class="smallTitle">睡眠追踪</text>
-      <text x="895" y="424" text-anchor="middle" class="smallBody">分期 · 日报 · 周趋势</text>
-
-      <rect x="668" y="448" width="142" height="34" rx="10" fill="#F1F5F4"/>
-      <text x="739" y="470" text-anchor="middle" class="smallTitle">健康监测</text>
-
-      <rect x="824" y="448" width="142" height="34" rx="10" fill="#F1F5F4"/>
-      <text x="895" y="470" text-anchor="middle" class="smallTitle">可穿戴同步</text>
+    <g transform="rotate(5 322 539)">
+      <rect x="281" y="501" width="87" height="78" rx="14" fill="#E8F0F7" stroke="#B7CAD9" stroke-width="1.5"/>
+      <rect x="295" y="516" width="59" height="34" rx="7" fill="#FFFFFF"/>
+      <polyline points="300,538 309,538 315,526 323,544 330,533 339,533 348,524" fill="none" stroke="#4B7294" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="325" y="568" text-anchor="middle" class="tiny">设备导出</text>
     </g>
 
-    <path d="M1000 362 H1046" fill="none" stroke="#5D7B75" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M82 652 h44" stroke="#C77A45" stroke-width="3" stroke-linecap="round"/>
+    <text x="82" y="678" class="cardTitle">聊天 · 照片与 PDF · 设备文件</text>
+    <text x="82" y="701" class="cardBody">食物、运动、报告、指标与睡眠都能记录</text>
 
-    <g filter="url(#shadow)">
-      <rect x="1056" y="246" width="306" height="232" rx="20" fill="#173F38"/>
+    <!-- arrow 1 -->
+    <path d="M404 435 C420 425 424 425 439 435" fill="none" stroke="#397A6D" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+    <circle cx="421" cy="414" r="3" fill="#D7A26E"/>
+    <circle cx="431" cy="404" r="2" fill="#D7A26E"/>
+
+    <!-- Panel 2: local organization -->
+    <rect x="446" y="154" width="550" height="594" rx="18" fill="#F4FAF7" stroke="#5E988B" stroke-width="2" stroke-dasharray="9 7"/>
+    <rect x="474" y="139" width="252" height="31" rx="15.5" fill="#397A6D"/>
+    <path d="M493 154 v-5 a7 7 0 0 1 14 0 v5" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <rect x="491" y="153" width="18" height="13" rx="3" fill="#FFFFFF"/>
+    <text x="522" y="159" font-size="12" font-weight="760" letter-spacing="1.4" fill="#FFFFFF">LOCAL · PRIVATE · 本地隐私边界</text>
+
+    <circle cx="480" cy="199" r="16" fill="#397A6D"/>
+    <text x="480" y="204" text-anchor="middle" class="stepNo">2</text>
+    <text x="506" y="204" class="stepEyebrowGreen">ORGANIZE · 自动整理</text>
+    <text x="478" y="244" class="panelTitle">MediWise 把碎片变成健康档案</text>
+    <text x="478" y="270" class="panelSub">按成员归档、持续补充，默认保存在你的设备上</text>
+
+    <!-- local filing cabinet -->
+    <g filter="url(#softShadow)">
+      <rect x="480" y="306" width="286" height="353" rx="15" fill="#FFFFFF" stroke="#BCD4CD" stroke-width="1.5"/>
     </g>
-    <text x="1084" y="284" font-size="14" font-weight="750" letter-spacing="1.5" fill="#97C9BE">PYTHON DATA LAYER</text>
-    <text x="1084" y="320" font-size="23" font-weight="720" fill="#FFFFFF">本地数据访问层</text>
-    <text x="1084" y="346" class="dbBody">事务 · 数据校验 · 审计 · 私有权限</text>
+    <rect x="480" y="306" width="286" height="55" rx="15" fill="#285E54"/>
+    <rect x="480" y="342" width="286" height="19" fill="#285E54"/>
+    <circle cx="511" cy="333" r="10" fill="#E4F1ED"/>
+    <path d="M506 333 l4 4 7-9" fill="none" stroke="#397A6D" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="532" y="339" font-size="18" font-weight="730" fill="#FFFFFF">本地健康档案柜</text>
 
-    <rect x="1084" y="372" width="118" height="72" rx="13" fill="#235C52" stroke="#3B776C"/>
-    <text x="1100" y="400" class="dbTitle">medical.db</text>
-    <text x="1100" y="423" class="dbBody">病历 / 指标 / 用药</text>
+    <rect x="498" y="376" width="116" height="68" rx="9" fill="#E5F1ED"/>
+    <circle cx="519" cy="398" r="10" fill="#77A99D"/>
+    <path d="M514 398 h10 M519 393 v10" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+    <text x="537" y="403" class="drawer">健康档案</text>
+    <text x="512" y="427" class="tiny">就诊 · 指标 · 用药</text>
 
-    <rect x="1216" y="372" width="118" height="72" rx="13" fill="#275C80" stroke="#44789A"/>
-    <text x="1232" y="400" class="dbTitle">lifestyle.db</text>
-    <text x="1232" y="423" class="dbBody">饮食 / 体重 / 设备</text>
+    <rect x="630" y="376" width="118" height="68" rx="9" fill="#FFF0DD"/>
+    <path d="M649 390 q10 7 0 20 q-10-7 0-20" fill="#D69A58"/>
+    <path d="M649 392 q4-6 9-6" fill="none" stroke="#7F9D63" stroke-width="2" stroke-linecap="round"/>
+    <text x="666" y="403" class="drawer">饮食记录</text>
+    <text x="644" y="427" class="tiny">餐次 · 热量 · 营养</text>
 
-    <text x="78" y="612" class="smallBody">默认路径位于系统用户数据目录 · 数据目录 0700 · 数据库、配置、附件与备份 0600</text>
+    <rect x="498" y="457" width="116" height="68" rx="9" fill="#EAF1F7"/>
+    <circle cx="519" cy="479" r="10" fill="none" stroke="#6C91AF" stroke-width="2"/>
+    <path d="M519 479 l6-5 M509 488 h20" stroke="#6C91AF" stroke-width="2" stroke-linecap="round"/>
+    <text x="537" y="484" class="drawer">体重运动</text>
+    <text x="512" y="508" class="tiny">趋势 · 围度 · 活动</text>
 
-    <text x="64" y="704" font-size="14" font-weight="750" letter-spacing="1.5" fill="#A94F38">OPTIONAL EXTERNAL SERVICES</text>
-    <text x="64" y="732" class="nodeBody">只有显式配置后才访问；虚线表示数据离开本地边界</text>
+    <rect x="630" y="457" width="118" height="68" rx="9" fill="#ECEAF7"/>
+    <path d="M654 469 q-11 13 2 25 q-18 0-18-13 q0-10 16-12" fill="#8580B2"/>
+    <text x="666" y="484" class="drawer">睡眠记录</text>
+    <text x="644" y="508" class="tiny">时长 · 分期 · 趋势</text>
 
-    <path d="M784 506 V686" fill="none" stroke="#C0644B" stroke-width="2" stroke-dasharray="7 7" marker-end="url(#arrowExternal)"/>
+    <rect x="498" y="538" width="116" height="68" rx="9" fill="#F8E8E3"/>
+    <path d="M510 567 h5 l4-10 5 18 5-8 h7" fill="none" stroke="#C5755D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="537" y="565" class="drawer">阈值提醒</text>
+    <text x="512" y="589" class="tiny">用药 · 复查 · 关注</text>
 
-    <g>
-      <rect x="614" y="754" width="244" height="76" rx="16" fill="#FBF1ED" stroke="#E7B8AA"/>
-      <text x="636" y="783" class="externalTitle">视觉 / LLM / Embedding</text>
-      <text x="636" y="807" class="externalBody">图片/PDF 或检索文本片段</text>
+    <rect x="630" y="538" width="118" height="68" rx="9" fill="#E5F1ED"/>
+    <rect x="642" y="552" width="17" height="26" rx="6" fill="none" stroke="#4E8B7E" stroke-width="2"/>
+    <circle cx="650.5" cy="565" r="4" fill="#4E8B7E"/>
+    <text x="666" y="565" class="drawer">设备数据</text>
+    <text x="644" y="589" class="tiny">步数 · 心率 · 睡眠</text>
 
-      <rect x="876" y="754" width="224" height="76" rx="16" fill="#FBF1ED" stroke="#E7B8AA"/>
-      <text x="898" y="783" class="externalTitle">USDA / Open Food Facts</text>
-      <text x="898" y="807" class="externalBody">仅食物查询词与必要参数</text>
+    <rect x="512" y="621" width="222" height="23" rx="11.5" fill="#EFF5F3"/>
+    <text x="623" y="637" text-anchor="middle" class="tiny">记录 · 整理 · 查询 · 展示 · 提醒</text>
 
-      <rect x="1118" y="754" width="244" height="76" rx="16" fill="#FBF1ED" stroke="#E7B8AA"/>
-      <text x="1140" y="783" class="externalTitle">设备文件 / 实验性接入</text>
-      <text x="1140" y="807" class="externalBody">仅显式导入或安全授权的数据</text>
+    <!-- family profiles -->
+    <text x="800" y="325" class="cardTitle">一个空间，照顾全家</text>
+    <text x="800" y="347" class="cardBody">每个人都有独立档案</text>
+
+    <g transform="translate(800 370)">
+      <rect width="162" height="65" rx="12" fill="#FFFFFF" stroke="#C9DCD6"/>
+      <circle cx="31" cy="32" r="19" fill="#DCEEE9"/>
+      <circle cx="31" cy="27" r="6" fill="#4E8B7E"/>
+      <path d="M19 43 q2-12 12-12 q10 0 12 12" fill="#4E8B7E"/>
+      <text x="60" y="29" class="cardTitle">我的档案</text>
+      <text x="60" y="48" class="tiny">记录持续更新</text>
     </g>
+    <g transform="translate(800 447)">
+      <rect width="162" height="65" rx="12" fill="#FFFFFF" stroke="#C9DCD6"/>
+      <circle cx="31" cy="32" r="19" fill="#F4E7D5"/>
+      <circle cx="31" cy="27" r="6" fill="#B98755"/>
+      <path d="M19 43 q2-12 12-12 q10 0 12 12" fill="#B98755"/>
+      <text x="60" y="29" class="cardTitle">父亲的档案</text>
+      <text x="60" y="48" class="tiny">用药提醒  08:00</text>
+    </g>
+    <g transform="translate(800 524)">
+      <rect width="162" height="65" rx="12" fill="#FFFFFF" stroke="#C9DCD6"/>
+      <circle cx="31" cy="32" r="19" fill="#E7E7F4"/>
+      <circle cx="31" cy="27" r="6" fill="#817CAB"/>
+      <path d="M19 43 q2-12 12-12 q10 0 12 12" fill="#817CAB"/>
+      <text x="60" y="29" class="cardTitle">母亲的档案</text>
+      <text x="60" y="48" class="tiny">复查提醒  周三</text>
+    </g>
+
+    <path d="M820 629 q50 22 102 0" fill="none" stroke="#8BB2A9" stroke-width="2" stroke-linecap="round"/>
+    <text x="871" y="657" text-anchor="middle" class="tiny">清楚是谁的，才写入谁的档案</text>
+    <path d="M838 675 h66" stroke="#397A6D" stroke-width="3" stroke-linecap="round"/>
+    <text x="871" y="701" text-anchor="middle" class="cardTitle">默认留在本机</text>
+    <text x="871" y="722" text-anchor="middle" class="tiny">方便备份与迁移</text>
+
+    <!-- arrow 2 -->
+    <path d="M1008 435 C1023 425 1029 425 1043 435" fill="none" stroke="#4B7294" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+    <circle cx="1024" cy="414" r="3" fill="#7EA2BE"/>
+
+    <!-- Panel 3: outputs -->
+    <g filter="url(#softShadow)">
+      <rect x="1048" y="174" width="338" height="554" rx="12" fill="#F2F7FB" stroke="#C9D9E6" stroke-width="1.5"/>
+    </g>
+    <circle cx="1077" cy="205" r="16" fill="#4B7294"/>
+    <text x="1077" y="210" text-anchor="middle" class="stepNo">3</text>
+    <text x="1103" y="210" class="stepEyebrowBlue">REVIEW · 看见重点</text>
+    <text x="1076" y="250" class="panelTitle">需要的时候，马上找到</text>
+    <text x="1076" y="276" class="panelSub">查询、提醒和卡片，围绕当前记录生成</text>
+
+    <!-- search result -->
+    <rect x="1076" y="308" width="282" height="88" rx="13" fill="#FFFFFF" stroke="#D4E0E9"/>
+    <circle cx="1102" cy="335" r="10" fill="none" stroke="#4B7294" stroke-width="2"/>
+    <line x1="1110" y1="343" x2="1118" y2="351" stroke="#4B7294" stroke-width="2" stroke-linecap="round"/>
+    <text x="1130" y="340" class="outputTitle">随时查询已有记录</text>
+    <text x="1092" y="369" class="outputBody">“帮我整理最近 7 天的健康情况”</text>
+
+    <!-- reminder -->
+    <rect x="1076" y="410" width="282" height="105" rx="13" fill="#FFFFFF" stroke="#D4E0E9"/>
+    <path d="M1093 441 q0-15 12-15 q12 0 12 15 l5 8 h-34 z" fill="#F1C98F"/>
+    <circle cx="1105" cy="454" r="4" fill="#D39951"/>
+    <text x="1130" y="440" class="outputTitle">不错过重要提醒</text>
+    <rect x="1092" y="463" width="112" height="33" rx="8" fill="#FFF4E4"/>
+    <text x="1103" y="484" class="outputBody">08:00  用药</text>
+    <rect x="1213" y="463" width="126" height="33" rx="8" fill="#F7EAE5"/>
+    <text x="1224" y="484" class="outputBody">周三  复查</text>
+
+    <!-- cards -->
+    <rect x="1076" y="529" width="282" height="152" rx="13" fill="#FFFFFF" stroke="#D4E0E9"/>
+    <text x="1092" y="555" class="outputTitle">生成健康记录卡片</text>
+    <text x="1092" y="576" class="outputBody">个人看近期记录，家庭看当前状态</text>
+
+    <rect x="1092" y="592" width="112" height="72" rx="8" fill="#EAF2F7"/>
+    <text x="1102" y="611" class="tiny">个人记录卡片</text>
+    <polyline points="1102,644 1118,631 1133,637 1148,619 1164,628 1192,612" fill="none" stroke="#4B7294" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="1102" y1="650" x2="1192" y2="650" stroke="#B8CBD9"/>
+
+    <rect x="1213" y="592" width="126" height="72" rx="8" fill="#E9F3F0"/>
+    <text x="1223" y="611" class="tiny">家庭状态卡片</text>
+    <circle cx="1228" cy="630" r="7" fill="#75A69B"/>
+    <rect x="1240" y="625" width="84" height="7" rx="3.5" fill="#B8D4CD"/>
+    <circle cx="1228" cy="649" r="7" fill="#C59664"/>
+    <rect x="1240" y="644" width="64" height="7" rx="3.5" fill="#D8C2A7"/>
+
+    <text x="1217" y="706" text-anchor="middle" class="cardBody">记录在变化，卡片也会随之更新</text>
+
+    <!-- Optional external service callout -->
+    <path d="M720 750 v28" fill="none" stroke="#B87355" stroke-width="1.7" stroke-dasharray="5 5"/>
+    <rect x="468" y="775" width="504" height="37" rx="18.5" fill="#FFF7F2" stroke="#D8A38D" stroke-width="1.3" stroke-dasharray="5 4"/>
+    <circle cx="492" cy="793.5" r="8" fill="#E6B29C"/>
+    <path d="M489 793.5 l2 2 4-5" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="508" y="798" font-size="12.5" font-weight="620" fill="#88503D">可选外部服务：仅在明确启用时访问</text>
+    <text x="939" y="798" text-anchor="end" font-size="11.5" font-weight="560" fill="#A06B57">OPTIONAL · OPT-IN</text>
+
+    <!-- product boundary -->
+    <rect x="54" y="830" width="1332" height="51" rx="10" fill="#FFFFFF" stroke="#D7DDD9"/>
+    <path d="M720 830 v51" stroke="#D7DDD9"/>
+
+    <rect x="70" y="842" width="62" height="27" rx="13.5" fill="#DFF0EB"/>
+    <text x="101" y="860" text-anchor="middle" class="bottomLabel" fill="#397A6D">只做</text>
+    <text x="149" y="856" class="bottomMain" fill="#29453F">记录 · 整理 · 查询 · 展示 · 汇总 · 提醒</text>
+    <text x="149" y="873" class="bottomSub" fill="#71807C">Records · Organizes · Searches · Displays · Summarizes · Reminds</text>
+
+    <rect x="738" y="842" width="62" height="27" rx="13.5" fill="#F8E7E2"/>
+    <text x="769" y="860" text-anchor="middle" class="bottomLabel" fill="#A65D49">不做</text>
+    <text x="817" y="856" class="bottomMain" fill="#6D4034">诊断 · 治疗建议 · 用药建议 · 其他医疗指导</text>
+    <text x="817" y="873" class="bottomSub" fill="#927066">No diagnosis · No treatment or medication advice · No medical guidance</text>
   </g>
 </svg>

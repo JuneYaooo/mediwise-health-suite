@@ -63,9 +63,9 @@ mediwise-health-suite/
 - `agents/`：特定 Agent 平台需要的元数据；并非每个模块都必须存在。
 - `references/`：仅在核心健康档案模块中使用的细分工作流说明。
 
-## 架构与数据边界
+## 项目架构与数据边界
 
-![MediWise Health Suite 架构与数据边界](images/architecture.svg)
+![从生活片段到本地健康记录：MediWise 使用流程与产品边界](images/architecture.svg)
 
 健康档案和生活方式数据默认保存在本机。当前 Agent 可以直接读取附件时，MediWise 不重复配置视觉服务；OCR、云端视觉、在线食物查询、远程向量搜索和后端 API 都是显式启用的可选能力。更完整的隐私说明见 [安装与配置指南](INSTALLATION.md)。
 

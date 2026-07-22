@@ -14,7 +14,7 @@ Keep personal and family health records in one place, including chat notes, medi
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
+[How it works](#how-mediwise-works) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
 
 </div>
 
@@ -33,6 +33,12 @@ Create profiles → Record by chat or image → Track changes → Review alerts 
 You can record blood pressure, blood glucose, medication, meals, weight, sleep, and exercise in natural language. MediWise can also import Apple Health and Gadgetbridge exports. Medical data and lifestyle data are stored in separate local SQLite databases.
 
 MediWise only records, organizes, searches, displays, summarizes, and reminds you about health information. It does not provide diagnoses, treatment advice, medication advice, nutrition therapy, clinical judgment, or any other medical guidance.
+
+## How MediWise works
+
+![From everyday fragments to a local health record: the MediWise workflow and product boundary](docs/images/architecture.svg)
+
+Share information through chat, photos, PDFs, or wearable exports. MediWise organizes it into local records for each family member, then makes those records available through search, reminders, personal record cards, and family status cards.
 
 ## Screenshots
 
