@@ -57,13 +57,13 @@ Ask MediWise to create a health record card for a recent period:
 Create my health record card for the last 7 days.
 ```
 
-The personal card brings together metric trends, recorded food intake, activity burn, steps, sleep, recent visits, lab results, imaging, and active medication. It is generated in English when the conversation or requested locale is English.
+The personal card keeps metric trends, recorded food intake, activity burn, steps, and sleep in a compact overview. A dated personal health timeline then combines metric updates, recent food and activity logs, sleep, visits, lab results, and imaging. It is generated in English when the conversation or requested locale is English.
 
 <p align="center">
-  <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with metrics, intake and activity, sleep, recent care, lab results, imaging, and medication">
+  <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with compact metrics, intake and activity, sleep, a personal health timeline, and medication">
 </p>
 
-Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
+The timeline shows up to ten recent events in reverse chronological order. Medical records come first when several events share a date. Food averages use only days that contain food logs, so an unlogged day is not treated as zero intake. Activity burn is shown as a recorded value and is not presented as a calorie deficit. A lab item is counted as abnormal only when the stored report explicitly marks it high, low, abnormal, or critical.
 
 MediWise also has a compact family card for one local user who manages several family profiles. It shows each person as `Name (relationship)`, prioritizes members with alerts or pending reminders, and combines recent visits, lab results, and imaging in a family care timeline. Ask for it explicitly:
 

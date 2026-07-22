@@ -56,7 +56,10 @@ COPY = {
         "family_timeline": "家庭近期医疗时间线", "stable": "无明确提醒", "needs_attention": "需要关注",
         "data_present": "近期有记录", "data_missing": "近期记录较少", "diet_days_short": "饮食 {count} 天",
         "activity_short": "运动 {count} 次", "sleep_short": "睡眠 {count} 夜", "care_short": "医疗 {count} 项",
-        "no_timeline": "所选时间范围内暂无家庭就医、检验或检查记录。",
+        "no_timeline": "所选时间范围内暂无家庭就医、检验或检查记录。", "health_timeline": "个人健康时间轴",
+        "no_health_timeline": "所选时间范围内暂无可展示的健康动态。", "metric_event": "指标",
+        "food_event": "饮食", "activity_event": "运动", "sleep_event": "睡眠", "health_metric_update": "健康指标更新",
+        "food_log": "饮食记录", "sleep_log": "睡眠记录", "sleep_score": "评分 {score}",
         "generated": "生成时间：{time}",
         "disclaimer": "本卡片仅整理已记录信息，不构成诊断或医疗建议；如有不适或异常，请咨询专业医生。",
         "self": "本人", "visit_event": "就医", "lab_event": "检验", "imaging_event": "检查",
@@ -92,7 +95,10 @@ COPY = {
         "family_timeline": "Recent family care timeline", "stable": "No explicit alerts", "needs_attention": "Needs attention",
         "data_present": "Recent records available", "data_missing": "Limited recent data", "diet_days_short": "Food {count}d",
         "activity_short": "Activity {count}", "sleep_short": "Sleep {count} nights", "care_short": "Care {count}",
-        "no_timeline": "No visits, lab results, imaging, or exams were recorded for the family in this period.",
+        "no_timeline": "No visits, lab results, imaging, or exams were recorded for the family in this period.", "health_timeline": "Personal health timeline",
+        "no_health_timeline": "No health events are available for this period.", "metric_event": "Metrics",
+        "food_event": "Food", "activity_event": "Activity", "sleep_event": "Sleep", "health_metric_update": "Health metrics updated",
+        "food_log": "Food log", "sleep_log": "Sleep record", "sleep_score": "Score {score}",
         "generated": "Generated {time}",
         "disclaimer": "This card organizes recorded information only. It is not a diagnosis or medical advice. Consult a qualified clinician about symptoms or abnormal results.",
         "self": "self", "visit_event": "Visit", "lab_event": "Lab", "imaging_event": "Imaging",
@@ -220,7 +226,8 @@ def _query_active_medications(member_id: str) -> list[dict]:
 def _query_lifestyle_summary(member_id: str, days: int) -> dict:
     cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
     result = {"diet_days": 0, "diet": None, "exercise_count": 0, "exercise_days": 0,
-              "duration": 0, "calories_burned": 0.0, "step_days": 0, "avg_steps": None}
+              "duration": 0, "calories_burned": 0.0, "step_days": 0, "avg_steps": None,
+              "recent_diet": None, "recent_exercise": []}
     conn = health_db.get_lifestyle_connection()
     try:
         row = conn.execute(
@@ -232,12 +239,22 @@ def _query_lifestyle_summary(member_id: str, days: int) -> dict:
         result["diet_days"] = diet_days
         if diet_days:
             result["diet"] = {key: float(row[key] or 0) / diet_days for key in ("calories", "protein", "fat", "carbs", "fiber")}
+            recent_diet = conn.execute(
+                """SELECT meal_date, SUM(total_calories) AS calories, SUM(total_protein) AS protein,
+                          SUM(total_fat) AS fat, SUM(total_carbs) AS carbs, SUM(total_fiber) AS fiber
+                   FROM diet_records WHERE member_id=? AND is_deleted=0 AND meal_date>=?
+                   GROUP BY meal_date ORDER BY meal_date DESC LIMIT 1""", (member_id, cutoff)).fetchone()
+            result["recent_diet"] = {key: recent_diet[key] for key in recent_diet.keys()} if recent_diet else None
         row = conn.execute(
             """SELECT COUNT(*) AS count, COUNT(DISTINCT exercise_date) AS days,
                       SUM(duration) AS duration, SUM(calories_burned) AS burned
                FROM exercise_records WHERE member_id=? AND is_deleted=0 AND exercise_date>=?""", (member_id, cutoff)).fetchone()
         result.update(exercise_count=int(row["count"] or 0), exercise_days=int(row["days"] or 0),
                       duration=int(row["duration"] or 0), calories_burned=float(row["burned"] or 0))
+        result["recent_exercise"] = health_db.rows_to_list(conn.execute(
+            """SELECT exercise_date, exercise_type, exercise_name, duration, calories_burned, intensity
+               FROM exercise_records WHERE member_id=? AND is_deleted=0 AND exercise_date>=?
+               ORDER BY exercise_date DESC, exercise_time DESC LIMIT 2""", (member_id, cutoff)).fetchall())
     finally:
         conn.close()
 
@@ -286,6 +303,7 @@ def _query_sleep_summary(member_id: str, days: int) -> dict:
         return sum(values) / len(values) if values else None
     return {"count": len(records), "avg_duration": average("duration_min"), "avg_score": average("score"),
             "latest_deep": records[-1].get("deep_min"), "latest_rem": records[-1].get("rem_min"),
+            "latest_duration": records[-1].get("duration_min"), "latest_score": records[-1].get("score"),
             "latest_date": records[-1]["date"]}
 
 
@@ -436,32 +454,75 @@ def _lifestyle_sleep(lifestyle: dict, sleep: dict, locale: str) -> str:
     return f'<section><div class="section-title"><span>02</span><h2>{c["intake_activity"]}</h2></div><div class="wellness-grid">{intake}{activity}{sleep_html}</div><p class="scope-note">{c["not_balance"]}</p></section>'
 
 
-def _care_html(care: dict, locale: str) -> str:
+def _timeline_metric_value(metric_type: str, point: dict) -> str:
+    if metric_type == "blood_pressure":
+        value = f'{point.get("systolic", "—")}/{point.get("diastolic", "—")}'
+    else:
+        value = _fmt_number(_metric_number(point, metric_type), 1 if metric_type in ("blood_sugar", "weight") else 0)
+    return f'{value} {METRIC_UNITS.get(metric_type, "")}'.strip()
+
+
+def _personal_timeline(trends: dict, lifestyle: dict, sleep: dict, care: dict, locale: str) -> str:
+    """Build a compact chronology spanning care and everyday health records."""
     c = COPY[locale]
-    def rows(kind):
-        values = care[kind]
-        if not values:
-            return f'<div class="empty compact">{c[{"visits":"no_visits","labs":"no_labs","imaging":"no_imaging"}[kind]]}</div>'
-        output = []
-        for item in values:
-            if kind == "visits":
-                title = item.get("diagnosis") or item.get("department") or item.get("visit_type") or c["unknown"]
-                detail = " · ".join(x for x in (item.get("hospital"), item.get("department")) if x)
-                date = item.get("visit_date", "")[:10]
-            elif kind == "labs":
-                title, date = item.get("test_name") or c["unknown"], item.get("test_date", "")[:10]
-                detail = c["abnormal"].format(count=item["abnormal_count"]) if item["abnormal_count"] else c["no_flagged"]
-                if item.get("abnormal_labels"):
-                    detail += " · " + "; ".join(item["abnormal_labels"])
-            else:
-                title, date = item.get("exam_name") or c["unknown"], item.get("exam_date", "")[:10]
-                detail = item.get("conclusion") or item.get("findings") or c["unknown"]
-            output.append(f'<div class="care-item"><time>{_escape(date)}</time><b>{_escape(title)}</b><p>{_escape(detail)}</p></div>')
-        return "".join(output)
-    return f'''<section><div class="section-title"><span>03</span><h2>{c["recent_care"]}</h2></div>
-      <div class="care-grid"><div class="care-col"><h3>{c["visits"]}</h3>{rows("visits")}</div>
-      <div class="care-col"><h3>{c["labs"]}</h3>{rows("labs")}</div>
-      <div class="care-col"><h3>{c["imaging"]}</h3>{rows("imaging")}</div></div></section>'''
+    events = []
+
+    for item in care["visits"]:
+        title = item.get("diagnosis") or item.get("department") or item.get("visit_type") or c["unknown"]
+        detail = " · ".join(value for value in (item.get("hospital"), item.get("department"), item.get("summary")) if value)
+        events.append({"date": item.get("visit_date", "")[:10], "priority": 0, "tone": "care-event",
+                       "kind": c["visit_event"], "title": title, "detail": detail})
+    for item in care["labs"]:
+        detail = c["abnormal"].format(count=item["abnormal_count"]) if item["abnormal_count"] else c["no_flagged"]
+        if item.get("abnormal_labels"):
+            detail += " · " + "; ".join(item["abnormal_labels"])
+        events.append({"date": item.get("test_date", "")[:10], "priority": 0, "tone": "care-event",
+                       "kind": c["lab_event"], "title": item.get("test_name") or c["unknown"], "detail": detail})
+    for item in care["imaging"]:
+        events.append({"date": item.get("exam_date", "")[:10], "priority": 0, "tone": "care-event",
+                       "kind": c["imaging_event"], "title": item.get("exam_name") or c["unknown"],
+                       "detail": item.get("conclusion") or item.get("findings") or c["unknown"]})
+
+    metric_dates = {}
+    for metric_type, points in trends.items():
+        if points:
+            point = points[-1]
+            metric_dates.setdefault(point.get("date", ""), []).append(
+                f'{METRIC_NAMES[locale].get(metric_type, metric_type)} {_timeline_metric_value(metric_type, point)}')
+    for date, values in metric_dates.items():
+        events.append({"date": date, "priority": 1, "tone": "metric-event", "kind": c["metric_event"],
+                       "title": c["health_metric_update"], "detail": " · ".join(values)})
+
+    recent_diet = lifestyle.get("recent_diet")
+    if recent_diet:
+        detail = f'{c["recorded_intake"]} {_fmt_number(recent_diet.get("calories"))} kcal · {c["protein"]} {_fmt_number(recent_diet.get("protein"))}g · {c["fiber"]} {_fmt_number(recent_diet.get("fiber"))}g'
+        events.append({"date": str(recent_diet.get("meal_date", ""))[:10], "priority": 3, "tone": "food-event",
+                       "kind": c["food_event"], "title": c["food_log"], "detail": detail})
+    for exercise in lifestyle.get("recent_exercise", []):
+        title = exercise.get("exercise_name") or exercise.get("exercise_type") or c["activity_event"]
+        detail = f'{c["duration"]} {_fmt_number(exercise.get("duration"))} {c["minutes"]} · {c["activity_burn"]} {_fmt_number(exercise.get("calories_burned"))} kcal'
+        events.append({"date": str(exercise.get("exercise_date", ""))[:10], "priority": 2, "tone": "activity-event",
+                       "kind": c["activity_event"], "title": title, "detail": detail})
+    if sleep.get("count"):
+        score = c["sleep_score"].format(score=_fmt_number(sleep.get("latest_score"))) if sleep.get("latest_score") is not None else ""
+        detail = " · ".join(value for value in (_hours(sleep.get("latest_duration"), locale), score,
+                                                   f'{c["latest_deep"]} {_fmt_number(sleep.get("latest_deep"))} {c["minutes"]}') if value)
+        events.append({"date": sleep.get("latest_date", ""), "priority": 4, "tone": "sleep-event",
+                       "kind": c["sleep_event"], "title": c["sleep_log"], "detail": detail})
+
+    def event_sort_key(event):
+        return event["date"], -event["priority"]
+
+    # Keep one true chronology. Medical events only win ties on the same day;
+    # an older visit must not displace today's sleep, meal, or activity log.
+    events = sorted(events, key=event_sort_key, reverse=True)[:10]
+    if not events:
+        body = f'<div class="empty">{c["no_health_timeline"]}</div>'
+    else:
+        body = '<div class="timeline personal-timeline">' + "".join(
+            f'<div class="timeline-item {event["tone"]}"><time>{_escape(event["date"])}</time><span></span><div><b>{_escape(event["title"])}</b><small>{_escape(event["kind"])}</small><p>{_escape(event["detail"])}</p></div></div>'
+            for event in events) + '</div>'
+    return f'<section class="timeline-section"><div class="section-title"><span>03</span><h2>{c["health_timeline"]}</h2></div>{body}</section>'
 
 
 def _medications_html(meds: list[dict], locale: str) -> str:
@@ -493,9 +554,9 @@ def _attention_html(member_data: dict, locale: str) -> str:
 
 def _personal_content(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict, care: dict, meds: list[dict], locale: str) -> str:
     c = COPY[locale]
-    return f'''<section class="attention-block"><div class="section-title"><span>00</span><h2>{c["attention"]}</h2></div>{_attention_html(member_data, locale)}</section>
-    <section><div class="section-title"><span>01</span><h2>{c["metrics"]}</h2></div>{_metric_cards(trends, locale)}</section>
-    {_lifestyle_sleep(lifestyle, sleep, locale)}{_care_html(care, locale)}{_medications_html(meds, locale)}'''
+    return f'''<section class="overview-section"><div class="compact-attention"><b>{c["attention"]}</b>{_attention_html(member_data, locale)}</div>
+    <div class="section-title metric-title"><span>01</span><h2>{c["metrics"]}</h2></div>{_metric_cards(trends, locale)}</section>
+    {_lifestyle_sleep(lifestyle, sleep, locale)}{_personal_timeline(trends, lifestyle, sleep, care, locale)}{_medications_html(meds, locale)}'''
 
 
 def _family_card(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict, care: dict, locale: str) -> str:
@@ -571,19 +632,18 @@ def _render_html(title: str, subtitle: str, privacy: str, summary: str, content:
     generated = c["generated"].format(time=datetime.now().strftime("%Y-%m-%d %H:%M"))
     return f'''<!DOCTYPE html><html lang="{c["lang"]}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{_escape(title)}</title>
 <style>
-*{{box-sizing:border-box}} body{{margin:0;background:#F4F8F7;color:#173B35;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}} .container{{max-width:1040px;margin:auto;padding:26px}}
-.header{{position:relative;overflow:hidden;border-radius:24px;padding:34px 38px;background:linear-gradient(135deg,#123C35,#1A6B5E);color:#fff;box-shadow:0 18px 42px rgba(18,60,53,.18)}} .header:after{{content:"";position:absolute;width:250px;height:250px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-48px;top:-112px;box-shadow:0 0 0 38px rgba(255,255,255,.035)}}
+*{{box-sizing:border-box}} body{{margin:0;background:#F4F8F7;color:#173B35;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;line-break:strict;overflow-wrap:break-word;font-synthesis:none}} .container{{max-width:1040px;margin:auto;padding:26px}}
+.header{{position:relative;overflow:hidden;border-radius:24px;padding:29px 36px;background:linear-gradient(135deg,#123C35,#1A6B5E);color:#fff;box-shadow:0 18px 42px rgba(18,60,53,.18)}} .header:after{{content:"";position:absolute;width:250px;height:250px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-48px;top:-112px;box-shadow:0 0 0 38px rgba(255,255,255,.035)}}
 .brand{{display:flex;align-items:center;gap:13px}} .mark{{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#E1F1ED;color:#17695D;font-weight:800;font-size:22px}} h1{{font-size:28px;line-height:1.2;margin:0;letter-spacing:-.4px}} .subtitle{{margin-top:15px;color:#CCE3DE}} .privacy{{display:inline-block;margin-top:14px;padding:5px 11px;border:1px solid rgba(255,255,255,.22);border-radius:99px;color:#E1EFEC;font-size:12px}}
 .summary-strip{{display:grid;grid-template-columns:repeat(3,1fr);background:white;border:1px solid #DFEAE7;border-radius:18px;margin:18px 0;padding:16px;box-shadow:0 9px 28px rgba(18,60,53,.06)}} .summary-strip>div{{padding:2px 22px;border-right:1px solid #E4ECEA}} .summary-strip>div:last-child{{border:0}} .summary-strip b{{font-size:25px;display:block;line-height:1.1}} .summary-strip span{{font-size:12px;color:#718580}} .green{{color:#167568}} .blue{{color:#2F6FEB}} .coral{{color:#D66548}} .gold{{color:#B7791F}}
-section{{background:#fff;border:1px solid #DFEAE7;border-radius:20px;padding:25px;margin:18px 0;box-shadow:0 10px 30px rgba(18,60,53,.055)}} .section-title{{display:flex;align-items:center;gap:10px;margin-bottom:17px}} .section-title>span{{font-size:10px;font-weight:800;color:#72A69C;border:1px solid #CDE1DC;border-radius:99px;padding:2px 7px}} h2{{font-size:18px;margin:0}} h3{{margin:0;font-size:14px}} .muted{{color:#718580;font-size:11px}} .empty{{padding:24px;text-align:center;border:1px dashed #BFD2CD;border-radius:13px;background:#F8FBFA;color:#718580}} .empty.compact{{padding:18px 10px;margin-top:10px}}
-.metric-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}} .metric-card{{padding:16px;border-radius:15px;background:#F7FAF9;border:1px solid #DCE8E5}} .metric-head,.meta{{display:flex;justify-content:space-between;gap:8px}} .metric-head span{{font-size:10px;background:#E8F0FA;color:#2F6FEB;border-radius:99px;padding:3px 7px}} .metric-value{{font-size:27px;font-weight:760;margin-top:8px}} .metric-value small,.big small{{font-size:11px;color:#718580}} .spark{{display:block;width:100%;height:54px;margin:7px 0}} .meta{{font-size:9px;color:#82938F}}
-.wellness-grid{{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:12px}} .panel{{min-height:190px;border-radius:16px;padding:17px;border:1px solid #DCE8E5;background:#F9FBFB}} .intake{{background:#F5F8FC;border-color:#DCE6F3}} .activity{{background:#F3F9F7;border-color:#D6E9E4}} .sleep{{background:#FCF7F4;border-color:#F1E0D9}} .eyebrow{{font-size:12px;font-weight:750;color:#506D67}} .big{{font-size:27px;font-weight:780;margin-top:9px}} .macro,.sleep-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:14px}} .macro span,.sleep-row span{{font-size:10px;color:#7A8D88}} .macro b,.sleep-row b{{display:block;font-size:12px;color:#284A44}} .step-box{{margin-top:15px;padding-top:12px;border-top:1px solid #D7E8E4;display:grid;grid-template-columns:1fr auto}} .step-box b{{font-size:18px;color:#176F63}} .step-box small{{grid-column:1/3;color:#82938F}} .top-gap{{margin-top:14px}} .scope-note{{margin:13px 2px 0;font-size:10px;color:#82938F}}
-.care-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}} .care-col{{border:1px solid #E1EAE8;border-radius:15px;padding:15px}} .care-col h3{{color:#365B54;margin-bottom:9px}} .care-item{{position:relative;padding:10px 0 10px 15px;border-top:1px solid #EDF2F1}} .care-item:before{{content:"";position:absolute;width:6px;height:6px;background:#D76A4A;border-radius:50%;left:0;top:17px}} .care-item time{{font-size:9px;color:#9B6B5F;display:block}} .care-item b{{font-size:12px}} .care-item p{{font-size:10px;color:#718580;margin:2px 0 0}}
-.table-wrap{{overflow:hidden;border:1px solid #DFE8E6;border-radius:14px}} table{{width:100%;border-collapse:collapse}} th{{background:#EDF4F2;color:#31564F;font-size:11px;text-align:left}} th,td{{padding:9px 12px;border-bottom:1px solid #EDF2F1}} tr:last-child td{{border:0}} td{{font-size:11px}}
-.clear{{display:flex;align-items:center;gap:10px;padding:14px 17px;border-radius:14px;background:#E7F5F1;color:#16665B}} .clear i{{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#1B786B;color:white;font-style:normal}} .hero-clear{{margin:18px 0;background:white;border:1px solid #D7E8E3;box-shadow:0 9px 28px rgba(18,60,53,.05)}} .attention-list{{display:grid;gap:8px}} .attention-item{{display:flex;gap:10px;padding:11px 13px;border-radius:11px;background:#F8FAFA}} .attention-item span{{width:7px;height:7px;border-radius:50%;background:#2F6FEB;margin-top:7px;flex:none}} .attention-item.alert span{{background:#D65F45}} .attention-item.warning span{{background:#D49A30}} .attention-item p{{margin:0}}
+section{{background:#fff;border:1px solid #DFEAE7;border-radius:20px;padding:21px;margin:14px 0;box-shadow:0 10px 30px rgba(18,60,53,.055)}} .section-title{{display:flex;align-items:center;gap:10px;margin-bottom:13px}} .section-title>span{{font-size:10px;font-weight:800;color:#72A69C;border:1px solid #CDE1DC;border-radius:99px;padding:2px 7px}} h2{{font-size:18px;margin:0;text-wrap:balance}} h3{{margin:0;font-size:14px}} p{{text-wrap:pretty}} .muted{{color:#718580;font-size:11px}} .empty{{padding:20px;text-align:center;border:1px dashed #BFD2CD;border-radius:13px;background:#F8FBFA;color:#718580}} .empty.compact{{padding:14px 9px;margin-top:8px}}
+.metric-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}} .metric-card{{padding:13px;border-radius:14px;background:#F7FAF9;border:1px solid #DCE8E5;min-width:0}} .metric-head,.meta{{display:flex;justify-content:space-between;gap:6px}} .metric-head b{{font-size:12px}} .metric-head span{{font-size:9px;background:#E8F0FA;color:#2F6FEB;border-radius:99px;padding:2px 6px;white-space:nowrap}} .metric-value{{font-size:24px;font-weight:760;margin-top:6px;font-variant-numeric:tabular-nums}} .metric-value small,.big small{{font-size:10px;color:#718580}} .spark{{display:block;width:100%;height:42px;margin:5px 0}} .meta{{font-size:8px;color:#82938F}} .metric-title{{margin-top:16px}}
+.wellness-grid{{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:10px}} .panel{{min-height:158px;border-radius:15px;padding:14px;border:1px solid #DCE8E5;background:#F9FBFB}} .intake{{background:#F5F8FC;border-color:#DCE6F3}} .activity{{background:#F3F9F7;border-color:#D6E9E4}} .sleep{{background:#FCF7F4;border-color:#F1E0D9}} .eyebrow{{font-size:11px;font-weight:750;color:#506D67}} .big{{font-size:24px;font-weight:780;margin-top:6px;font-variant-numeric:tabular-nums}} .macro,.sleep-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:9px}} .macro span,.sleep-row span{{font-size:9px;color:#7A8D88}} .macro b,.sleep-row b{{display:block;font-size:11px;color:#284A44}} .step-box{{margin-top:9px;padding-top:8px;border-top:1px solid #D7E8E4;display:grid;grid-template-columns:1fr auto}} .step-box b{{font-size:16px;color:#176F63}} .step-box small{{grid-column:1/3;color:#82938F}} .top-gap{{margin-top:10px}} .scope-note{{margin:9px 2px 0;font-size:9px;color:#82938F}}
+.table-wrap{{overflow:hidden;border:1px solid #DFE8E6;border-radius:14px}} table{{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}} th{{background:#EDF4F2;color:#31564F;font-size:11px;text-align:left}} th,td{{padding:9px 12px;border-bottom:1px solid #EDF2F1}} tr:last-child td{{border:0}} td{{font-size:11px}}
+.clear{{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:13px;background:#E7F5F1;color:#16665B}} .clear i{{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#1B786B;color:white;font-style:normal}} .hero-clear{{margin:14px 0;background:white;border:1px solid #D7E8E3;box-shadow:0 9px 28px rgba(18,60,53,.05)}} .attention-list{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;flex:1}} .attention-item{{display:flex;gap:9px;padding:8px 11px;border-radius:10px;background:#F4F8F7}} .attention-item span{{width:6px;height:6px;border-radius:50%;background:#2F6FEB;margin-top:7px;flex:none}} .attention-item.alert span{{background:#D65F45}} .attention-item.warning span{{background:#D49A30}} .attention-item p{{margin:0;font-size:12px}} .compact-attention{{display:flex;align-items:center;gap:14px;padding-bottom:13px;border-bottom:1px solid #E5EEEB}} .compact-attention>b{{font-size:12px;white-space:nowrap;color:#45645E}} .compact-attention>.clear{{flex:1;padding:8px 11px}} .compact-attention>.clear i{{width:20px;height:20px}}
 .family-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}} .family-card{{padding:18px;border:1px solid #DCE8E5;border-radius:17px;background:#FAFCFB}} .family-card-head{{display:flex;justify-content:space-between;gap:10px}} .family-card-head p{{margin:3px 0;color:#718580;font-size:10px}} .status{{height:max-content;padding:4px 8px;border-radius:99px;background:#E5F3EF;color:#176B60;font-size:9px;white-space:nowrap}} .status.watch{{background:#FCEBE5;color:#A64C36}} .family-metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}} .family-metrics span{{padding:9px;background:#F0F6F4;border-radius:10px}} .family-metrics span.wide{{grid-column:1/4}} .family-metrics small,.family-metrics b{{display:block}} .family-metrics small{{font-size:9px;color:#718580}} .family-metrics b{{font-size:14px;margin-top:3px}} .family-metrics i{{font-size:8px;font-style:normal;color:#7B8E89}} .chips{{display:flex;flex-wrap:wrap;gap:5px}} .chips span{{font-size:9px;padding:3px 7px;border:1px solid #DCE8E5;border-radius:99px;color:#637C76}}
-.timeline{{padding-left:6px}} .timeline-item{{display:grid;grid-template-columns:78px 12px 1fr;gap:9px;min-height:55px}} .timeline-item time{{font-size:10px;color:#718580;padding-top:2px}} .timeline-item>span{{position:relative}} .timeline-item>span:before{{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#D76A4A;top:5px;left:2px}} .timeline-item>span:after{{content:"";position:absolute;width:1px;background:#DDE8E5;top:15px;bottom:0;left:5px}} .timeline-item:last-child>span:after{{display:none}} .timeline-item b{{font-size:12px}} .timeline-item small{{margin-left:7px;padding:2px 6px;border-radius:99px;background:#F4E9E5;color:#9B5A47;font-size:8px}} .timeline-item p{{font-size:11px;color:#59726C;margin:1px 0}}
-.footer{{text-align:center;color:#758984;font-size:10px;padding:18px 10px 8px}} .footer b{{display:block;color:#385C55;margin:4px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid,.wellness-grid,.care-grid,.family-grid{{grid-template-columns:1fr}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
+.timeline{{padding-left:6px}} .timeline-item{{display:grid;grid-template-columns:78px 12px 1fr;gap:9px;min-height:55px}} .timeline-item time{{font-size:10px;color:#718580;padding-top:2px;font-variant-numeric:tabular-nums}} .timeline-item>span{{position:relative}} .timeline-item>span:before{{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#D76A4A;top:5px;left:2px}} .timeline-item>span:after{{content:"";position:absolute;width:1px;background:#DDE8E5;top:15px;bottom:0;left:5px}} .timeline-item:last-child>span:after{{display:none}} .timeline-item b{{font-size:12px}} .timeline-item small{{margin-left:7px;padding:2px 6px;border-radius:99px;background:#F4E9E5;color:#9B5A47;font-size:8px}} .timeline-item p{{font-size:11px;color:#59726C;margin:1px 0}} .personal-timeline{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:25px}} .personal-timeline .timeline-item{{grid-template-columns:72px 12px 1fr;min-height:52px}} .personal-timeline .metric-event>span:before{{background:#2F6FEB}} .personal-timeline .metric-event small{{background:#E8F0FA;color:#2F6FEB}} .personal-timeline .food-event>span:before{{background:#557FBA}} .personal-timeline .food-event small{{background:#EDF3FA;color:#446A9E}} .personal-timeline .activity-event>span:before{{background:#1E7A6E}} .personal-timeline .activity-event small{{background:#E4F2EE;color:#176B60}} .personal-timeline .sleep-event>span:before{{background:#C8775E}} .personal-timeline .sleep-event small{{background:#F7EAE5;color:#A45C47}}
+.footer{{text-align:center;color:#758984;font-size:10px;padding:14px 10px 6px}} .footer b{{display:block;color:#385C55;margin:3px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid{{grid-template-columns:repeat(2,1fr)}}.wellness-grid,.family-grid,.personal-timeline{{grid-template-columns:1fr}}.attention-list{{grid-template-columns:1fr}}.compact-attention{{align-items:flex-start;flex-direction:column}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
 </style></head><body><main class="container"><header class="header"><div class="brand"><div class="mark">M</div><h1>{_escape(title)}</h1></div><div class="subtitle">{_escape(subtitle)}</div><div class="privacy">●&nbsp; {_escape(privacy)} · MediWise</div></header>{summary}{content}<footer class="footer"><span>{_escape(generated)}</span><b>MediWise Health Suite</b><span>{_escape(c["disclaimer"])}</span></footer></main></body></html>'''
 
 
@@ -644,7 +704,8 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         data = all_data[0]
         title = c["title"]
         subtitle = f'{_member_label(data["member"], locale)} · {c["period"].format(start=start, end=end)} · {c["last_days"].format(days=days)}'
-        summary = _summary_strip(card_briefing, locale)
+        has_priority_items = any(card_briefing.get(key, 0) for key in ("total_alerts", "total_warnings", "total_due_reminders"))
+        summary = _summary_strip(card_briefing, locale) if has_priority_items else ""
         content = _personal_content(data["member"], data["member_data"], data["trends"], data["lifestyle"], data["sleep"], data["care"], data["meds"], locale)
         privacy = c["local_profile"]
     else:
