@@ -28,6 +28,9 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 
 ### ✅ 3. 体重管理 (weight-manager)
 - 目标设定：减重/增重/维持
+- 体重翻译器：区分单日波动与稳健长期趋势
+- 「MediWise 体重译报」：联合分析体重稳健趋势与同期饮食、运动、睡眠记录，生成默认脱敏的本地 HTML 和 1080×1440 PNG
+- 24 套差异化模板的可解释选择：按可用信号、场景、偏好、历史和探索概率推荐；每套有独立构图与主导内容，原经典航向版兼容入口继续保留
 - BMI/BMR/TDEE 计算
 - 运动记录与消耗追踪
 - 身体围度记录
@@ -88,7 +91,14 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
    "帮我设定一个减重目标，从 70kg 减到 65kg"
    ```
 
-6. **就医前准备**
+6. **翻译体重波动并生成分享卡**
+   ```
+   "别只告诉我今天重了多少，帮我翻译最近 14 天的体重趋势"
+   "从 24 套模板中选一个适合我的分享风格，别和最近几张重复"
+   "生成一张默认脱敏的体重译报，不显示姓名和绝对体重"
+   ```
+
+7. **就医前准备**
    ```
    "我准备去看医生，帮我整理一下最近的情况"
    ```
@@ -101,7 +111,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
-- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片或 PDF 时需要；纯文字记录与查询不需要
+- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、体重译报、旧体重真相卡或 PDF 时需要；HTML 和纯文字记录、查询不需要
 
 ## 数据隐私
 

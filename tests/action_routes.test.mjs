@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -60,6 +60,90 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   assert.equal(metrics.status, 'ok');
   assert.equal(metrics.result.count, 1);
   assert.equal(metrics.result.metrics[0].value, '62');
+
+  const truth = await weight.execute({
+    action: 'weight-truth', member_id: member.id,
+    params: { days: 14, as_of: '2026-07-24' },
+  }, context);
+  assert.equal(truth.status, 'ok');
+  assert.equal(truth.result.analysis.state, 'insufficient');
+  assert.equal(truth.result.analysis.method, 'daily_median+theil_sen');
+  assert.equal(truth.result.privacy.share_safe_default, true);
+
+  const styleSelection = await weight.execute({
+    action: 'select-weight-card-style', member_id: member.id,
+    params: {
+      days: 14, as_of: '2026-07-24', scene: 'share', tone: 'playful',
+      preferred_styles: ['weather-now'], recent_styles: ['direction-course'], seed: 'route-test',
+    },
+  }, context);
+  assert.equal(styleSelection.status, 'ok');
+  assert.equal(styleSelection.result.style_selection.selection_policy.non_uniform, true);
+  assert.equal(styleSelection.result.style_selection.story_moments[0].id, 'prologue');
+  assert.equal(styleSelection.result.style_selection.eligible_styles.includes('terrain-contour'), false);
+  assert.equal(styleSelection.result.style_selection.visual_signature.reproducible, true);
+
+  const updatedStylePreferences = await weight.execute({
+    action: 'update-weight-card-preferences', member_id: member.id,
+    params: {
+      tone: 'playful', density: 'concise', surprise_level: 0.7,
+      like_styles: ['weather-now'], dislike_styles: ['editorial-cover'],
+      generated_style: 'direction-course',
+    },
+  }, context);
+  assert.equal(updatedStylePreferences.status, 'ok');
+  assert.deepEqual(updatedStylePreferences.result.profile.preferred_styles, ['weather-now']);
+  assert.deepEqual(updatedStylePreferences.result.profile.recent_styles, ['direction-course']);
+  assert.equal(updatedStylePreferences.result.storage.member_id_hashed, true);
+
+  const stylePreferences = await weight.execute({
+    action: 'weight-card-preferences', member_id: member.id, params: {},
+  }, context);
+  assert.equal(stylePreferences.status, 'ok');
+  assert.equal(stylePreferences.result.profile.tone, 'playful');
+  assert.equal(stylePreferences.result.profile.disliked_styles.includes('editorial-cover'), true);
+
+  const weightStoryDir = join(dataDir, 'weight-story-test');
+  const weightStory = await weight.execute({
+    action: 'generate-weight-story-card', member_id: member.id,
+    params: {
+      days: 14, as_of: '2026-07-24', format: 'html', output_dir: weightStoryDir,
+      context_lines: ['仅用于译报路由测试'], seed: 'story-route-test',
+    },
+  }, context);
+  assert.equal(weightStory.status, 'ok');
+  assert.equal(weightStory.result.product_name, 'MediWise 体重译报');
+  assert.equal(weightStory.result.analysis.management.method, 'daily_weight_median+theil_sen+parallel_recorded_lifestyle_summary');
+  assert.equal(weightStory.result.analysis.management.synthesis.causal_claim, false);
+  assert.equal(weightStory.result.card.style, weightStory.result.style_selection.selected_style.id);
+  assert.equal(weightStory.result.style_selection.eligible_styles.includes(weightStory.result.card.style), true);
+  assert.equal(weightStory.result.card.share_safe, true);
+  assert.equal(weightStory.result.style_history.saved, true);
+  assert.equal(existsSync(weightStory.result.card.html_path), true);
+  const weightStoryHtml = readFileSync(weightStory.result.card.html_path, 'utf8');
+  assert.match(weightStoryHtml, /MediWise 体重译报/);
+  assert.match(weightStoryHtml, /class="analysis-note analysis-/);
+  assert.match(weightStoryHtml, new RegExp(`data-style-id="${weightStory.result.card.style}"`));
+  assert.doesNotMatch(weightStoryHtml, /测试成员/);
+
+  const weightCardDir = join(dataDir, 'weight-card-test');
+  const weightCard = await weight.execute({
+    action: 'generate-weight-card', member_id: member.id,
+    params: {
+      days: 14, as_of: '2026-07-24', format: 'html', output_dir: weightCardDir,
+      context_lines: ['仅用于路由测试'],
+    },
+  }, context);
+  assert.equal(weightCard.status, 'ok');
+  assert.equal(weightCard.result.card.share_safe, true);
+  assert.equal(weightCard.result.card.width, 1080);
+  assert.equal(weightCard.result.card.height, 1440);
+  assert.equal(existsSync(weightCard.result.card.html_path), true);
+  const weightCardHtml = readFileSync(weightCard.result.card.html_path, 'utf8');
+  assert.match(weightCardHtml, /体重真相卡/);
+  assert.match(weightCardHtml, /data-share-safe="true"/);
+  assert.doesNotMatch(weightCardHtml, /测试成员/);
+  assert.doesNotMatch(weightCardHtml, /当前 62\.0 kg/);
 
   const meal = await diet.execute({
     action: 'add-meal', member_id: member.id,

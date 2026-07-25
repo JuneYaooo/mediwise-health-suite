@@ -1,13 +1,13 @@
 ---
 name: weight-manager
-description: "Weight management: set goals, track progress, log exercise, calculate BMI/BMR/TDEE, analyze calorie balance and body composition. Integrates with diet-tracker and mediwise-health-tracker."
+description: "Weight management: set goals, track progress, translate daily fluctuations into robust trends, generate personalized share-safe Weight Story cards across 24 dynamic styles, preserve legacy weight truth cards, log exercise, calculate BMI/BMR/TDEE, and analyze body composition. Integrates with diet-tracker and mediwise-health-tracker."
 ---
 
 # MediWise · 体重与运动 Skill
 
 ## 概述
 
-提供体重目标设定、进度追踪、趋势分析、热量估算、BMI/BMR/TDEE 估算、运动记录和身体围度记录功能。体重数据复用 `health_metrics` 表（weight 类型），饮食热量数据来自 `diet_records` 表，运动消耗数据来自 `exercise_records` 表。
+提供体重目标设定、进度追踪、趋势分析、体重波动翻译、可分享图卡、热量估算、BMI/BMR/TDEE 估算、运动记录和身体围度记录功能。体重数据复用 `health_metrics` 表（weight 类型），饮食热量数据来自 `diet_records` 表，运动消耗数据来自 `exercise_records` 表。
 
 本 Skill 只记录和展示数据、用户目标差异与模型估算，不提供减重、增重、饮食、运动或其他健康指导。运动消耗只代表已记录活动；缺少完整基础代谢与日常活动数据时，不得把结果表述为真实热量缺口或预测治疗效果。
 
@@ -65,6 +65,25 @@ description: "Weight management: set goals, track progress, log exercise, calcul
 | calorie-balance | calorie-balance | --member-id | --days (默认 7) | 分别汇总已记录饮食摄入和运动消耗，不计算热量缺口 |
 | weekly-report | weekly-report | --member-id | --end-date | 周报（体重变化 + 饮食热量 + 运动记录 + 目标差异） |
 | weight-projection | projection | --member-id | | 按当前速度预测达标日期 |
+
+### weight_truth_card.py — 体重翻译与分享卡片
+
+| 动作 | 子命令 | 必要参数 | 可选参数 | 说明 |
+|------|--------|----------|----------|------|
+| weight-truth | analyze | --member-id | --days（默认 14）、--as-of | 将单日变化和稳健长期趋势分开解释，返回结构化分析，不生成处方 |
+| select-weight-card-style | select-style | --member-id | --days、--scene、--tone、--density、--preferred-style、--disliked-style、--recent-style、--pinned-style、--surprise-level、--seed | 从 24 套模板中进行可解释、非均匀、可复现的选择；只返回选择结果，不冒充已经渲染的卡片 |
+| weight-card-preferences | get | --member-id |  | 读取本地风格偏好与最近生成历史，不读取或返回健康数值 |
+| update-weight-card-preferences | update | --member-id | --tone、--density、--surprise-level、--like-style、--dislike-style、--neutral-style、--pin-style、--clear-pin、--generated-style、--clear-history | 更新私有风格记忆；成员 ID 摘要存储，文件权限为 0600 |
+| generate-weight-story-card | generate-story | --member-id | --days、--scene、--tone、--density、--style（默认 auto）、--format、隐私开关、偏好/历史、--seed、--no-save-history | 生成「MediWise 体重译报」：联合分析体重、饮食、运动与睡眠，选择 24 套差异化模板之一，导出 HTML/PNG 并记录最近风格 |
+| generate-weight-card | generate | --member-id | --days、--format（html/png/both）、--show-exact-weight、--show-member-name、--show-exact-date、--context | 生成 1080×1440 的「体重真相卡」；默认脱敏，可导出 HTML 和 PNG |
+
+分析会先把同一天的多次体重测量聚合为中位数，再使用 Theil–Sen 稳健斜率估计长期方向。少于 7 个记录日或覆盖跨度不足 7 天时，只显示“记录不足”，不宣称趋势已经形成。新体重译报还会并列分析同期已有的饮食摄入、运动和睡眠记录，生成一段综合解读，并依据真实模式形成「阶段肖像」和默认脱敏的分享包装。分享结构采用结论先行、数字证明、完整分析、保存理由，但必须返回 `clickbait: false`。饮食只统计有营养数据的记录日，未记录日不按 0 kcal；运动消耗不冒充全天总能量消耗，也不与摄入相减生成热量缺口；睡眠只描述记录时长。同期变化只作为线索，不得写成体重变化的原因。文案由确定性规则产生，不调用模型自由发挥，也不预测达标日期。
+
+分享卡默认隐藏姓名、绝对体重、目标体重、精确日期、用药、检验和其他医疗数据。仅在用户明确要求时，才通过 `show_exact_weight`、`show_member_name` 或 `show_exact_date` 展示对应字段。`context` 只能用于展示已经记录的中性事实；不得把时间上同时发生的饮食、睡眠或运动记录写成体重变化原因。
+
+风格选择器包含 12 个叙事家族、24 套动态模板。每套都有唯一 `layout-mode`、唯一内容角色，以及体重、摄入、运动、睡眠、记录行为或综合分析中的一个主导任务。选择器综合当前可用信号、数据资格、使用场景、语气/密度偏好、用户明确喜欢或拒绝、最近生成历史和 8%～18% 的探索概率。它可以识别「故事序章」「剧情反转」「信号变清楚」「双重曝光」「长线视野」等记录时刻，并生成只基于记录行为的安全人格标签。不得用 BMI、绝对体重、趋势方向、性别、年龄、疾病、用药或目标完成度选择审美。
+
+对外统一把新完整链路称为 **「MediWise 体重译报」**。`generate-weight-story-card` 是首选生成动作；旧 `weight-truth` 和 `generate-weight-card` 是兼容入口，必须保持原行为，不得静默改名或改变输出结构。
 
 ### exercise.py — 运动记录
 
@@ -137,6 +156,10 @@ MediWise 不根据 TDEE 自动生成减重、增重或维持所需的每日热�
 11. 使用 `body-summary` 查看综合身体报告
 12. 使用 `weekly-report` 获取综合周报（含运动统计）
 13. 使用 `weight-projection` 预测达标日期
+14. 使用 `weight-truth` 区分单日波动和稳健长期趋势
+15. 需要个性化视觉建议时使用 `select-weight-card-style`，解释选择原因和数据资格
+16. 需要完整生成时使用 `generate-weight-story-card`；除非用户明确要求，否则保留默认脱敏设置
+17. 用户明确要求旧版体重真相卡或兼容流程时使用 `generate-weight-card`
 
 ## 注意事项
 
@@ -149,4 +172,7 @@ MediWise 不根据 TDEE 自动生成减重、增重或维持所需的每日热�
 - BMI/BMR/TDEE 计算需要成员有身高、体重、性别和出生日期信息
 - 身体围度数据存储在 health_metrics 表中，与其他健康指标共用
 - 预测功能基于近期体重变化趋势，仅供参考
+- 「体重译报」和旧「体重真相卡」都是聚焦体重波动的分享卡，不替代包含完整私密信息的「健康记录卡片」
+- 两类体重卡片都只陈述记录事实和统计趋势；相关线索不代表因果，不得据此自动生成饮食、热量或运动处方
+- PNG 导出需要 Chrome/Chromium；未安装时仍会返回可直接打开的本地 HTML
 - **附件管理**：身材照片、运动截图等文件的上传和管理通过 `mediwise-health-tracker` 的附件功能完成（`attachment.py`），本 skill 不直接处理文件存储。使用 `add-attachment` 动作并指定 category 为 `body_photo` 或 `exercise_photo`

@@ -81,6 +81,121 @@ const ROUTES = {
     if (inputs.params?.days) args.push('--days', String(inputs.params.days));
     return { script: 'weight_analysis.py', args };
   },
+  'weight-truth': (inputs) => {
+    const args = ['analyze', '--member-id', inputs.member_id];
+    if (inputs.params?.days) args.push('--days', String(inputs.params.days));
+    if (inputs.params?.as_of) args.push('--as-of', inputs.params.as_of);
+    return { script: 'weight_truth_card.py', args };
+  },
+  'select-weight-card-style': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['select-style', '--member-id', inputs.member_id];
+    if (p.days) args.push('--days', String(p.days));
+    if (p.as_of) args.push('--as-of', p.as_of);
+    if (p.scene) args.push('--scene', p.scene);
+    if (p.tone) args.push('--tone', p.tone);
+    if (p.density) args.push('--density', p.density);
+    if (p.pinned_style) args.push('--pinned-style', p.pinned_style);
+    if (p.surprise_level != null) args.push('--surprise-level', String(p.surprise_level));
+    if (p.seed != null) args.push('--seed', String(p.seed));
+    const repeatArgs = [
+      ['preferred_styles', '--preferred-style'],
+      ['disliked_styles', '--disliked-style'],
+      ['recent_styles', '--recent-style'],
+    ];
+    for (const [field, flag] of repeatArgs) {
+      const values = Array.isArray(p[field]) ? p[field] : [];
+      for (const value of values) {
+        if (value != null && String(value).trim()) args.push(flag, String(value));
+      }
+    }
+    return { script: 'weight_truth_card.py', args };
+  },
+  'weight-card-preferences': (inputs) => ({
+    script: 'weight_card_preferences.py',
+    args: ['get', '--member-id', inputs.member_id],
+  }),
+  'update-weight-card-preferences': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['update', '--member-id', inputs.member_id];
+    if (p.tone) args.push('--tone', p.tone);
+    if (p.density) args.push('--density', p.density);
+    if (p.surprise_level != null) args.push('--surprise-level', String(p.surprise_level));
+    if (p.pinned_style) args.push('--pin-style', p.pinned_style);
+    if (p.clear_pin === true) args.push('--clear-pin');
+    if (p.generated_style) args.push('--generated-style', p.generated_style);
+    if (p.clear_history === true) args.push('--clear-history');
+    const repeatArgs = [
+      ['like_styles', '--like-style'],
+      ['dislike_styles', '--dislike-style'],
+      ['neutral_styles', '--neutral-style'],
+    ];
+    for (const [field, flag] of repeatArgs) {
+      const values = Array.isArray(p[field]) ? p[field] : [];
+      for (const value of values) {
+        if (value != null && String(value).trim()) args.push(flag, String(value));
+      }
+    }
+    return { script: 'weight_card_preferences.py', args };
+  },
+  'generate-weight-story-card': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['generate-story', '--member-id', inputs.member_id];
+    if (p.days) args.push('--days', String(p.days));
+    if (p.as_of) args.push('--as-of', p.as_of);
+    if (p.scene) args.push('--scene', p.scene);
+    if (p.tone) args.push('--tone', p.tone);
+    if (p.density) args.push('--density', p.density);
+    if (p.style) args.push('--style', p.style);
+    if (p.pinned_style) args.push('--pinned-style', p.pinned_style);
+    if (p.surprise_level != null) args.push('--surprise-level', String(p.surprise_level));
+    if (p.seed != null) args.push('--seed', String(p.seed));
+    if (p.format) args.push('--format', p.format);
+    if (p.output_dir) args.push('--output-dir', p.output_dir);
+    if (p.show_exact_weight === true) args.push('--show-exact-weight');
+    if (p.show_member_name === true) args.push('--show-member-name');
+    if (p.show_exact_date === true) args.push('--show-exact-date');
+    if (p.show_context === false) args.push('--hide-context');
+    if (p.save_history === false) args.push('--no-save-history');
+    const repeatArgs = [
+      ['preferred_styles', '--preferred-style'],
+      ['disliked_styles', '--disliked-style'],
+      ['recent_styles', '--recent-style'],
+    ];
+    for (const [field, flag] of repeatArgs) {
+      const values = Array.isArray(p[field]) ? p[field] : [];
+      for (const value of values) {
+        if (value != null && String(value).trim()) args.push(flag, String(value));
+      }
+    }
+    const contextLines = Array.isArray(p.context_lines)
+      ? p.context_lines
+      : (typeof p.context === 'string' ? [p.context] : []);
+    for (const line of contextLines) {
+      if (line != null && String(line).trim()) args.push('--context', String(line));
+    }
+    return { script: 'weight_truth_card.py', args };
+  },
+  'generate-weight-card': (inputs) => {
+    const p = inputs.params ?? {};
+    const args = ['generate', '--member-id', inputs.member_id];
+    if (p.days) args.push('--days', String(p.days));
+    if (p.as_of) args.push('--as-of', p.as_of);
+    if (p.format) args.push('--format', p.format);
+    if (p.theme) args.push('--theme', p.theme);
+    if (p.output_dir) args.push('--output-dir', p.output_dir);
+    if (p.show_exact_weight === true) args.push('--show-exact-weight');
+    if (p.show_member_name === true) args.push('--show-member-name');
+    if (p.show_exact_date === true) args.push('--show-exact-date');
+    if (p.show_context === false) args.push('--hide-context');
+    const contextLines = Array.isArray(p.context_lines)
+      ? p.context_lines
+      : (typeof p.context === 'string' ? [p.context] : []);
+    for (const line of contextLines) {
+      if (line != null && String(line).trim()) args.push('--context', String(line));
+    }
+    return { script: 'weight_truth_card.py', args };
+  },
   // Exercise routes
   'add-exercise': (inputs) => {
     const args = ['add', '--member-id', inputs.member_id,
