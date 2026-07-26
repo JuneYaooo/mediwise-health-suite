@@ -388,6 +388,18 @@ def select_weight_card_style(
     traces: Dict[str, List[str]] = {}
     for style in STYLE_CATALOG:
         allowed, disabled_reason = _eligible(style, analysis, domain)
+        # `no-verdict` turns insufficient evidence into an honest visual theme. Once
+        # a robust long-run number exists, choosing it automatically makes the style
+        # name and its "还缺什么" copy contradict the card's own estimate. An explicit
+        # pin still wins: pinning is an authored design request, not auto narration.
+        if (
+            allowed
+            and style.id == "no-verdict"
+            and pinned_style != style.id
+            and analysis.get("trend_delta") is not None
+        ):
+            allowed = False
+            disabled_reason = "已有可陈述的稳健方向"
         eligibility[style.id] = {
             "eligible": allowed,
             "disabled_reason": disabled_reason,

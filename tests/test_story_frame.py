@@ -400,6 +400,8 @@ class RobustFitTests(unittest.TestCase):
                 self.assertEqual(trend.get("method"), "theil_sen")
                 self.assertGreaterEqual(trend.get("visual_strength"), -1.0)
                 self.assertLessEqual(trend.get("visual_strength"), 1.0)
+                self.assertIn(trend.get("confidence"), ("low", "medium", "high"))
+                self.assertNotEqual(trend.get("confidence_label"), "不足")
                 self.assertIn(
                     frame["series_meta"]["fold"],
                     ("median", "mean", "sum", "count", "last"),
@@ -456,6 +458,16 @@ class RobustFitTests(unittest.TestCase):
         self.assertEqual(frame["series_meta"]["fold"], "median")
         ready = frame_mod.render_ready("weight", analysis)
         self.assertEqual(ready["trend_delta"], -0.875)
+
+    def test_render_ready_surfaces_frame_confidence_without_overwriting_weight(self):
+        sleep = frame_mod.render_ready("sleep", _loaded_analysis("sleep"))
+        self.assertIn(sleep["confidence"], ("low", "medium", "high"))
+        self.assertNotEqual(sleep["confidence_label"], "不足")
+
+        weight = dict(_loaded_analysis("weight"), confidence="high", confidence_label="较高")
+        ready = frame_mod.render_ready("weight", weight)
+        self.assertEqual(ready["confidence"], "high")
+        self.assertEqual(ready["confidence_label"], "较高")
 
 
 if __name__ == "__main__":

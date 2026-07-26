@@ -221,6 +221,24 @@ def _trend(analysis: Mapping[str, object], adapter, series: list, window_days: i
     return trend
 
 
+def _trend_confidence(trend: Mapping[str, object], coverage: Mapping[str, object]) -> tuple:
+    """Grade evidence coverage without reinterpreting the measured direction.
+
+    The estimator remains threshold-free. These buckets only answer whether a
+    renderer may label the available line 较低 / 中等 / 较高 confidence; they do not
+    change its slope, delta, direction, or the adapter's claim gate.
+    """
+    if not trend.get("claim_allowed") or trend.get("delta") is None:
+        return "insufficient", "不足"
+    recorded = int(coverage.get("recorded_days") or 0)
+    span = int(coverage.get("span_days") or 0)
+    if recorded >= 10 and span >= 10:
+        return "high", "较高"
+    if recorded >= 7 and span >= 7:
+        return "medium", "中等"
+    return "low", "较低"
+
+
 def _latest_delta(series: list) -> Optional[float]:
     """Change between the two most recent folded points, or None below two points."""
     if len(series) < 2:
@@ -339,6 +357,10 @@ def build_frame(domain: str, analysis: Mapping[str, object]) -> dict:
     series = list(adapter.series_for(analysis))
     coverage = dict(adapter.coverage_for(analysis))
     window = _window(analysis, series)
+    trend = _trend(analysis, adapter, series, window["days"])
+    confidence, confidence_label = _trend_confidence(trend, coverage)
+    trend["confidence"] = confidence
+    trend["confidence_label"] = confidence_label
     frame = {
         "schema_version": 1,
         "domain": adapter.DOMAIN,
@@ -350,7 +372,7 @@ def build_frame(domain: str, analysis: Mapping[str, object]) -> dict:
             "relative_only": True,
         },
         "shape": adapter.shape_for(analysis),
-        "trend": _trend(analysis, adapter, series, window["days"]),
+        "trend": trend,
         "coverage": coverage,
         "facts": _facts(coverage, lexicon),
         "limits": {
@@ -407,6 +429,8 @@ def render_ready(domain: str, analysis: Mapping[str, object]) -> dict:
         "latest_value": _latest_value(series),
         "trend_delta": trend.get("delta"),
         "trend_visual_strength": trend.get("visual_strength"),
+        "confidence": trend.get("confidence"),
+        "confidence_label": trend.get("confidence_label"),
     }
     for key, value in derived.items():
         if value is not None and ready.get(key) in (None, ""):

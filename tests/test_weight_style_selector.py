@@ -79,6 +79,20 @@ class WeightStyleSelectorTests(unittest.TestCase):
         self.assertEqual(result["probabilities"]["editorial-cover"], 1.0)
         self.assertFalse(result["exploration"])
 
+    def test_no_verdict_is_auto_only_until_a_robust_direction_exists(self):
+        sufficient = analysis(trend_delta=-0.8)
+        automatic = select_weight_card_style(sufficient, seed="has-a-fit")
+        self.assertNotIn("no-verdict", automatic["eligible_styles"])
+        self.assertEqual(
+            automatic["eligibility"]["no-verdict"]["disabled_reason"],
+            "已有可陈述的稳健方向",
+        )
+
+        pinned = select_weight_card_style(
+            sufficient, pinned_style="no-verdict", seed="explicit-design-request"
+        )
+        self.assertEqual(pinned["selected_style"]["id"], "no-verdict")
+
     def test_ineligible_pin_returns_an_explicit_error(self):
         with self.assertRaisesRegex(ValueError, "not eligible"):
             select_weight_card_style(
