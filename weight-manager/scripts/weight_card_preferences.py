@@ -20,7 +20,10 @@ setup_mediwise_path()
 
 from config import DATA_DIR
 from health_db import output_json
-from weight_card_styles import STYLES_BY_ID
+
+from _story_bootstrap import story_module
+
+STYLES_BY_ID = story_module("catalog").STYLES_BY_ID
 
 
 PROFILE_VERSION = 1

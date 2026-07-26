@@ -1,8 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const dataDir = mkdtempSync(join(tmpdir(), 'mediwise-actions-'));
 process.env.MEDIWISE_DATA_DIR = dataDir;
@@ -126,6 +132,30 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   assert.match(weightStoryHtml, new RegExp(`data-style-id="${weightStory.result.card.style}"`));
   assert.doesNotMatch(weightStoryHtml, /测试成员/);
 
+  // format: 'svg' routes through to the animated card.  The still HTML still has
+  // to land: it is the composition of record that the poster frame reproduces.
+  const weightStorySvgDir = join(dataDir, 'weight-story-svg-test');
+  const weightStorySvg = await weight.execute({
+    action: 'generate-weight-story-card', member_id: member.id,
+    params: {
+      days: 14, as_of: '2026-07-24', format: 'svg', output_dir: weightStorySvgDir,
+      seed: 'story-route-test', save_history: false,
+    },
+  }, context);
+  assert.equal(weightStorySvg.status, 'ok');
+  assert.equal(weightStorySvg.result.card.format, 'svg');
+  assert.equal(existsSync(weightStorySvg.result.card.html_path), true);
+  assert.equal(existsSync(weightStorySvg.result.card.svg_path), true);
+  assert.equal(weightStorySvg.result.card.png_path, null);
+  assert.equal(weightStorySvg.result.card.share_safe, true);
+  const storySvg = readFileSync(weightStorySvg.result.card.svg_path, 'utf8');
+  assert.match(storySvg, /data-renderer="story-svg-v1"/);
+  assert.match(storySvg, new RegExp(`data-style-id="${weightStorySvg.result.card.style}"`));
+  assert.match(storySvg, /<foreignObject/);
+  assert.match(storySvg, /prefers-reduced-motion:reduce/);
+  assert.doesNotMatch(storySvg, /测试成员/);
+  assert.ok(weightStorySvg.result.card.motion.duration_ms > 0);
+
   const weightCardDir = join(dataDir, 'weight-card-test');
   const weightCard = await weight.execute({
     action: 'generate-weight-card', member_id: member.id,
@@ -165,6 +195,28 @@ test('action adapters preserve fields, propagate errors, and complete core workf
     action: 'sleep-log', member_id: member.id, params: { duration: 420, date: '2026-07-21' },
   }, context);
   assert.equal(sleepLog.status, 'ok');
+
+  const sleepStyleSelection = await weight.execute({
+    action: 'select-weight-card-style', member_id: member.id,
+    params: { domain: 'sleep', days: 14, as_of: '2026-07-24', seed: 'sleep-route-test' },
+  }, context);
+  assert.equal(sleepStyleSelection.status, 'ok');
+  assert.equal(sleepStyleSelection.result.domain, 'sleep');
+
+  const sleepStoryDir = join(dataDir, 'sleep-story-test');
+  const sleepStory = await weight.execute({
+    action: 'generate-weight-story-card', member_id: member.id,
+    params: {
+      domain: 'sleep', days: 14, as_of: '2026-07-24', format: 'svg',
+      output_dir: sleepStoryDir, seed: 'sleep-route-test', save_history: false,
+    },
+  }, context);
+  assert.equal(sleepStory.status, 'ok');
+  assert.equal(sleepStory.result.domain, 'sleep');
+  assert.equal(sleepStory.result.product_name, 'MediWise 睡眠译报');
+  assert.equal(sleepStory.result.card.product_name, 'MediWise 睡眠译报');
+  assert.equal(existsSync(sleepStory.result.card.svg_path), true);
+  assert.match(readFileSync(sleepStory.result.card.svg_path, 'utf8'), /MediWise 睡眠译报/);
 
   const lab = await health.execute({
     action: 'add-lab-result', member_id: member.id,
@@ -284,4 +336,60 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   assert.deepEqual(synced.result.metric_types, ['heart_rate', 'steps']);
   assert.equal(synced.result.time_range.earliest, '2026-07-22 08:00:00');
   assert.equal(synced.result.time_range.latest, '2026-07-22 23:59:00');
+});
+
+// The storytelling engine moved to shared/story/ under domain-neutral names.  The
+// legacy weight-* module names stay as compatibility shells, and every weight
+// action keeps its old id.  Both surfaces are contracts: breaking either silently
+// breaks installed skills, the design gallery, and the golden digests.
+test('legacy story modules alias shared/story and every weight action still routes', async () => {
+  const probe = `
+import weight_story_card as sc, weight_style_selector as ss
+import weight_card_styles as cs, weight_management_analysis as ma
+from shared.story import render, selector, catalog, synthesis
+
+# Domain-neutral alias -> same object as the weight-named original.
+assert sc.render_story_html is render.render_weight_story_html
+assert ss.select_story_style is selector.select_weight_card_style
+assert cs.WeightCardStyle is catalog.StoryStyle
+assert ma.analyze_companions is synthesis.analyze_weight_management
+
+# Shells re-export, never re-implement.
+assert sc.render_weight_story_html is render.render_weight_story_html
+assert ss.select_weight_card_style is selector.select_weight_card_style
+assert cs.STYLE_CATALOG is catalog.STYLE_CATALOG
+assert cs.STYLES_BY_ID is catalog.STYLES_BY_ID
+assert ma.analyze_weight_management is synthesis.analyze_weight_management
+print(len(cs.STYLES_BY_ID))
+`;
+  const { stdout } = await execFileAsync('python3', ['-c', probe], {
+    cwd: REPO_ROOT,
+    env: {
+      ...process.env,
+      PYTHONPATH: [
+        REPO_ROOT,
+        join(REPO_ROOT, 'mediwise-health-tracker', 'scripts'),
+        join(REPO_ROOT, 'weight-manager', 'scripts'),
+      ].join(delimiter),
+    },
+  });
+  assert.equal(stdout.trim(), '24', 'shells must expose the full template catalog');
+
+  // Action ids are the public surface; the extraction must not rename or drop one.
+  const preserved = [
+    'weight-truth', 'generate-weight-card', 'generate-weight-story-card',
+    'select-weight-card-style', 'weight-card-preferences', 'update-weight-card-preferences',
+  ];
+  for (const action of preserved) {
+    const result = await weight.execute({ action, member_id: 'missing-member', params: {} }, context);
+    assert.notEqual(result.status, undefined, `${action} must return a result`);
+    assert.doesNotMatch(
+      String(result.error ?? ''), /Unknown action/,
+      `${action} must stay routable after the shared/story extraction`,
+    );
+  }
+
+  const unknown = await weight.execute({ action: 'not-a-real-action', member_id: 'x', params: {} }, context);
+  assert.equal(unknown.status, 'error');
+  assert.match(unknown.error, /Unknown action/);
 });

@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -140,6 +141,127 @@ class HealthCardThemeTest(unittest.TestCase):
 
         self.assertIn("#246BCE", html)
         self.assertNotIn("#1E7A6E", html)
+
+
+class PersonalHealthStoryTest(unittest.TestCase):
+    def _sleep_story(self):
+        sleep = {
+            "count": 7,
+            "daily_records": [
+                {"date": f"2026-07-{day:02d}", "duration_min": 390 + day * 8}
+                for day in range(1, 8)
+            ],
+        }
+        lifestyle = {"diet_records": [], "step_records": [], "exercise_records": []}
+        return briefing_report._build_personal_story("member-1", {}, lifestyle, sleep, 7)
+
+    def test_story_row_shaper_leaves_domain_folding_to_adapters(self):
+        trends = {
+            "weight": [
+                {"date": "2026-07-01", "value": 70.0},
+                {"date": "2026-07-01", "value": 72.0},
+            ],
+            "heart_rate": [{"date": "2026-07-01", "value": 71}],
+        }
+        lifestyle = {
+            "diet_records": [],
+            "step_records": [
+                {"metric_type": "steps", "measured_at": "2026-07-01 08:00:00", "value": {"count": 1000}},
+                {"metric_type": "steps", "measured_at": "2026-07-01 20:00:00", "value": {"count": 2200}},
+            ],
+        }
+        rows = briefing_report._story_rows(trends, lifestyle, {"daily_records": []})
+
+        self.assertEqual(rows["weight"][0]["weight"], 71.0)
+        self.assertEqual(rows["weight"][0]["measurement_count"], 2)
+        self.assertEqual(rows["vitals"][0]["metric_type"], "heart_rate")
+        self.assertEqual(len(rows["activity"]), 2)
+
+        api = briefing_report._story_api()
+        analysis = api["domain_analysis_from_rows"]("activity", rows["activity"], 7)
+        ready = api["render_ready"]("activity", analysis)
+        self.assertEqual(len(ready["frame"]["series"]), 1)
+        self.assertEqual(ready["frame"]["series"][0]["value"], 2200.0)
+
+    def test_story_builder_selects_and_fits_a_recorded_domain(self):
+        story = self._sleep_story()
+
+        self.assertIsNotNone(story)
+        self.assertEqual(story["domain"], "sleep")
+        self.assertEqual(story["frame"]["series_meta"]["fold"], "mean")
+        self.assertEqual(story["frame"]["trend"]["method"], "theil_sen")
+        self.assertIsNotNone(story["selection"]["selected_style"]["id"])
+        svg = briefing_report._personal_story_svg(story)
+        self.assertIn("<svg", svg)
+        self.assertIn("MediWise 睡眠译报", svg)
+        self.assertIn('data-story-domain="sleep"', svg)
+        self.assertIn('data-motion-mode="', svg)
+        self.assertIn('data-duration-ms="', svg)
+        self.assertNotIn('data-duration-ms="0"', svg)
+
+    def test_story_builder_skips_one_malformed_domain(self):
+        api = briefing_report._story_api()
+        analyze = api["domain_analysis_from_rows"]
+
+        def fail_weight_only(domain, rows, days):
+            if domain == "weight":
+                raise ValueError("malformed legacy weight stream")
+            return analyze(domain, rows, days)
+
+        trends = {
+            "weight": [
+                {"date": f"2026-07-{day:02d}", "value": 70 + day / 10}
+                for day in range(1, 8)
+            ]
+        }
+        sleep = {
+            "count": 7,
+            "daily_records": [
+                {"date": f"2026-07-{day:02d}", "duration_min": 390 + day * 8}
+                for day in range(1, 8)
+            ],
+        }
+        lifestyle = {"diet_records": [], "step_records": [], "exercise_records": []}
+
+        with self.assertLogs(briefing_report.LOG, level="WARNING") as logs:
+            with patch.dict(api, {"domain_analysis_from_rows": fail_weight_only}):
+                story = briefing_report._build_personal_story(
+                    "member-1", trends, lifestyle, sleep, 7
+                )
+
+        self.assertIsNotNone(story)
+        self.assertEqual(story["domain"], "sleep")
+        self.assertIn("skipped weight domain", "\n".join(logs.output))
+
+    def test_story_is_a_real_fifth_layout_section_in_both_locales(self):
+        story = self._sleep_story()
+        member_data = {"health_tips": [], "due_reminders": []}
+        lifestyle = {"diet_days": 0, "exercise_count": 0, "step_days": 0}
+        sleep = {"count": 7}
+        care = {"visits": [], "labs": [], "imaging": [], "record_counts": {}}
+        layout = briefing_report._personal_layout(
+            member_data, {}, lifestyle, sleep, care, [], "story", story=story
+        )
+
+        self.assertEqual(layout["section_order"][0], "story")
+        zh = briefing_report._personal_content(
+            {"id": "member-1"}, member_data, {}, lifestyle, sleep, care, [],
+            "zh-CN", layout, story=story,
+        )
+        en = briefing_report._personal_content(
+            {"id": "member-1"}, member_data, {}, lifestyle, sleep, care, [],
+            "en-US", layout, story=story,
+        )
+        self.assertIn("个人健康译报", zh)
+        self.assertIn('data-story-domain="sleep"', zh)
+        self.assertIn("Personal Health Story", en)
+        self.assertIn("sleep duration", en)
+
+    def test_no_recorded_domain_means_no_story_section(self):
+        story = briefing_report._build_personal_story(
+            "member-1", {}, {"diet_records": [], "step_records": []}, {"daily_records": []}, 7
+        )
+        self.assertIsNone(story)
 
 
 if __name__ == "__main__":

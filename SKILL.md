@@ -1,6 +1,6 @@
 ---
 name: mediwise-health-suite
-description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, health cards, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
+description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, health cards, eight-domain health stories, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
 ---
 
 # MediWise Health Suite
@@ -20,6 +20,14 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - 查询能力：文字健康摘要、时间线、在用药、全家概览
 - **就医前摘要**：自动整理病情、既往史、在用药，生成文本/图片/PDF
 
+### 健康译报：八域观察与叙事
+- 体重、睡眠、生命体征、摄入、活动、服药记录、记录行为和家庭记录共用 24 套叙事模板
+- 各域只读取自己的记录边界，陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
+- 体重译报是展示案例，不是能力边界；原有体重分析和经典卡片入口继续兼容
+- 默认脱敏，可导出自包含 HTML、动画 SVG 和 1080×1440 冻结 PNG；家庭记录域不读取姓名，不比较成员
+
+调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-report`；明确要个性化动态健康译报但未点名域时，同一动作传 `focus=story`，发送结果里的 `story_artifact.svg_path`，由系统在体重、睡眠、生命体征、摄入和活动中确定性选择记录最完整的一域。用户明确点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的兼容动作 `generate-weight-story-card` 并传对应 `domain`；动作名虽然保留 weight，但产品能力不是体重专属。普通健康记录卡仍默认发送 PNG，家庭健康记录卡不附带个人故事产物。
+
 ### ✅ 2. 饮食追踪 (diet-tracker)
 - 每餐记录与食物条目管理
 - 营养分析：热量、蛋白质、脂肪、碳水、膳食纤维
@@ -29,13 +37,13 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 ### ✅ 3. 体重管理 (weight-manager)
 - 目标设定：减重/增重/维持
 - 体重翻译器：区分单日波动与稳健长期趋势
-- 「MediWise 体重译报」：联合分析体重稳健趋势与同期饮食、运动、睡眠记录，生成默认脱敏的本地 HTML 和 1080×1440 PNG
+- 「MediWise 体重译报」展示案例：观察体重稳健方向与同期已有的摄入、活动、睡眠记录，生成默认脱敏的本地 HTML、动画 SVG 和 1080×1440 冻结 PNG
 - 24 套差异化模板的可解释选择：按可用信号、场景、偏好、历史和探索概率推荐；每套有独立构图与主导内容，原经典航向版兼容入口继续保留
 - BMI/BMR/TDEE 计算
 - 运动记录与消耗追踪
 - 身体围度记录
 - 热量收支分析
-- 达标预测
+- 目标时间估算
 
 ### ✅ 4. 智能健康监测 (health-monitor) - 按需检查
 - 多级阈值告警（info/warning/urgent/emergency）
@@ -91,11 +99,11 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
    "帮我设定一个减重目标，从 70kg 减到 65kg"
    ```
 
-6. **翻译体重波动并生成分享卡**
+6. **生成健康译报**
    ```
-   "别只告诉我今天重了多少，帮我翻译最近 14 天的体重趋势"
-   "从 24 套模板中选一个适合我的分享风格，别和最近几张重复"
-   "生成一张默认脱敏的体重译报，不显示姓名和绝对体重"
+   "根据最近 14 天的睡眠记录生成一张默认脱敏的动画译报"
+   "用体重展示案例观察同期已有的体重、摄入、活动和睡眠记录"
+   "生成家庭记录译报，不显示姓名，也不比较成员"
    ```
 
 7. **就医前准备**
@@ -111,7 +119,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
-- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、体重译报、旧体重真相卡或 PDF 时需要；HTML 和纯文字记录、查询不需要
+- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、健康译报冻结 PNG、旧体重真相卡或 PDF 时需要；健康译报 HTML、动画 SVG 和纯文字记录、查询不需要
 
 ## 数据隐私
 
@@ -231,4 +239,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**关键词**: 健康管理、医疗记录、家庭健康、饮食追踪、体重管理、health management, medical records, family health, diet tracking, weight management
+**关键词**: 健康管理、医疗记录、家庭健康、健康译报、观察叙事、饮食追踪、体重管理、health management, medical records, family health, health story, observation, narration, diet tracking, weight management

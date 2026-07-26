@@ -37,6 +37,24 @@ class WeightTruthAnalysisTests(unittest.TestCase):
         self.assertEqual(daily[0]["weight"], 71.0)
         self.assertEqual(daily[0]["measurement_count"], 3)
 
+    def test_impossible_readings_are_dropped_not_folded_in(self):
+        """A scale glitch must not become a recorded day.
+
+        `aggregate_daily_medians` keeps only 10..500 kg.  Without that filter a
+        0 kg reading folds into the median and an unrecorded-looking day acquires
+        data, which then inflates `recorded_days` and unlocks templates the real
+        coverage does not support.
+        """
+        daily = weight_truth_card.aggregate_daily_medians([
+            {"value": 0, "measured_at": "2026-07-01 07:00:00"},
+            {"value": 700.0, "measured_at": "2026-07-02 07:00:00"},
+            {"value": float("nan"), "measured_at": "2026-07-03 07:00:00"},
+            {"value": 70.4, "measured_at": "2026-07-04 08:00:00"},
+        ])
+
+        self.assertEqual([item["date"] for item in daily], ["2026-07-04"])
+        self.assertEqual(daily[0]["weight"], 70.4)
+
     def test_theil_sen_resists_a_large_middle_outlier(self):
         daily = weight_truth_card.aggregate_daily_medians(
             records([70.0, 69.9, 69.8, 90.0, 69.6, 69.5, 69.4])

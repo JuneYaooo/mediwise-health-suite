@@ -6,7 +6,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionResult } from '../shared/action_result.mjs';
 
@@ -14,6 +14,9 @@ const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = resolve(__dirname, 'scripts');
 const HEALTH_SCRIPTS_DIR = resolve(__dirname, '..', 'mediwise-health-tracker', 'scripts');
+// Repository root, so the domain-neutral `shared.story` package is importable.
+const REPO_ROOT = resolve(__dirname, '..');
+const PYTHON_PATH = [HEALTH_SCRIPTS_DIR, REPO_ROOT].join(delimiter);
 
 /**
  * Action-to-script routing table.
@@ -90,6 +93,7 @@ const ROUTES = {
   'select-weight-card-style': (inputs) => {
     const p = inputs.params ?? {};
     const args = ['select-style', '--member-id', inputs.member_id];
+    if (p.domain) args.push('--domain', p.domain);
     if (p.days) args.push('--days', String(p.days));
     if (p.as_of) args.push('--as-of', p.as_of);
     if (p.scene) args.push('--scene', p.scene);
@@ -141,6 +145,7 @@ const ROUTES = {
   'generate-weight-story-card': (inputs) => {
     const p = inputs.params ?? {};
     const args = ['generate-story', '--member-id', inputs.member_id];
+    if (p.domain) args.push('--domain', p.domain);
     if (p.days) args.push('--days', String(p.days));
     if (p.as_of) args.push('--as-of', p.as_of);
     if (p.scene) args.push('--scene', p.scene);
@@ -274,7 +279,7 @@ async function runScript(script, args) {
   const scriptPath = resolve(SCRIPTS_DIR, script);
   const { stdout } = await execFileAsync('python3', [scriptPath, ...args], {
     timeout: 30_000,
-    env: { ...process.env, PYTHONPATH: HEALTH_SCRIPTS_DIR },
+    env: { ...process.env, PYTHONPATH: PYTHON_PATH },
   });
   return JSON.parse(stdout.trim());
 }

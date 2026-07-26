@@ -7,7 +7,7 @@ expenditure model, it must not imply a calorie deficit or clinical fluid I/O.
 Usage:
   python3 scripts/briefing_report.py generate [--member-id <id>]
       [--days 7] [--locale zh-CN|en-US] [--view auto|personal|family]
-      [--focus auto|metrics|lifestyle|care|medications]
+      [--focus auto|metrics|lifestyle|care|medications|story]
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import health_advisor
 import health_db
@@ -62,6 +63,14 @@ COPY = {
         "more_meds": "另有 {count} 种在用药", "more_attention": "另有 {count} 项提醒或注意事项",
         "due_prefix": "待处理", "upcoming_prefix": "计划提醒",
         "health_timeline": "个人健康时间轴",
+        "health_story": "个人健康译报", "story_pattern": "本期版式：{name}",
+        "story_observation": "根据最近 {days} 天有记录的数据，观察{subject}的记录形状。",
+        "story_recorded_days": "有记录日", "story_measurements": "记录次数",
+        "story_long_run": "长期变化", "story_not_enough": "记录不足，暂不判断",
+        "story_unfitted": "暂无稳健拟合", "story_stable": "数字方向接近水平",
+        "story_up": "记录数字呈上行方向", "story_down": "记录数字呈下行方向",
+        "story_rebuilding": "记录在间隔后重新接续", "story_conflict": "最近一次与长期方向不同",
+        "story_multi": "多组记录可同框观察", "story_spotlight": "这一组记录最为完整",
         "no_health_timeline": "所选时间范围内暂无可展示的健康动态。", "metric_event": "指标",
         "food_event": "饮食", "activity_event": "运动", "sleep_event": "睡眠", "health_metric_update": "健康指标更新",
         "food_log": "饮食记录", "sleep_log": "睡眠记录", "sleep_score": "评分 {score}",
@@ -105,6 +114,14 @@ COPY = {
         "more_meds": "{count} more active medications", "more_attention": "{count} more reminders or attention items",
         "due_prefix": "Due", "upcoming_prefix": "Planned",
         "health_timeline": "Personal health timeline",
+        "health_story": "Personal Health Story", "story_pattern": "Pattern: {name}",
+        "story_observation": "An observation of the recorded {subject} pattern across the last {days} days.",
+        "story_recorded_days": "Recorded days", "story_measurements": "Records",
+        "story_long_run": "Long-run change", "story_not_enough": "Not enough records to infer a direction",
+        "story_unfitted": "No robust fit available", "story_stable": "The recorded values are near level",
+        "story_up": "The recorded values point upward", "story_down": "The recorded values point downward",
+        "story_rebuilding": "Recording resumed after a gap", "story_conflict": "The latest change differs from the longer direction",
+        "story_multi": "Several recorded signals can be viewed together", "story_spotlight": "This is the most complete recorded signal",
         "no_health_timeline": "No health events are available for this period.", "metric_event": "Metrics",
         "food_event": "Food", "activity_event": "Activity", "sleep_event": "Sleep", "health_metric_update": "Health metrics updated",
         "food_log": "Food log", "sleep_log": "Sleep record", "sleep_score": "Score {score}",
@@ -126,7 +143,53 @@ SOURCES = {
 }
 RELATIONS_EN = {"本人": "self", "父亲": "father", "母亲": "mother", "配偶": "partner", "丈夫": "husband", "妻子": "wife", "儿子": "son", "女儿": "daughter", "子女": "child", "祖父": "grandfather", "祖母": "grandmother"}
 ABNORMAL_WORDS = {"high", "low", "abnormal", "critical", "h", "l", "a", "hh", "ll"}
-FOCUS_CHOICES = ("auto", "metrics", "lifestyle", "care", "medications")
+FOCUS_CHOICES = ("auto", "metrics", "lifestyle", "care", "medications", "story")
+
+STORY_DOMAIN_NAMES = {
+    "zh-CN": {"weight": "体重", "sleep": "睡眠", "vitals": "生命体征", "intake": "摄入", "activity": "活动"},
+    "en-US": {"weight": "weight", "sleep": "sleep duration", "vitals": "vital signs", "intake": "intake", "activity": "activity"},
+}
+
+STORY_SHAPE_COPY = {
+    "insufficient": "story_not_enough",
+    "today-vs-trend-conflict": "story_conflict",
+    "sustained-rise": "story_up",
+    "sustained-fall": "story_down",
+    "flat-with-noise": "story_stable",
+    "stable": "story_stable",
+    "rebuilding": "story_rebuilding",
+    "spotlight": "story_spotlight",
+    "multi-signal": "story_multi",
+}
+
+_STORY_API = None
+
+
+def _story_api():
+    """Load the domain-neutral story engine only when a personal card needs it."""
+    global _STORY_API
+    if _STORY_API is None:
+        repo_root = str(Path(__file__).resolve().parents[2])
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from shared.story import derive_style_seed, select_story_style
+        from shared.story.adapters import lexicon_for_analysis
+        from shared.story.frame import render_ready
+        from shared.story.normalize import aggregate_daily_medians, domain_analysis_from_rows
+        from shared.story.render import _signed
+        from shared.story.svg import render_story_svg
+
+        _STORY_API = {
+            "aggregate_daily_medians": aggregate_daily_medians,
+            "domain_analysis_from_rows": domain_analysis_from_rows,
+            "render_ready": render_ready,
+            "lexicon_for_analysis": lexicon_for_analysis,
+            "derive_style_seed": derive_style_seed,
+            "select_story_style": select_story_style,
+            "signed": _signed,
+            "render_story_svg": render_story_svg,
+        }
+    return _STORY_API
 
 
 def _escape(value) -> str:
@@ -208,10 +271,12 @@ def _query_metric_trends(member_id: str, days: int = 30) -> dict:
                 except (json.JSONDecodeError, TypeError):
                     parsed = raw
                 if isinstance(parsed, dict):
-                    point = {"date": row["measured_at"][:10], "source": row["source"] or "manual", **parsed}
+                    point = {"date": row["measured_at"][:10], "source": row["source"] or "manual",
+                             "metric_type": metric_type, **parsed}
                 else:
                     try:
-                        point = {"date": row["measured_at"][:10], "source": row["source"] or "manual", "value": float(parsed)}
+                        point = {"date": row["measured_at"][:10], "source": row["source"] or "manual",
+                                 "metric_type": metric_type, "value": float(parsed)}
                     except (TypeError, ValueError):
                         continue
                 points.append(point)
@@ -250,7 +315,8 @@ def _query_lifestyle_summary(member_id: str, days: int) -> dict:
     cutoff = (datetime.now() - timedelta(days=max(days - 1, 0))).strftime("%Y-%m-%d")
     result = {"diet_days": 0, "diet": None, "exercise_count": 0, "exercise_days": 0,
               "duration": 0, "calories_burned": 0.0, "step_days": 0, "avg_steps": None,
-              "recent_diet": None, "recent_exercise": []}
+              "recent_diet": None, "recent_exercise": [], "diet_records": [],
+              "exercise_records": [], "step_records": []}
     conn = health_db.get_lifestyle_connection()
     try:
         row = conn.execute(
@@ -268,6 +334,10 @@ def _query_lifestyle_summary(member_id: str, days: int) -> dict:
                    FROM diet_records WHERE member_id=? AND is_deleted=0 AND meal_date>=?
                    GROUP BY meal_date ORDER BY meal_date DESC LIMIT 1""", (member_id, cutoff)).fetchone()
             result["recent_diet"] = {key: recent_diet[key] for key in recent_diet.keys()} if recent_diet else None
+        result["diet_records"] = health_db.rows_to_list(conn.execute(
+            """SELECT meal_date,total_calories,total_protein,total_fat,total_carbs,total_fiber
+               FROM diet_records WHERE member_id=? AND is_deleted=0 AND meal_date>=?
+               ORDER BY meal_date, meal_time""", (member_id, cutoff)).fetchall())
         row = conn.execute(
             """SELECT COUNT(*) AS count, COUNT(DISTINCT exercise_date) AS days,
                       SUM(duration) AS duration, SUM(calories_burned) AS burned
@@ -278,16 +348,21 @@ def _query_lifestyle_summary(member_id: str, days: int) -> dict:
             """SELECT exercise_date, exercise_type, exercise_name, duration, calories_burned, intensity
                FROM exercise_records WHERE member_id=? AND is_deleted=0 AND exercise_date>=?
                ORDER BY exercise_date DESC, exercise_time DESC LIMIT 2""", (member_id, cutoff)).fetchall())
+        result["exercise_records"] = health_db.rows_to_list(conn.execute(
+            """SELECT exercise_date, exercise_type, exercise_name, duration, calories_burned, intensity
+               FROM exercise_records WHERE member_id=? AND is_deleted=0 AND exercise_date>=?
+               ORDER BY exercise_date, exercise_time""", (member_id, cutoff)).fetchall())
     finally:
         conn.close()
 
     conn = health_db.get_medical_connection()
     try:
         rows = conn.execute(
-            """SELECT measured_at, value FROM health_metrics WHERE member_id=? AND metric_type='steps'
+            """SELECT metric_type, measured_at, value, source FROM health_metrics WHERE member_id=? AND metric_type='steps'
                AND is_deleted=0 AND measured_at>=? ORDER BY measured_at""", (member_id, cutoff)).fetchall()
         daily = {}
         for row in rows:
+            result["step_records"].append({key: row[key] for key in row.keys()})
             try:
                 parsed = json.loads(row["value"]) if isinstance(row["value"], str) else row["value"]
                 value = parsed.get("value", parsed.get("steps")) if isinstance(parsed, dict) else parsed
@@ -320,14 +395,133 @@ def _query_sleep_summary(member_id: str, days: int) -> dict:
     finally:
         conn.close()
     if not records:
-        return {"count": 0}
+        return {"count": 0, "daily_records": []}
     def average(key):
         values = [float(item[key]) for item in records if item.get(key) is not None]
         return sum(values) / len(values) if values else None
     return {"count": len(records), "avg_duration": average("duration_min"), "avg_score": average("score"),
             "latest_deep": records[-1].get("deep_min"), "latest_rem": records[-1].get("rem_min"),
             "latest_duration": records[-1].get("duration_min"), "latest_score": records[-1].get("score"),
-            "latest_date": records[-1]["date"]}
+            "latest_date": records[-1]["date"], "daily_records": records}
+
+
+def _story_rows(trends: dict, lifestyle: dict, sleep: dict) -> dict:
+    """Shape existing report queries into adapter-owned raw rows, without judging them.
+
+    The host does not fold sleep, intake, activity or vitals. Their adapters own that
+    decision. Weight is the one exception declared by the story contract, so raw
+    weighings pass through the shared daily-median helper before reaching its adapter.
+    """
+    api = _story_api()
+    weight_rows = [dict(point) for point in trends.get("weight", [])]
+    vitals_rows = []
+    for metric_type in ("heart_rate", "blood_pressure", "temperature", "blood_oxygen"):
+        for point in trends.get(metric_type, []):
+            vitals_rows.append(dict(point, metric_type=metric_type))
+    return {
+        "weight": api["aggregate_daily_medians"](weight_rows),
+        "sleep": [dict(row) for row in sleep.get("daily_records", [])],
+        "vitals": vitals_rows,
+        "intake": [dict(row) for row in lifestyle.get("diet_records", [])],
+        # Raw sync rows are intentional: activity's contract is last-sync-of-day,
+        # whereas the existing summary average still uses its historical daily sum.
+        "activity": [dict(row) for row in lifestyle.get("step_records", [])],
+    }
+
+
+def _build_personal_story(member_id: str, trends: dict, lifestyle: dict,
+                          sleep: dict, days: int) -> dict | None:
+    """Choose one recorded domain and return its reproducible story trace."""
+    api = _story_api()
+    candidates = []
+    domain_priority = {"weight": 5, "sleep": 4, "vitals": 3, "intake": 2, "activity": 1}
+    for domain, rows in _story_rows(trends, lifestyle, sleep).items():
+        if not rows:
+            continue
+        try:
+            analysis = api["domain_analysis_from_rows"](domain, rows, days)
+            ready = api["render_ready"](domain, analysis)
+        except (KeyError, TypeError, ValueError) as exc:
+            # One malformed legacy stream must not erase a valid story from a
+            # different domain. The full health card remains best-effort, while
+            # each adapter still fails loudly in its own direct tests and CLI.
+            LOG.warning("Personal health story skipped %s domain: %s", domain, exc)
+            continue
+        frame = ready["frame"]
+        coverage = frame["coverage"]
+        score = (
+            int(bool(frame["trend"].get("claim_allowed"))),
+            int(coverage.get("recorded_days") or 0),
+            int(coverage.get("measurement_count") or 0),
+            domain_priority[domain],
+        )
+        candidates.append((score, domain, ready))
+    if not candidates:
+        return None
+
+    _score, domain, analysis = max(candidates, key=lambda item: item[0])
+    lexicon = api["lexicon_for_analysis"](domain, analysis)
+    latest = analysis.get("latest_date") or analysis["frame"]["window"]["end"]
+    seed = api["derive_style_seed"](member_id, latest, 0)
+    selection = api["select_story_style"](
+        analysis,
+        scene="daily",
+        tone="auto",
+        density="auto",
+        surprise_level=0.5,
+        seed=seed,
+        domain=domain,
+        lexicon=lexicon,
+    )
+    return {
+        "domain": domain,
+        "analysis": analysis,
+        "frame": analysis["frame"],
+        "lexicon": dict(lexicon),
+        "selection": selection,
+    }
+
+
+def _story_section(story: dict, locale: str, number: str, featured: bool = False) -> str:
+    """Render a compact fifth panel from the same frame and selector as full stories."""
+    c = COPY[locale]
+    frame = story["frame"]
+    trend = frame["trend"]
+    coverage = frame["coverage"]
+    selected = story["selection"]["selected_style"]
+    domain = story["domain"]
+    subject = STORY_DOMAIN_NAMES[locale].get(domain, domain)
+    shape_key = STORY_SHAPE_COPY.get(frame["shape"], "story_not_enough")
+    headline = c[shape_key]
+    if not trend.get("claim_allowed"):
+        trend_text = c["story_not_enough"]
+    elif trend.get("delta") is None:
+        trend_text = c["story_unfitted"]
+    else:
+        unit = str(story["lexicon"].get("unit") or "")
+        trend_text = "%s %s" % (_story_api()["signed"](trend["delta"]), unit)
+    style_label = selected.get("name") if locale == "zh-CN" else selected.get("id")
+    classes = "story-section section-featured" if featured else "story-section"
+    return (
+        f'<section class="{classes}" data-story-domain="{_escape(domain)}" '
+        f'data-layout-mode="{_escape(selected.get("layout_mode"))}">'
+        f'<div class="section-title"><span>{number}</span><h2>{_escape(c["health_story"])}</h2></div>'
+        f'<div class="story-panel"><div class="story-copy"><small>{_escape(c["story_pattern"].format(name=style_label))}</small>'
+        f'<h3>{_escape(headline)}</h3><p>{_escape(c["story_observation"].format(subject=subject, days=frame["window"]["days"]))}</p></div>'
+        f'<div class="story-facts"><div><b>{int(coverage.get("recorded_days") or 0)}</b><span>{_escape(c["story_recorded_days"])}</span></div>'
+        f'<div><b>{int(coverage.get("measurement_count") or 0)}</b><span>{_escape(c["story_measurements"])}</span></div>'
+        f'<div><b>{_escape(trend_text)}</b><span>{_escape(c["story_long_run"])}</span></div></div></div></section>'
+    )
+
+
+def _personal_story_svg(story: dict) -> str:
+    """Render the selected personal story as a share-safe animated SVG artifact."""
+    return _story_api()["render_story_svg"](
+        story["analysis"],
+        story["selection"],
+        domain=story["domain"],
+        lexicon=story["lexicon"],
+    )
 
 
 def _lab_items(raw) -> list[dict]:
@@ -517,7 +711,8 @@ def _has_timeline_data(trends: dict, lifestyle: dict, sleep: dict, care: dict) -
 
 
 def _personal_layout(member_data: dict, trends: dict, lifestyle: dict, sleep: dict,
-                     care: dict, meds: list[dict], requested_focus: str = "auto") -> dict:
+                     care: dict, meds: list[dict], requested_focus: str = "auto",
+                     story: dict | None = None) -> dict:
     """Choose a reproducible layout from risk signals, coverage, and user intent."""
     coverage = {
         "metrics": sum(len(points) for points in trends.values()),
@@ -525,6 +720,7 @@ def _personal_layout(member_data: dict, trends: dict, lifestyle: dict, sleep: di
                      int(lifestyle.get("step_days", 0)) + int(sleep.get("count", 0)),
         "care": _care_record_count(care),
         "medications": len(meds),
+        "story": int((story or {}).get("frame", {}).get("coverage", {}).get("recorded_days") or 0),
     }
     risk = {key: 0 for key in coverage}
     reasons = []
@@ -561,17 +757,19 @@ def _personal_layout(member_data: dict, trends: dict, lifestyle: dict, sleep: di
     total_records = sum(coverage.values())
     density = "rich" if total_records >= 30 else ("standard" if total_records >= 8 else "sparse")
     base_orders = {
-        "metrics": ["metrics", "lifestyle", "timeline", "medications"],
-        "lifestyle": ["lifestyle", "metrics", "timeline", "medications"],
-        "care": ["timeline", "metrics", "lifestyle", "medications"],
-        "medications": ["medications", "metrics", "timeline", "lifestyle"],
-        "balanced": ["metrics", "lifestyle", "timeline", "medications"],
+        "metrics": ["metrics", "story", "lifestyle", "timeline", "medications"],
+        "lifestyle": ["lifestyle", "story", "metrics", "timeline", "medications"],
+        "care": ["timeline", "metrics", "story", "lifestyle", "medications"],
+        "medications": ["medications", "metrics", "story", "timeline", "lifestyle"],
+        "story": ["story", "metrics", "lifestyle", "timeline", "medications"],
+        "balanced": ["story", "metrics", "lifestyle", "timeline", "medications"],
     }
     available = {
         "metrics": bool(trends),
         "lifestyle": _has_lifestyle_data(lifestyle, sleep),
         "timeline": _has_timeline_data(trends, lifestyle, sleep, care),
         "medications": bool(meds),
+        "story": bool(story),
     }
     requested_section = {"care": "timeline"}.get(requested_focus, requested_focus)
     section_order = [section for section in base_orders[focus]
@@ -793,7 +991,8 @@ def _attention_section(member_data: dict, care: dict, locale: str) -> str:
 
 
 def _personal_content(member: dict, member_data: dict, trends: dict, lifestyle: dict, sleep: dict,
-                      care: dict, meds: list[dict], locale: str, layout: dict) -> str:
+                      care: dict, meds: list[dict], locale: str, layout: dict,
+                      story: dict | None = None) -> str:
     c = COPY[locale]
     sections = []
     for index, section in enumerate(layout["section_order"], start=1):
@@ -811,6 +1010,8 @@ def _personal_content(member: dict, member_data: dict, trends: dict, lifestyle: 
                                                 layout["focus"] == "care"))
         elif section == "medications":
             sections.append(_medications_html(meds, locale, number, layout["focus"] == "medications"))
+        elif section == "story" and story:
+            sections.append(_story_section(story, locale, number, layout["focus"] == "story"))
     return _attention_section(member_data, care, locale) + "".join(sections)
 
 
@@ -1007,11 +1208,12 @@ def _render_html(title: str, subtitle: str, privacy: str, summary: str, content:
 section{{background:var(--surface);border:1px solid var(--line);border-radius:19px;padding:24px;margin:15px 0;box-shadow:0 10px 30px rgba(21,63,104,.065)}} .section-featured{{border-color:#A8C9E8;box-shadow:0 12px 34px rgba(31,91,147,.11)}} .section-title{{display:flex;align-items:center;gap:10px;margin-bottom:15px}} .section-title>span{{font-size:11px;font-weight:800;color:#2F6EA5;border:1px solid #C5D9EC;background:#F2F7FC;border-radius:99px;padding:3px 8px}} h2{{font-size:21px;line-height:1.3;margin:0;color:var(--ink-strong);text-wrap:balance}} h3{{margin:0;font-size:16px;color:var(--ink-strong)}} p{{text-wrap:pretty}} .muted{{color:var(--muted);font-size:12px}} .empty{{padding:20px;text-align:center;border:1px dashed #B9CDE0;border-radius:12px;background:#F8FAFD;color:var(--muted)}} .empty.compact{{padding:14px 9px;margin-top:8px}}
 .metric-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}} .metric-grid.focused{{grid-template-columns:repeat(5,1fr)}} .metric-card{{padding:15px;border-radius:13px;background:var(--surface-muted);border:1px solid #D9E4EF;min-width:0}} .metric-card.featured{{grid-column:span 2;background:#F1F7FD;border-color:#B8D0E7}} .metric-card.featured .spark{{height:52px}} .metric-head,.meta{{display:flex;justify-content:space-between;gap:6px}} .metric-head b{{font-size:13px;color:var(--ink-strong)}} .metric-head span{{font-size:11px;background:var(--primary-soft);color:var(--primary);border-radius:99px;padding:2px 7px;white-space:nowrap}} .metric-value{{font-size:28px;font-weight:760;margin-top:7px;color:var(--ink-strong);font-variant-numeric:tabular-nums}} .metric-value small,.big small{{font-size:11px;color:var(--muted)}} .spark{{display:block;width:100%;height:44px;margin:7px 0}} .meta{{font-size:11px;color:#587087}} .metric-title{{margin-top:17px}}
 .wellness-grid{{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:11px}} .wellness-grid.focused{{grid-template-columns:repeat(4,minmax(0,1fr))}} .featured-panel{{grid-column:span 2}} .panel{{min-height:174px;border-radius:14px;padding:16px;border:1px solid #D9E4EF;background:#F8FAFD}} .intake{{background:#F2F7FE;border-color:#D4E2F2}} .activity{{background:#F1F8FC;border-color:#D2E7F0}} .sleep{{background:#FCF6F3;border-color:#EFDCD3}} .eyebrow{{font-size:12px;font-weight:760;color:#496780}} .big{{font-size:28px;font-weight:780;margin-top:7px;font-variant-numeric:tabular-nums}} .macro,.sleep-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}} .macro span,.sleep-row span{{font-size:11px;color:#526B82}} .macro b,.sleep-row b{{display:block;font-size:12px;color:#24445F}} .step-box{{margin-top:10px;padding-top:9px;border-top:1px solid #D2E3EE;display:grid;grid-template-columns:1fr auto}} .step-box b{{font-size:17px;color:var(--cyan)}} .step-box small{{grid-column:1/3;color:#587087}} .top-gap{{margin-top:11px}} .scope-note{{margin:11px 2px 0;font-size:11px;color:#587087}}
+.story-panel{{display:grid;grid-template-columns:1.2fr 1fr;gap:18px;padding:20px;border:1px solid #C5D9EC;border-radius:15px;background:linear-gradient(135deg,#F2F7FC,#FCF6F3)}} .story-copy small{{font-size:11px;font-weight:780;letter-spacing:.04em;color:var(--primary)}} .story-copy h3{{margin-top:12px;font-size:23px;line-height:1.35}} .story-copy p{{margin:9px 0 0;color:var(--muted);font-size:13px}} .story-facts{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch}} .story-facts div{{display:flex;flex-direction:column;justify-content:center;padding:12px;border-radius:11px;background:#fff;border:1px solid #D9E4EF;min-width:0}} .story-facts b{{font-size:18px;color:var(--ink-strong);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}} .story-facts span{{margin-top:4px;font-size:11px;color:var(--muted)}}
 .table-wrap{{overflow:hidden;border:1px solid var(--line);border-radius:13px}} table{{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}} th{{background:#EDF4FA;color:#274E70;font-size:12px;text-align:left}} th,td{{padding:11px 13px;border-bottom:1px solid #E8EEF4}} tr:last-child td{{border:0}} td{{font-size:12px}}
 .clear{{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:12px;background:#EAF3FB;color:#195F93}} .clear i{{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#2C78B8;color:white;font-style:normal}} .hero-clear{{margin:14px 0;background:white;border:1px solid #D3E1EE;box-shadow:0 9px 28px rgba(21,63,104,.06)}} .attention-section{{padding:15px 18px}} .attention-section.has-risk{{border-color:#E9B9AA;background:#FFFCFB}} .attention-section .compact-attention{{padding:0;border:0}} .attention-list{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;flex:1}} .attention-item{{display:flex;gap:9px;padding:8px 11px;border-radius:10px;background:#F4F7FA}} .attention-item span{{width:6px;height:6px;border-radius:50%;background:var(--primary);margin-top:7px;flex:none}} .attention-item.alert span{{background:#D65F45}} .attention-item.warning span{{background:#D49A30}} .attention-item p{{margin:0;font-size:12px}} .compact-attention{{display:flex;align-items:center;gap:14px;padding-bottom:13px;border-bottom:1px solid #E4EBF2}} .compact-attention>b{{font-size:12px;white-space:nowrap;color:#385A76}} .compact-attention>.clear{{flex:1;padding:8px 11px}} .compact-attention>.clear i{{width:20px;height:20px}}
 .family-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}} .family-card{{padding:20px;border:1px solid #D6E2ED;border-radius:16px;background:#FBFCFE}} .family-card.featured-member{{border-color:#E7A48E;background:#FFF9F7;box-shadow:0 10px 24px rgba(174,78,49,.10)}} .family-card-head{{display:flex;justify-content:space-between;gap:10px;margin-bottom:13px}} .family-card-head p{{margin:3px 0;color:var(--muted);font-size:11px}} .family-grid>.family-card:nth-child(odd):last-child{{grid-column:1/-1;display:grid;grid-template-columns:1.3fr .85fr .85fr;column-gap:15px}} .family-grid>.family-card:nth-child(odd):last-child .family-card-head{{grid-column:1/-1}} .status{{height:max-content;padding:5px 9px;border-radius:99px;background:#EAF3FB;color:#195F93;font-size:11px;white-space:nowrap}} .status.watch{{background:#FCEBE5;color:#A64C36}} .family-block{{padding:12px 0;border-top:1px solid #E3EBF2}} .family-block-title{{font-size:11px;font-weight:760;color:#46657E;margin-bottom:8px}} .family-metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}} .family-metrics span{{padding:9px;background:#EFF5FA;border-radius:9px;min-width:0}} .family-metrics small,.family-metrics b{{display:block}} .family-metrics small{{font-size:11px;color:var(--muted)}} .family-metrics b{{font-size:15px;margin-top:2px;white-space:nowrap;color:var(--ink-strong)}} .family-metrics i{{font-size:11px;font-style:normal;color:#587087}} .family-state-note,.family-empty{{padding:9px 11px;border-radius:9px;background:#F1F5F9;color:var(--muted);font-size:11px}} .family-empty.clear-state{{background:#EAF3FB;color:#195F93}} .family-list{{display:grid;gap:7px}} .family-list-item{{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;background:#F1F5F9;min-width:0}} .family-list-item.medication{{justify-content:space-between;background:#EDF4FC}} .family-list-item.medication div{{min-width:0}} .family-list-item.medication b,.family-list-item.medication small{{display:block}} .family-list-item.medication b{{font-size:13px;color:#234D70}} .family-list-item.medication small{{font-size:11px;color:#526B82;margin-top:1px}} .family-list-item.medication em{{font-size:11px;font-style:normal;color:var(--primary);background:#fff;padding:3px 7px;border-radius:99px;white-space:nowrap}} .family-list-item.attention{{align-items:flex-start}} .family-list-item.attention i{{width:6px;height:6px;border-radius:50%;background:var(--primary);margin-top:7px;flex:none}} .family-list-item.attention.warning i{{background:#D49A30}} .family-list-item.attention.alert i{{background:#D65F45}} .family-list-item.attention p{{margin:0;font-size:11px;color:#405E77}} .family-more{{font-size:11px;color:var(--muted);padding-left:3px}}
 .timeline{{padding-left:6px}} .timeline-item{{display:grid;grid-template-columns:82px 12px 1fr;gap:10px;min-height:64px}} .timeline-item time{{font-size:11px;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}} .timeline-item>span{{position:relative}} .timeline-item>span:before{{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--coral);top:6px;left:2px}} .timeline-item>span:after{{content:"";position:absolute;width:1px;background:#D9E4EF;top:16px;bottom:0;left:5px}} .timeline-item:last-child>span:after{{display:none}} .timeline-item b{{font-size:13px;color:var(--ink-strong)}} .timeline-item small{{margin-left:7px;padding:2px 7px;border-radius:99px;background:#F4E9E5;color:#9B5A47;font-size:11px}} .timeline-item p{{font-size:12px;color:#536D83;margin:2px 0}} .personal-timeline{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px}} .personal-timeline .timeline-item{{grid-template-columns:76px 12px 1fr;min-height:61px}} .personal-timeline .metric-event>span:before{{background:var(--primary)}} .personal-timeline .metric-event small{{background:var(--primary-soft);color:var(--primary)}} .personal-timeline .food-event>span:before{{background:#557FBA}} .personal-timeline .food-event small{{background:#EDF3FA;color:#446A9E}} .personal-timeline .activity-event>span:before{{background:var(--cyan)}} .personal-timeline .activity-event small{{background:var(--cyan-soft);color:#126985}} .personal-timeline .sleep-event>span:before{{background:#C8775E}} .personal-timeline .sleep-event small{{background:#F7EAE5;color:#A45C47}}
-.footer{{text-align:center;color:#526B82;font-size:11px;padding:16px 10px 7px}} .footer b{{display:block;color:#2B5475;margin:3px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid,.metric-grid.focused{{grid-template-columns:repeat(2,1fr)}}.wellness-grid,.wellness-grid.focused,.family-grid,.personal-timeline{{grid-template-columns:1fr}}.family-grid>.family-card:nth-child(odd):last-child{{grid-column:auto;display:block}}.featured-panel{{grid-column:auto}}.attention-list{{grid-template-columns:1fr}}.compact-attention{{align-items:flex-start;flex-direction:column}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
+.footer{{text-align:center;color:#526B82;font-size:11px;padding:16px 10px 7px}} .footer b{{display:block;color:#2B5475;margin:3px}} @media(max-width:700px){{.container{{padding:12px}}.header{{padding:25px}}.metric-grid,.metric-grid.focused{{grid-template-columns:repeat(2,1fr)}}.wellness-grid,.wellness-grid.focused,.family-grid,.personal-timeline,.story-panel{{grid-template-columns:1fr}}.story-facts{{grid-template-columns:repeat(2,minmax(0,1fr))}}.family-grid>.family-card:nth-child(odd):last-child{{grid-column:auto;display:block}}.featured-panel{{grid-column:auto}}.attention-list{{grid-template-columns:1fr}}.compact-attention{{align-items:flex-start;flex-direction:column}}.summary-strip>div{{padding:2px 8px}}.family-metrics{{grid-template-columns:repeat(2,1fr)}}}} @media print{{body{{background:white}}.container{{max-width:none}}section,.header{{box-shadow:none;break-inside:avoid}}}}
 </style></head><body><main class="container"><header class="header"><div class="brand"><div class="mark">M</div><h1>{_escape(title)}</h1></div><div class="subtitle">{_escape(subtitle)}</div><div class="privacy">●&nbsp; {_escape(privacy)} · MediWise</div></header>{summary}{content}<footer class="footer"><span>{_escape(generated)}</span><b>MediWise Health Suite</b><span>{_escape(c["disclaimer"])}</span></footer></main></body></html>'''
 
 
@@ -1057,8 +1259,19 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
     for member in members:
         mid = member["id"]
         member_data = lookup.get(mid, {"member_id": mid, "member_name": member["name"], "relation": member["relation"], "due_reminders": [], "health_tips": []})
-        all_data.append({"member": member, "member_data": member_data, "trends": _query_metric_trends(mid, days),
-                         "lifestyle": _query_lifestyle_summary(mid, days), "sleep": _query_sleep_summary(mid, days),
+        trends = _query_metric_trends(mid, days)
+        lifestyle = _query_lifestyle_summary(mid, days)
+        sleep = _query_sleep_summary(mid, days)
+        story = None
+        if resolved_view == "personal":
+            try:
+                story = _build_personal_story(mid, trends, lifestyle, sleep, days)
+            except (ImportError, KeyError, TypeError, ValueError) as exc:
+                # The health record card remains available if an optional narrative
+                # cannot be assembled from malformed legacy rows.
+                LOG.warning("Personal health story unavailable: %s", exc)
+        all_data.append({"member": member, "member_data": member_data, "trends": trends,
+                         "lifestyle": lifestyle, "sleep": sleep, "story": story,
                          "care": _query_recent_care(mid, days), "meds": _query_active_medications(mid),
                          "reminders": _query_active_reminders(mid)})
 
@@ -1079,13 +1292,15 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
     if resolved_view == "personal":
         data = all_data[0]
         layout_profile = _personal_layout(data["member_data"], data["trends"], data["lifestyle"],
-                                          data["sleep"], data["care"], data["meds"], focus)
+                                          data["sleep"], data["care"], data["meds"], focus,
+                                          story=data.get("story"))
         title = c["title"]
         subtitle = f'{_member_label(data["member"], locale)} · {c["period"].format(start=start, end=end)} · {c["last_days"].format(days=days)}'
         has_priority_items = any(card_briefing.get(key, 0) for key in ("total_alerts", "total_warnings", "total_due_reminders"))
         summary = _summary_strip(card_briefing, locale) if has_priority_items else ""
         content = _personal_content(data["member"], data["member_data"], data["trends"], data["lifestyle"],
-                                    data["sleep"], data["care"], data["meds"], locale, layout_profile)
+                                    data["sleep"], data["care"], data["meds"], locale, layout_profile,
+                                    story=data.get("story"))
         privacy = c["local_profile"]
     else:
         all_data.sort(key=_family_rank, reverse=True)
@@ -1111,6 +1326,26 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
     path = os.path.join(reports_dir, filename)
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(html)
+    story_artifact = None
+    if resolved_view == "personal" and all_data[0].get("story"):
+        story = all_data[0]["story"]
+        story_filename = (f'health_story_{story["domain"]}_{end}_{member_id}.svg')
+        story_path = os.path.join(reports_dir, story_filename)
+        try:
+            with open(story_path, "w", encoding="utf-8") as handle:
+                handle.write(_personal_story_svg(story))
+            try:
+                os.chmod(story_path, 0o600)
+            except OSError:
+                pass
+            story_artifact = {
+                "domain": story["domain"],
+                "style": story["selection"]["selected_style"]["id"],
+                "svg_path": story_path,
+                "share_safe": True,
+            }
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            LOG.warning("Personal health story SVG unavailable: %s", exc)
     try:
         import daily_snapshot
         for member in members:
@@ -1119,7 +1354,7 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         LOG.warning("daily_snapshot save failed: %s", exc)
     return {"status": "ok", "report_path": path, "file_size": os.path.getsize(path), "date": end,
             "member_count": len(members), "days": days, "locale": locale, "view": resolved_view,
-            "layout_profile": layout_profile}
+            "layout_profile": layout_profile, "story_artifact": story_artifact}
 
 
 def _parser(command: str) -> argparse.ArgumentParser:
@@ -1150,6 +1385,7 @@ def main():
     png["html_path"] = report["report_path"]
     png.update({key: report[key] for key in ("locale", "view", "member_count", "days")})
     png["layout_profile"] = report["layout_profile"]
+    png["story_artifact"] = report.get("story_artifact")
     health_db.output_json(png)
 
 

@@ -64,7 +64,14 @@ def normalize_metrics(raw_metrics: list[RawMetric], provider: str) -> list[dict]
             })
 
     # Direct pass-through: time-series and summary types (Garmin, Huawei, Zepp, etc.)
-    for metric_type in ("stress", "body_battery", "hrv", "activity"):
+    #
+    # `steps` belongs here rather than in the aggregator above: Zepp (`zepp.py`) and
+    # Huawei (`huawei.py`) report a day's count as one finished `steps` row, so there
+    # is nothing left to add up.  Only providers that hand over intraday samples name
+    # them `steps_raw`, and those are the ones `_aggregate_daily_steps` folds.  Without
+    # this branch a `steps` row matched no case in this function and was dropped, which
+    # is why those two providers' step data never reached the database.
+    for metric_type in ("stress", "body_battery", "hrv", "activity", "steps"):
         for rm in by_type.get(metric_type, []):
             normalized.append({
                 "metric_type": metric_type,
@@ -91,24 +98,93 @@ def normalize_metrics(raw_metrics: list[RawMetric], provider: str) -> list[dict]
 
 
 def _aggregate_daily_steps(raw_steps: list[RawMetric], provider: str) -> list[dict]:
-    """Aggregate raw step samples into daily totals."""
-    daily = defaultdict(int)
+    """Aggregate raw step samples into daily totals.
+
+    Two shapes arrive under `steps_raw`.  Apple Health and Gadgetbridge send intraday
+    samples whose value is a bare number, and those are what the sum here is for.
+    Garmin's `_fetch_stats` sends one already-finished day whose value is a JSON object
+    carrying `count` alongside the distance and calories the watch measured itself.
+
+    Both have to be read, because a day's totals cannot be recovered from the wrong one.
+    Summing the JSON text is impossible, and a day that arrived pre-aggregated must not
+    be added to anything.  When a day has both, the provider's own total wins: it is the
+    device's arithmetic over the same samples, and it brings distance and calories that
+    no sum of step counts could produce.
+
+    Distance and calories are carried only when a provider actually reported them.  An
+    absent key is left absent rather than written as 0, so that a reader can tell 「这台
+    设备没报距离」 from 「这天距离是 0」 -- the same distinction the story adapters need
+    and cannot make from a zero.
+    """
+    sampled = defaultdict(int)     # days assembled from intraday samples
+    seen_samples = set()
+    summary = {}                   # days a provider already totalled for us
+
     for rm in raw_steps:
         day = rm.timestamp[:10]  # YYYY-MM-DD
-        try:
-            daily[day] += int(float(rm.value))
-        except (ValueError, TypeError):
-            pass
+        payload = _as_payload(rm.value)
+        if payload is not None:
+            count = _as_int(payload.get("count"))
+            if count is None:
+                continue
+            row = {"count": count}
+            for key in ("distance_m", "calories"):
+                extra = _as_int(payload.get(key))
+                if extra is not None:
+                    row[key] = extra
+            summary[day] = row
+            continue
+        count = _as_int(rm.value)
+        if count is None:
+            continue
+        sampled[day] += count
+        seen_samples.add(day)
 
     result = []
-    for day, total in sorted(daily.items()):
+    for day in sorted(seen_samples | set(summary)):
+        row = summary.get(day) or {"count": sampled[day]}
         result.append({
             "metric_type": "steps",
-            "value": json.dumps({"count": total, "distance_m": 0, "calories": 0}),
+            "value": json.dumps(row),
             "measured_at": f"{day} 23:59:00",
             "source": provider,
         })
     return result
+
+
+def _as_payload(value) -> dict | None:
+    """Read a value as a JSON object, or None if it is not one.
+
+    Used to tell a pre-aggregated day from an intraday sample without trusting
+    `RawMetric.extra`: the `aggregated` flag Garmin sets is advisory and no other
+    provider sets it, so the value's own shape is the more reliable signal.
+    """
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _as_int(value) -> int | None:
+    """Coerce a reported number to int, or None when it is not a number.
+
+    None is returned rather than 0 so that callers can drop an unreadable field
+    instead of recording a measurement nobody took.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return None
 
 
 def _aggregate_sleep_sessions(raw_sleep: list[RawMetric], provider: str) -> list[dict]:

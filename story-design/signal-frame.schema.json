@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JuneYaooo/mediwise-health-suite/story-design/signal-frame.schema.json",
+  "title": "MediWise Signal Frame",
+  "description": "Domain-neutral intermediate representation for MediWise 健康译报. Produced by shared/story/adapters/<domain>.py, consumed by the selector, the motion layer, and the renderers. Renderers must read all domain wording from `lexicon` and must never reference a specific domain, unit, or metric name directly.",
+  "type": "object",
+  "required": ["domain", "lexicon", "window", "series", "series_meta", "shape", "trend", "coverage", "facts", "limits"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "domain": {
+      "description": "Which health domain this frame narrates. Selector uses it for eligibility and template domain tags only, never for aesthetics.",
+      "enum": ["weight", "sleep", "intake", "activity", "vitals", "adherence", "records", "family"]
+    },
+    "lexicon": {
+      "description": "Per-domain wording table. All user-visible domain nouns come from here.",
+      "type": "object",
+      "required": ["subject", "reading", "unit", "up", "down", "series_label", "scope_label"],
+      "additionalProperties": false,
+      "properties": {
+        "subject": {"type": "string", "maxLength": 12},
+        "reading": {"type": "string", "maxLength": 12},
+        "unit": {"type": "string", "maxLength": 8},
+        "up": {"description": "Neutral direction word. Must not imply success, failure, or progress.", "type": "string", "maxLength": 8},
+        "down": {"description": "Neutral direction word. Must not imply success, failure, or progress.", "type": "string", "maxLength": 8},
+        "series_label": {"type": "string", "maxLength": 16},
+        "fold_note": {"description": "How same-day duplicates were collapsed.", "type": "string", "maxLength": 24},
+        "scope_label": {"description": "Statistical scope, e.g. 有记录日. Averages must always carry it.", "type": "string", "maxLength": 12}
+      }
+    },
+    "window": {
+      "type": "object",
+      "required": ["days", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "days": {"type": "integer", "minimum": 7, "maximum": 90},
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"}
+      }
+    },
+    "series": {
+      "description": "Same-day-folded daily points, ascending by date. Drives `draw`, `settle`, and `trace`. May be empty for zero-data frames.",
+      "type": "array",
+      "maxItems": 90,
+      "items": {
+        "type": "object",
+        "required": ["date", "value", "count"],
+        "additionalProperties": false,
+        "properties": {
+          "date": {"type": "string", "format": "date"},
+          "value": {"type": "number"},
+          "count": {"description": "Raw measurements folded into this point. >1 enables the double-exposure moment.", "type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "series_meta": {
+      "type": "object",
+      "required": ["fold", "relative_only"],
+      "additionalProperties": false,
+      "properties": {
+        "fold": {"description": "How same-day duplicates were folded. Never `sum` for a level-type reading.", "enum": ["median", "mean", "sum", "count", "last"]},
+        "relative_only": {"description": "When true the renderer must plot deltas from the series baseline, never absolute values. Required true whenever show_exact_reading is false.", "type": "boolean"},
+        "baseline": {"description": "Baseline used for relative plotting. Omitted from all user-visible output.", "type": ["number", "null"]},
+        "quantized_gaps": {"description": "True when `settle` intervals were bucketed to avoid leaking exact dates.", "type": "boolean"}
+      }
+    },
+    "shape": {
+      "description": "Shared narrative shape. Copy is keyed on this, never on a per-domain state, so template copy stays O(templates x shapes).",
+      "enum": ["insufficient", "today-vs-trend-conflict", "sustained-rise", "sustained-fall", "flat-with-noise", "stable", "rebuilding", "spotlight", "multi-signal"]
+    },
+    "trend": {
+      "type": "object",
+      "required": ["claim_allowed"],
+      "additionalProperties": false,
+      "properties": {
+        "claim_allowed": {"description": "False blocks every trend sentence and every trend-requiring template.", "type": "boolean"},
+        "slope_per_day": {"type": ["number", "null"]},
+        "delta": {"description": "Robust change across the window, in `lexicon.unit`.", "type": ["number", "null"]},
+        "latest_delta": {"description": "Change between the two most recent recorded points.", "type": ["number", "null"]},
+        "latest_deviation": {"description": "Latest point minus the robust fit at that date.", "type": ["number", "null"]},
+        "visual_strength": {"description": "Unitless signed direction consistency for visual encoding only: median pairwise slope divided by median absolute pairwise slope. Not a health magnitude or a second estimate.", "type": ["number", "null"], "minimum": -1, "maximum": 1},
+        "direction": {"enum": ["up", "down", "stable", null]},
+        "confidence": {"enum": ["insufficient", "low", "medium", "high"]},
+        "confidence_label": {"type": "string", "maxLength": 8},
+        "method": {"description": "Estimator identifier, e.g. theil_sen. Same-day folding is declared separately by series_meta.fold.", "type": "string", "maxLength": 64}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["recorded_days", "span_days", "ratio"],
+      "additionalProperties": false,
+      "properties": {
+        "recorded_days": {"type": "integer", "minimum": 0},
+        "measurement_count": {"type": "integer", "minimum": 0},
+        "span_days": {"type": "integer", "minimum": 0},
+        "ratio": {"type": "number", "minimum": 0, "maximum": 1},
+        "longest_gap_days": {"type": "integer", "minimum": 0},
+        "repeat_days": {"description": "Days holding more than one raw measurement.", "type": "integer", "minimum": 0},
+        "label": {"type": "string", "maxLength": 16}
+      }
+    },
+    "facts": {
+      "description": "Pre-formatted, privacy-safe evidence lines. Templates select and reorder these; they never recompute numbers.",
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "value_text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32},
+          "label": {"type": "string", "maxLength": 16},
+          "value_text": {"description": "Already rendered, already redacted, already signed. Includes unit when relevant.", "type": "string", "maxLength": 48},
+          "scope_label": {"type": "string", "maxLength": 12},
+          "relative": {"description": "False means the text carries an absolute reading and is gated behind show_exact_reading.", "type": "boolean"}
+        }
+      }
+    },
+    "companions": {
+      "description": "Reduced frames for the other domains observed in the same window. Replaces the weight-specific `management` block.",
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["domain", "claim_allowed", "coverage_ratio"],
+        "additionalProperties": false,
+        "properties": {
+          "domain": {"enum": ["weight", "sleep", "intake", "activity", "vitals", "adherence", "records", "family"]},
+          "claim_allowed": {"type": "boolean"},
+          "coverage_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+          "recorded_days": {"type": "integer", "minimum": 0},
+          "fact": {"description": "One same-period sentence for this companion domain.", "type": ["string", "null"], "maxLength": 64},
+          "change_direction": {"enum": ["higher", "lower", "similar", "insufficient"]},
+          "scope_label": {"type": "string", "maxLength": 12}
+        }
+      }
+    },
+    "situation": {
+      "description": "Deterministic stage portrait. Not a health score and not encouragement copy.",
+      "type": "object",
+      "required": ["pattern_id", "title", "hook", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern_id": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32},
+        "title": {"type": "string", "maxLength": 24},
+        "hook": {"type": "string", "maxLength": 48},
+        "summary": {"description": "Full synthesis paragraph including the non-causal boundary sentence.", "type": "string", "maxLength": 400},
+        "evidence": {"type": "array", "maxItems": 6, "items": {"type": "string", "maxLength": 64}},
+        "coverage_line": {"type": "string", "maxLength": 96},
+        "comparable_domains": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
+        "changed_domains": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
+        "dominant_domain": {"type": ["string", "null"]},
+        "non_judgemental": {"const": true}
+      }
+    },
+    "social_packaging": {
+      "description": "Share framing. May only amplify facts already confirmed in `facts` and `situation`.",
+      "type": "object",
+      "required": ["cover_hook", "cover_subhook", "clickbait"],
+      "additionalProperties": false,
+      "properties": {
+        "cover_hook": {"type": "string", "maxLength": 24},
+        "cover_subhook": {"type": "string", "maxLength": 48},
+        "hook_mechanisms": {"type": "array", "maxItems": 4, "items": {"enum": ["result_first", "numbers_proof", "contrarian", "curiosity_gap", "before_after"]}},
+        "proof_points": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 64}},
+        "save_prompt": {"type": "string", "maxLength": 48},
+        "share_caption": {"type": "string", "maxLength": 160},
+        "share_reason": {"type": "string", "maxLength": 64},
+        "clickbait": {"const": false},
+        "privacy_safe": {"type": "boolean"}
+      }
+    },
+    "persona": {
+      "description": "Observer identity derived only from recording behavior. Never from readings, direction, BMI, sex, age, diagnosis, medication, or goal completion.",
+      "type": "object",
+      "required": ["id", "label", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32},
+        "label": {"type": "string", "maxLength": 16},
+        "basis": {"type": "string", "maxLength": 32}
+      }
+    },
+    "motion": {
+      "description": "Deterministic motion parameters derived from the style seed and coverage. Same seed plus same data must yield a byte-identical SVG.",
+      "type": "object",
+      "required": ["motion_mode", "primitives", "duration_ms", "poster_time_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "motion_mode": {"description": "Globally unique per template, alongside content_role and layout_mode.", "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32},
+        "primitives": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"enum": ["draw", "settle", "reveal", "breathe", "count", "trace"]}},
+        "motion_variant": {"type": "integer", "minimum": 0, "maximum": 7},
+        "tempo": {"description": "Beats per second for calendar-mapped settle.", "type": "number", "minimum": 0.5, "maximum": 8},
+        "stagger_ms": {"type": "integer", "minimum": 0, "maximum": 2000},
+        "duration_ms": {"description": "One loop, excluding the trailing hold.", "type": "integer", "minimum": 4000, "maximum": 12000},
+        "hold_ms": {"type": "integer", "minimum": 0, "maximum": 4000},
+        "poster_time_ms": {"description": "Frozen frame timestamp used for PNG export.", "type": "integer", "minimum": 0},
+        "beats": {
+          "description": "Calendar-mapped settle beats: one entry per series point, gap_days carrying the real interval so missing days become perceptible silence.",
+          "type": "array",
+          "maxItems": 90,
+          "items": {
+            "type": "object",
+            "required": ["index", "at_ms"],
+            "additionalProperties": false,
+            "properties": {
+              "index": {"type": "integer", "minimum": 0},
+              "at_ms": {"type": "integer", "minimum": 0},
+              "gap_days": {"type": "integer", "minimum": 0},
+              "gap_bucket": {"description": "Bucketed gap used when exact dates are redacted.", "enum": ["none", "short", "medium", "long"]}
+            }
+          }
+        },
+        "reduced_motion_fallback": {"description": "prefers-reduced-motion must degrade to the poster frame.", "const": "poster"}
+      }
+    },
+    "limits": {
+      "description": "Boundary flags the renderer surfaces verbatim. All four must hold for every frame.",
+      "type": "object",
+      "required": ["causal_claim", "prescription", "unrecorded_is_zero", "non_causal_note"],
+      "additionalProperties": false,
+      "properties": {
+        "causal_claim": {"const": false},
+        "prescription": {"const": false},
+        "unrecorded_is_zero": {"const": false},
+        "cross_domain_arithmetic": {"description": "Deriving a balance by subtracting one domain from another is forbidden.", "const": false},
+        "non_causal_note": {"type": "string", "maxLength": 120},
+        "notes": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 120}}
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "share_safe": {"type": "boolean"},
+        "show_exact_reading": {"type": "boolean"},
+        "show_member_name": {"type": "boolean"},
+        "show_exact_date": {"type": "boolean"},
+        "hidden_by_default": {"type": "array", "maxItems": 12, "items": {"type": "string"}}
+      }
+    }
+  }
+}

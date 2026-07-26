@@ -33,13 +33,14 @@ def analysis(**overrides):
 
 
 class WeightStyleCatalogTests(unittest.TestCase):
-    def test_catalog_has_twelve_real_families_and_twenty_four_variants(self):
+    def test_catalog_has_paired_real_families_and_at_least_twenty_four_variants(self):
         families = {}
         for style in STYLE_CATALOG:
             families.setdefault(style.family, []).append(style.id)
 
-        self.assertEqual(len(STYLE_CATALOG), 24)
-        self.assertEqual(len(families), 12)
+        self.assertGreaterEqual(len(STYLE_CATALOG), 24)
+        self.assertEqual(len(STYLE_CATALOG) % 2, 0)
+        self.assertEqual(len(families), len(STYLE_CATALOG) // 2)
         self.assertTrue(all(len(styles) == 2 for styles in families.values()))
         self.assertEqual(
             [style.id for style in STYLE_CATALOG if style.renderer_status == "production"],

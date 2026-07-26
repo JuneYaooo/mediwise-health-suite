@@ -15,7 +15,7 @@ Keep personal and family health records in one place, including chat notes, medi
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[How it works](#how-mediwise-works) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
+[How it works](#how-mediwise-works) · [Health Stories](#health-stories) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
 
 </div>
 
@@ -92,6 +92,20 @@ Create Zhang Jianguo's health record card for the last 30 days.
 
 Missing measurements are shown as missing. MediWise does not invent values to fill the card.
 
+## Health Stories
+
+MediWise Health Stories is an eight-domain observation and narration engine for weight, sleep, vital signs, intake, activity, medication records, recording activity, and family records. Each domain defines which records it may read, how same-day entries are folded, and which neutral direction words describe the numbers. A story states what was recorded, where dates are blank, and how the recorded values moved; it does not turn correlation into a cause or make a medical judgment.
+
+The weight story is the engine's showcase, not its boundary. It folds same-day measurements to a median, uses a robust Theil–Sen trend to separate a latest-day change from the longer recorded direction, and can place recorded intake, activity, and sleep beside that direction as contemporaneous observations.
+
+All eight domains use the same 24 narrative templates. Missing days remain absent instead of becoming zero. Family stories read only opaque member IDs and dates, never names or profile details, and never compare family members. By default, stories are share-safe and can be exported as self-contained HTML, animated SVG with a reduced-motion mode, or a frozen 1080×1440 PNG.
+
+```text
+Create a share-safe animated story from my last 30 days of sleep records.
+Use the weight showcase to narrate my recorded weight, intake, activity, and sleep over the same period.
+Create a family-record story without names or member comparisons.
+```
+
 ## Features
 
 | Area | What is available | Status |
@@ -103,6 +117,7 @@ Missing measurements are shown as missing. MediWise does not invent values to fi
 | Diet | Meal records, traceable nutrition sources, daily totals, and nutrition goals | Implemented |
 | Weight and exercise | Weight trends, BMI, BMR, TDEE, body measurements, activity, and goals | Implemented |
 | Sleep | Duration, deep sleep, light sleep, REM, awake periods, daily summaries, and weekly trends | Implemented |
+| Health Stories | Eight observation and narration domains using 24 templates; share-safe HTML, animated SVG, and frozen PNG output, with weight as the showcase | Implemented |
 | Wearable imports | Apple Health and Gadgetbridge file imports with normalization and deduplication | Verified |
 | Monitoring | On-demand custom thresholds, anomaly checks, alerts, dashboards, and trend review | Implemented on demand |
 | Visit preparation | Recent symptoms, measurements, medication, and history exported as text, image, or PDF | Implemented |
@@ -236,6 +251,7 @@ Family members are records managed by the current local user. They are not separ
 - API keys, passwords, and tokens should not pass through chat.
 - Node action logs omit complete parameters, health content, and OAuth credentials.
 - Git ignore rules exclude databases, attachments, configuration, exports, and backups.
+- Health Stories are share-safe by default. Family-record stories read no names or profile details and do not compare members.
 
 ### Optional external services
 
@@ -287,7 +303,7 @@ Backups contain complete health records and are not encrypted. Keep them in a pr
 - Python 3.8 or newer
 - Node.js 18 or newer
 - SQLite 3.x
-- Chrome or Chromium for local PNG health cards and PDF rendering; text records and queries do not require it
+- Chrome or Chromium for local PNG health cards, frozen Health Story PNGs, and PDF rendering; Health Story HTML and animated SVG, text records, and queries do not require it
 - An agent that can load Skills, access local files, and run scripts
 - OpenClaw 2026.3.0 or newer when using OpenClaw
 - Linux, macOS, or Windows

@@ -11,11 +11,26 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+
+_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _story_export():
+    """Import shared.story.export, adding the repo root to sys.path if needed.
+
+    This script is executed directly as well as imported, so the root is not
+    guaranteed to be importable already.
+    """
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    import importlib
+
+    return importlib.import_module("shared.story.export")
 
 
 def _strip_external_scripts(html_path: str) -> str:
@@ -89,26 +104,24 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
     if not chrome_binary:
         return {"status": "error", "error": "Chrome/Chromium not found"}
 
-    chrome_cmd = [
+    # Story cards park their animations and only then set window.__ready.  Waiting
+    # for a settled frame is the motion layer's concern, so the flags come from
+    # shared/story/export.py rather than being duplicated here.
+    chrome_cmd = _story_export().chrome_command(
         chrome_binary,
-        "--headless=new",
-        "--disable-gpu",
-        "--no-sandbox",
-        "--disable-software-rasterizer",
-        "--disable-dev-shm-usage",
-        "--hide-scrollbars",
-        "--disable-background-networking",
-        f"--window-size={width},{viewport_height}",
-        f"--screenshot={output_path}",
         Path(render_path).resolve().as_uri(),
-    ]
+        output_path,
+        width=width,
+        height=viewport_height,
+        extra_flags=("--disable-software-rasterizer",),
+    )
 
     try:
         result = subprocess.run(
             chrome_cmd,
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=30,
         )
     except FileNotFoundError:
         return {"status": "error", "error": "Chrome/Chromium not found"}
@@ -189,23 +202,12 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
 
 
 def find_chrome() -> str | None:
-    """Locate Chrome/Chromium on Linux, macOS, or Windows."""
-    for command in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"):
-        resolved = shutil.which(command)
-        if resolved:
-            return resolved
+    """Locate Chrome/Chromium on Linux, macOS, or Windows.
 
-    candidates = [
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
-        os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-    ]
-    for candidate in candidates:
-        if candidate and os.path.isfile(candidate):
-            return candidate
-    return None
+    One implementation, in shared/story/export.py, so the card renderer and this
+    generic screenshot helper can never disagree about which binary is used.
+    """
+    return _story_export().find_chrome()
 
 
 # Backward-compatible alias for callers that imported the former private helper.

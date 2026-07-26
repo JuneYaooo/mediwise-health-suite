@@ -40,8 +40,10 @@ class WeightStoryCardTests(unittest.TestCase):
     def setUpClass(cls):
         cls.analysis = long_analysis()
 
-    def test_all_twenty_four_styles_have_dynamic_renderers(self):
-        self.assertEqual(len(available_story_styles()), 24)
+    def test_all_catalog_styles_have_dynamic_renderers(self):
+        style_count = len(STYLE_CATALOG)
+        self.assertGreaterEqual(len(available_story_styles()), 24)
+        self.assertEqual(len(available_story_styles()), style_count)
         self.assertEqual({style.renderer_status for style in STYLE_CATALOG}, {"production"})
 
         family_markup = set()
@@ -78,10 +80,10 @@ class WeightStoryCardTests(unittest.TestCase):
             analysis_roles.add(analysis_role.group(1))
             metric_profiles.update(re.findall(r'data-metric-profile="([^"]+)"', rendered))
 
-        self.assertEqual(len(family_markup), 12)
-        self.assertEqual(len(content_roles), 24)
-        self.assertEqual(len(layout_modes), 24)
-        self.assertEqual(len(analysis_roles), 24)
+        self.assertEqual(len(family_markup), style_count // 2)
+        self.assertEqual(len(content_roles), style_count)
+        self.assertEqual(len(layout_modes), style_count)
+        self.assertEqual(len(analysis_roles), style_count)
         self.assertGreaterEqual(len(metric_profiles), 10)
 
     def test_templates_make_different_editorial_choices_from_the_same_analysis(self):
