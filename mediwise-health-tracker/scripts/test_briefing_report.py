@@ -199,6 +199,45 @@ class PersonalHealthStoryTest(unittest.TestCase):
         self.assertIn('data-duration-ms="', svg)
         self.assertNotIn('data-duration-ms="0"', svg)
 
+    def test_story_bundle_keeps_every_recorded_domain_for_video(self):
+        trends = {
+            "weight": [
+                {"date": f"2026-07-{day:02d}", "value": 70 + day / 10}
+                for day in range(1, 8)
+            ],
+            "heart_rate": [
+                {"date": f"2026-07-{day:02d}", "value": 68 + day}
+                for day in range(1, 8)
+            ],
+        }
+        sleep = {
+            "daily_records": [
+                {"date": f"2026-07-{day:02d}", "duration_min": 390 + day * 8}
+                for day in range(1, 8)
+            ]
+        }
+        lifestyle = {
+            "diet_records": [
+                {"meal_date": f"2026-07-{day:02d}", "total_calories": 1600 + day * 20}
+                for day in range(1, 8)
+            ],
+            "step_records": [
+                {"metric_type": "steps", "measured_at": f"2026-07-{day:02d} 20:00:00", "value": {"count": 5000 + day * 200}}
+                for day in range(1, 8)
+            ],
+        }
+
+        stories = briefing_report._build_personal_stories(
+            "member-1", trends, lifestyle, sleep, 7
+        )
+
+        self.assertEqual(
+            [story["domain"] for story in stories],
+            ["weight", "sleep", "vitals", "intake", "activity"],
+        )
+        self.assertTrue(all(story["frame"]["series"] for story in stories))
+        self.assertTrue(all(story["selection"]["selected_style"]["id"] for story in stories))
+
     def test_story_builder_skips_one_malformed_domain(self):
         api = briefing_report._story_api()
         analyze = api["domain_analysis_from_rows"]

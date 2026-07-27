@@ -7,7 +7,7 @@ expenditure model, it must not imply a calorie deficit or clinical fluid I/O.
 Usage:
   python3 scripts/briefing_report.py generate [--member-id <id>]
       [--days 7] [--locale zh-CN|en-US] [--view auto|personal|family]
-      [--focus auto|metrics|lifestyle|care|medications|story]
+      [--focus auto|metrics|lifestyle|care|medications|story] [--story-video]
 """
 
 from __future__ import annotations
@@ -178,6 +178,7 @@ def _story_api():
         from shared.story.normalize import aggregate_daily_medians, domain_analysis_from_rows
         from shared.story.render import _signed
         from shared.story.svg import render_story_svg
+        from shared.story.video import render_health_story_video
 
         _STORY_API = {
             "aggregate_daily_medians": aggregate_daily_medians,
@@ -188,6 +189,7 @@ def _story_api():
             "select_story_style": select_story_style,
             "signed": _signed,
             "render_story_svg": render_story_svg,
+            "render_health_story_video": render_health_story_video,
         }
     return _STORY_API
 
@@ -429,12 +431,23 @@ def _story_rows(trends: dict, lifestyle: dict, sleep: dict) -> dict:
     }
 
 
-def _build_personal_story(member_id: str, trends: dict, lifestyle: dict,
-                          sleep: dict, days: int) -> dict | None:
-    """Choose one recorded domain and return its reproducible story trace."""
-    api = _story_api()
-    candidates = []
+def _story_rank(story: dict) -> tuple:
+    frame = story["frame"]
+    coverage = frame["coverage"]
     domain_priority = {"weight": 5, "sleep": 4, "vitals": 3, "intake": 2, "activity": 1}
+    return (
+        int(bool(frame["trend"].get("claim_allowed"))),
+        int(coverage.get("recorded_days") or 0),
+        int(coverage.get("measurement_count") or 0),
+        domain_priority.get(story.get("domain"), 0),
+    )
+
+
+def _build_personal_stories(member_id: str, trends: dict, lifestyle: dict,
+                            sleep: dict, days: int) -> list[dict]:
+    """Build one reproducible story per recorded domain, in stable domain order."""
+    api = _story_api()
+    stories = []
     for domain, rows in _story_rows(trends, lifestyle, sleep).items():
         if not rows:
             continue
@@ -448,38 +461,38 @@ def _build_personal_story(member_id: str, trends: dict, lifestyle: dict,
             LOG.warning("Personal health story skipped %s domain: %s", domain, exc)
             continue
         frame = ready["frame"]
-        coverage = frame["coverage"]
-        score = (
-            int(bool(frame["trend"].get("claim_allowed"))),
-            int(coverage.get("recorded_days") or 0),
-            int(coverage.get("measurement_count") or 0),
-            domain_priority[domain],
+        # Rows can exist while every value is rejected by an adapter.  Such a
+        # stream has no recorded fact to show and must not become a video scene.
+        if not frame.get("series"):
+            continue
+        lexicon = api["lexicon_for_analysis"](domain, ready)
+        latest = ready.get("latest_date") or frame["window"]["end"]
+        seed = api["derive_style_seed"](member_id, latest, 0)
+        selection = api["select_story_style"](
+            ready,
+            scene="daily",
+            tone="auto",
+            density="auto",
+            surprise_level=0.5,
+            seed=seed,
+            domain=domain,
+            lexicon=lexicon,
         )
-        candidates.append((score, domain, ready))
-    if not candidates:
-        return None
+        stories.append({
+            "domain": domain,
+            "analysis": ready,
+            "frame": frame,
+            "lexicon": dict(lexicon),
+            "selection": selection,
+        })
+    return stories
 
-    _score, domain, analysis = max(candidates, key=lambda item: item[0])
-    lexicon = api["lexicon_for_analysis"](domain, analysis)
-    latest = analysis.get("latest_date") or analysis["frame"]["window"]["end"]
-    seed = api["derive_style_seed"](member_id, latest, 0)
-    selection = api["select_story_style"](
-        analysis,
-        scene="daily",
-        tone="auto",
-        density="auto",
-        surprise_level=0.5,
-        seed=seed,
-        domain=domain,
-        lexicon=lexicon,
-    )
-    return {
-        "domain": domain,
-        "analysis": analysis,
-        "frame": analysis["frame"],
-        "lexicon": dict(lexicon),
-        "selection": selection,
-    }
+
+def _build_personal_story(member_id: str, trends: dict, lifestyle: dict,
+                          sleep: dict, days: int) -> dict | None:
+    """Choose the best recorded domain for the legacy fifth card section."""
+    stories = _build_personal_stories(member_id, trends, lifestyle, sleep, days)
+    return max(stories, key=_story_rank) if stories else None
 
 
 def _story_section(story: dict, locale: str, number: str, featured: bool = False) -> str:
@@ -1218,7 +1231,8 @@ section{{background:var(--surface);border:1px solid var(--line);border-radius:19
 
 
 def generate_report(member_id: str | None = None, owner_id: str | None = None, days: int = 7,
-                    locale: str = "zh-CN", view: str = "auto", focus: str = "auto") -> dict:
+                    locale: str = "zh-CN", view: str = "auto", focus: str = "auto",
+                    story_video: bool = False) -> dict:
     """Generate a personal or family card and return its local HTML path."""
     if locale not in COPY:
         return {"status": "error", "message": f"Unsupported locale: {locale}", "supported_locales": list(COPY)}
@@ -1263,15 +1277,18 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         lifestyle = _query_lifestyle_summary(mid, days)
         sleep = _query_sleep_summary(mid, days)
         story = None
+        stories = []
         if resolved_view == "personal":
             try:
-                story = _build_personal_story(mid, trends, lifestyle, sleep, days)
+                stories = _build_personal_stories(mid, trends, lifestyle, sleep, days)
+                story = max(stories, key=_story_rank) if stories else None
             except (ImportError, KeyError, TypeError, ValueError) as exc:
                 # The health record card remains available if an optional narrative
                 # cannot be assembled from malformed legacy rows.
                 LOG.warning("Personal health story unavailable: %s", exc)
         all_data.append({"member": member, "member_data": member_data, "trends": trends,
                          "lifestyle": lifestyle, "sleep": sleep, "story": story,
+                         "stories": stories,
                          "care": _query_recent_care(mid, days), "meds": _query_active_medications(mid),
                          "reminders": _query_active_reminders(mid)})
 
@@ -1346,6 +1363,23 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
             }
         except (OSError, KeyError, TypeError, ValueError) as exc:
             LOG.warning("Personal health story SVG unavailable: %s", exc)
+    video_artifact = None
+    if resolved_view == "personal" and story_video and all_data[0].get("stories"):
+        video_dir = os.path.join(reports_dir, f'health_story_video_{end}_{member_id}')
+        try:
+            video_artifact = _story_api()["render_health_story_video"](
+                all_data[0]["stories"],
+                video_dir,
+                days=days,
+                locale=locale,
+                # Chinese adapter lexicons may name a selected component (心率、
+                # 热量、步数), which is more precise than the host's broad domain
+                # label. English still needs the host translation table.
+                domain_labels=STORY_DOMAIN_NAMES[locale] if locale == "en-US" else {},
+            )
+        except (OSError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+            LOG.warning("Personal multi-domain story video unavailable: %s", exc)
+            video_artifact = {"status": "unavailable", "message": str(exc)}
     try:
         import daily_snapshot
         for member in members:
@@ -1354,7 +1388,8 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         LOG.warning("daily_snapshot save failed: %s", exc)
     return {"status": "ok", "report_path": path, "file_size": os.path.getsize(path), "date": end,
             "member_count": len(members), "days": days, "locale": locale, "view": resolved_view,
-            "layout_profile": layout_profile, "story_artifact": story_artifact}
+            "layout_profile": layout_profile, "story_artifact": story_artifact,
+            "video_artifact": video_artifact}
 
 
 def _parser(command: str) -> argparse.ArgumentParser:
@@ -1365,6 +1400,7 @@ def _parser(command: str) -> argparse.ArgumentParser:
     parser.add_argument("--locale", choices=sorted(COPY), default="zh-CN")
     parser.add_argument("--view", choices=("auto", "personal", "family"), default="auto")
     parser.add_argument("--focus", choices=FOCUS_CHOICES, default="auto")
+    parser.add_argument("--story-video", action="store_true")
     if command == "screenshot":
         parser.add_argument("--width", type=int, default=1040)
     return parser
@@ -1376,7 +1412,8 @@ def main():
         return
     command = sys.argv[1]
     args = _parser(command).parse_args(sys.argv[2:])
-    report = generate_report(args.member_id, args.owner_id, args.days, args.locale, args.view, args.focus)
+    report = generate_report(args.member_id, args.owner_id, args.days, args.locale, args.view,
+                             args.focus, args.story_video)
     if command == "generate" or report.get("status") != "ok":
         health_db.output_json(report)
         return
@@ -1386,6 +1423,7 @@ def main():
     png.update({key: report[key] for key in ("locale", "view", "member_count", "days")})
     png["layout_profile"] = report["layout_profile"]
     png["story_artifact"] = report.get("story_artifact")
+    png["video_artifact"] = report.get("video_artifact")
     health_db.output_json(png)
 
 

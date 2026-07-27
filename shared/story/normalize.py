@@ -26,7 +26,7 @@ from statistics import median
 from typing import Dict, Iterable, List, Optional
 
 from .adapters import component_for, component_key_for
-from .frame import render_ready
+from .frame import render_ready, robust_fit
 
 # Event-shaped domains conclude from two recorded days; daily-series domains need
 # three.  See 分析边界 in story-design/story-system.md.
@@ -98,17 +98,40 @@ def domain_analysis_from_rows(domain: str, rows: List[dict], days: int) -> dict:
     coverage = frame["coverage"]
     series = frame["series"]
     recorded_days = int(coverage.get("recorded_days") or 0)
+    parsed_dates = [_parse_date(point.get("date")) for point in series]
+    valid_dates = [item for item in parsed_dates if item is not None]
+    observed_span = (
+        (max(valid_dates) - min(valid_dates)).days + 1 if valid_dates else 0
+    )
+    span_days = int(coverage.get("span_days") or 0) or observed_span
+    coverage_ratio = float(coverage.get("ratio") or 0.0)
+    if recorded_days and coverage_ratio <= 0:
+        coverage_ratio = min(recorded_days / float(max(days, 1)), 1.0)
     minimum = 2 if domain in EVENT_SHAPED_DOMAINS else 3
+    claim_allowed = recorded_days >= minimum
     analysis = {
         "daily_records": rows,
         "window_days": days,
-        "span_days": int(coverage.get("span_days") or 0),
+        "span_days": span_days,
         "recorded_days": recorded_days,
         "measurement_count": int(coverage.get("measurement_count") or 0),
-        "coverage_ratio": float(coverage.get("ratio") or 0.0),
-        "trend_claim_allowed": recorded_days >= minimum,
+        "coverage_ratio": round(coverage_ratio, 3),
+        "trend_claim_allowed": claim_allowed,
         "latest_date": series[-1]["date"] if series else None,
     }
+    if len(series) >= 2:
+        try:
+            analysis["daily_delta"] = round(
+                float(series[-1]["value"]) - float(series[-2]["value"]), 4
+            )
+        except (KeyError, TypeError, ValueError):
+            pass
+    if claim_allowed:
+        slope, _intercept = robust_fit(series)
+        if slope is not None:
+            analysis["trend_slope_per_day"] = round(slope, 5)
+            analysis["slope_per_day"] = round(slope, 5)
+            analysis["trend_delta"] = round(slope * (days - 1), 3)
     if component_key and component:
         analysis[component_key] = component
     return analysis

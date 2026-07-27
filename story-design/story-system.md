@@ -19,10 +19,12 @@ Signal Frame IR（story-design/signal-frame.schema.json）
         ↓  selector.py：资格 → 场景/语气/密度 → 可用信号 → 偏好 → 防重复 → 时刻加权 → 探索
         ↓  motion.py：由 seed + 覆盖率派生 tempo / stagger / poster_time
         ↓  render/：artboard + families/*（静态海报帧 与 动画帧 同源）
-自包含 .svg（动态卡） / .html（预览） / .png（冻结海报帧） / .webm（可选）
+单域：自包含 .svg（动态卡） / .html（预览） / .png（冻结海报帧）
+        ↓  video.py：只串联各域已完成的 Signal Frame，不做跨域计算
+个人综合译报：1080×1440 逐镜头 .png + 1080×1920 H.264 .mp4 + manifest / QA
 ```
 
-渲染层不认识任何具体域。它只认识 Signal Frame。凡是渲染器里出现「体重」「秤面」「kg」这类词，都属于契约违规，应改为从 `lexicon` 取词。
+渲染层不认识任何具体域。它只认识 Signal Frame。凡是渲染器里出现「体重」「秤面」「kg」这类词，都属于契约违规，应改为从 `lexicon` 取词。视频层同样不得按域分支：它可以串联多个完成的 frame，但只能逐域展示各自单位，不能归一化后比较、相减或生成因果叙述。
 
 ## 形状词汇（shape）
 

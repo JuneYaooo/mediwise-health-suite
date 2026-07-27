@@ -78,7 +78,7 @@ MediWise 在 OpenClaw 中只支持个人本地实例：一个本地用户管理�
 3. 把生成的 PNG 作为图片发送，不粘贴 JSON 或 HTML。
 4. 没有数据的项目显示暂无数据，不推测或补造指标。
 
-用户明确请求个人“健康译报”“动态译报”或“动画”时，`generate-report` 传 `focus=story`，发送返回结果中 `story_artifact.svg_path` 对应的动画 SVG；PNG 可作为不支持 SVG 动画时的预览。若用户点名体重、睡眠、生命体征、摄入、活动、服药记录、记录行为或家庭记录中的某一域，改走体重管理 Skill 的兼容动作 `generate-weight-story-card` 并传对应 `domain`。家庭健康记录卡本身不生成个人故事产物。
+用户明确请求个人“健康译报”“动态译报”“小视频”或“多维分析”时，`generate-report` 传 `focus=story` 和 `format=mp4`，发送返回结果中 `video_artifact.mp4_path` 对应的 MP4；需要单独分享某张卡时，从 `video_artifact.scene_images` 发送对应 PNG。`story_artifact.svg_path` 是最佳单域的兼容中间产物，不得冒充最终视频。若用户点名体重、睡眠、生命体征、摄入、活动、服药记录、记录行为或家庭记录中的某一域，改走体重管理 Skill 的兼容动作 `generate-weight-story-card` 并传对应 `domain`。家庭健康记录卡本身不生成个人故事产物。
 
 ## 安全要求
 

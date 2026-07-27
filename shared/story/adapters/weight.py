@@ -73,9 +73,45 @@ NO_COMPANION_COPY = {
 COMPANIONS = ("intake", "activity", "sleep")
 
 
+def state_for(daily_delta, trend_delta, sufficient: bool) -> str:
+    """Map weight signals to the historic eight states in one canonical place."""
+    if not sufficient or trend_delta is None:
+        return "insufficient"
+    daily_direction = "stable"
+    if daily_delta is not None and daily_delta > 0.15:
+        daily_direction = "up"
+    elif daily_delta is not None and daily_delta < -0.15:
+        daily_direction = "down"
+
+    trend_direction = "stable"
+    if trend_delta > 0.2:
+        trend_direction = "up"
+    elif trend_delta < -0.2:
+        trend_direction = "down"
+
+    if daily_direction == "up" and trend_direction == "down":
+        return "daily_up_trend_down"
+    if daily_direction == "down" and trend_direction == "up":
+        return "daily_down_trend_up"
+    if trend_direction == "down":
+        return "sustained_down"
+    if trend_direction == "up":
+        return "sustained_up"
+    if daily_direction == "up":
+        return "daily_up_stable"
+    if daily_direction == "down":
+        return "daily_down_stable"
+    return "stable"
+
+
 def shape_for(analysis: Mapping[str, object]) -> str:
     """Return the shared narrative shape for a weight analysis result."""
-    state = str(analysis.get("state") or "insufficient")
+    authored_state = analysis.get("state")
+    state = str(authored_state) if authored_state else state_for(
+        analysis.get("daily_delta"),
+        analysis.get("trend_delta"),
+        bool(analysis.get("trend_claim_allowed")),
+    )
     shape = SHAPE_BY_STATE.get(state)
     if shape:
         return shape

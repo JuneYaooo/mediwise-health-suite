@@ -75,6 +75,7 @@ story_prescription_noun_for = story_module("adapters").prescription_noun_for
 # The module itself is bound because `theil_sen_fit` below also delegates its
 # arithmetic here -- one estimator for all eight domains.
 _story_frame = story_module("frame")
+_story_weight_adapter = story_module("adapters.weight")
 story_render_ready = _story_frame.render_ready
 # Row folding and the row->analysis normalizer moved into the engine so the
 # briefing card can reach them without importing this skill; see the module
@@ -175,33 +176,7 @@ def _confidence(recorded_days: int, span_days: int) -> Tuple[str, str, bool]:
 
 
 def _state_for(daily_delta: Optional[float], trend_delta: Optional[float], sufficient: bool) -> str:
-    if not sufficient or trend_delta is None:
-        return "insufficient"
-    daily_direction = "stable"
-    if daily_delta is not None and daily_delta > 0.15:
-        daily_direction = "up"
-    elif daily_delta is not None and daily_delta < -0.15:
-        daily_direction = "down"
-
-    trend_direction = "stable"
-    if trend_delta > 0.2:
-        trend_direction = "up"
-    elif trend_delta < -0.2:
-        trend_direction = "down"
-
-    if daily_direction == "up" and trend_direction == "down":
-        return "daily_up_trend_down"
-    if daily_direction == "down" and trend_direction == "up":
-        return "daily_down_trend_up"
-    if trend_direction == "down":
-        return "sustained_down"
-    if trend_direction == "up":
-        return "sustained_up"
-    if daily_direction == "up":
-        return "daily_up_stable"
-    if daily_direction == "down":
-        return "daily_down_stable"
-    return "stable"
+    return _story_weight_adapter.state_for(daily_delta, trend_delta, sufficient)
 
 
 def analyze_weight_records(records: Iterable[dict], days: int = DEFAULT_DAYS) -> dict:

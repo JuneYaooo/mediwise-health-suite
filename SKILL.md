@@ -24,9 +24,9 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - 体重、睡眠、生命体征、摄入、活动、服药记录、记录行为和家庭记录共用 24 套叙事模板
 - 各域只读取自己的记录边界，陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
 - 体重译报是展示案例，不是能力边界；原有体重分析和经典卡片入口继续兼容
-- 默认脱敏，可导出自包含 HTML、动画 SVG 和 1080×1440 冻结 PNG；家庭记录域不读取姓名，不比较成员
+- 默认脱敏；单域可导出自包含 HTML、动画 SVG 和 1080×1440 冻结 PNG，个人综合译报可把所有有记录域编成 1080×1920 MP4，并同时保留每个镜头的独立 PNG；家庭记录域不读取姓名，不比较成员
 
-调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-report`；明确要个性化动态健康译报但未点名域时，同一动作传 `focus=story`，发送结果里的 `story_artifact.svg_path`，由系统在体重、睡眠、生命体征、摄入和活动中确定性选择记录最完整的一域。用户明确点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的兼容动作 `generate-weight-story-card` 并传对应 `domain`；动作名虽然保留 weight，但产品能力不是体重专属。普通健康记录卡仍默认发送 PNG，家庭健康记录卡不附带个人故事产物。
+调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-report`；明确要个性化动态健康译报、小视频或多维分析但未点名域时，同一动作传 `focus=story` 和 `format=mp4`，发送结果里的 `video_artifact.mp4_path`，并按需发送 `video_artifact.scene_images` 中的独立 PNG。视频串联当前所有有有效记录的体重、睡眠、生命体征、摄入和活动域；现有 `story_artifact.svg_path` 仅作为最佳单域的兼容中间产物。用户明确点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的兼容动作 `generate-weight-story-card` 并传对应 `domain`；动作名虽然保留 weight，但产品能力不是体重专属。普通健康记录卡仍默认发送 PNG，家庭健康记录卡不附带个人故事产物。
 
 ### ✅ 2. 饮食追踪 (diet-tracker)
 - 每餐记录与食物条目管理
@@ -119,7 +119,8 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
-- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、健康译报冻结 PNG、旧体重真相卡或 PDF 时需要；健康译报 HTML、动画 SVG 和纯文字记录、查询不需要
+- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、健康译报冻结 PNG、综合译报分镜、旧体重真相卡或 PDF 时需要；健康译报 HTML、动画 SVG 和纯文字记录、查询不需要
+- **FFmpeg / ffprobe**: 把综合译报分镜编码为本地 MP4 时需要；缺失时仍保留已生成的独立 PNG
 
 ## 数据隐私
 
