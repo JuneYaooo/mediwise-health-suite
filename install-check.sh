@@ -119,7 +119,6 @@ REQUIRED_MODULES=(
   mediwise-health-tracker
   diet-tracker
   weight-manager
-  health-goals
   sleep-tracker
   health-monitor
   wearable-sync
@@ -134,7 +133,7 @@ if [[ ! -f "$SKILL_DIR/shared/path_setup.py" ]]; then
   err "共享路径工具缺失: shared/path_setup.py"
   CHECK_FAILED=1
 else
-  ok "七个领域模块和共享路径工具完整"
+  ok "六个领域模块和共享路径工具完整"
 fi
 if [[ ! -f "$SKILL_DIR/shared/action_result.mjs" ]]; then
   err "共享 Action 结果适配器缺失: shared/action_result.mjs"
@@ -168,12 +167,11 @@ if python3 -m compileall -q \
   "$SKILL_DIR/mediwise-health-tracker/scripts" \
   "$SKILL_DIR/diet-tracker/scripts" \
   "$SKILL_DIR/weight-manager/scripts" \
-  "$SKILL_DIR/health-goals/scripts" \
   "$SKILL_DIR/sleep-tracker/scripts" \
   "$SKILL_DIR/health-monitor/scripts" \
   "$SKILL_DIR/wearable-sync/scripts"
 then
-  ok "七个领域的 Python 脚本编译通过"
+  ok "六个领域的 Python 脚本编译通过"
 else
   err "Python 脚本编译失败"
   CHECK_FAILED=1
@@ -188,7 +186,7 @@ for module in "${REQUIRED_MODULES[@]}"; do
   fi
 done
 if [[ "$INDEX_CHECK_FAILED" -eq 0 ]]; then
-  ok "七个领域的 Action 入口语法检查通过"
+  ok "六个领域的 Action 入口语法检查通过"
 fi
 
 SMOKE_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t mediwise-smoke)"
@@ -198,7 +196,6 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 const root = process.env.SKILL_DIR;
 const health = await import(pathToFileURL(join(root, 'mediwise-health-tracker', 'index.js')));
-const goals = await import(pathToFileURL(join(root, 'health-goals', 'index.js')));
 const sleep = await import(pathToFileURL(join(root, 'sleep-tracker', 'index.js')));
 const context = { log: () => {} };
 const created = await health.execute({
@@ -206,19 +203,6 @@ const created = await health.execute({
   params: { name: '安装检查', relation: '本人', blood_type: 'O' },
 }, context);
 if (created.status !== 'ok' || created.result?.member?.blood_type !== 'O') process.exit(1);
-const rejectedGoal = await goals.execute({
-  action: 'create-health-goal', member_id: created.result.member.id,
-  params: { domain: 'activity', goal_type: 'weekly_frequency', title: '每周运动两次', target_value: 2 },
-}, context);
-if (rejectedGoal.status !== 'error') process.exit(1);
-const acceptedGoal = await goals.execute({
-  action: 'create-health-goal', member_id: created.result.member.id,
-  params: {
-    domain: 'activity', goal_type: 'weekly_frequency', title: '每周运动两次',
-    target_value: 2, total_periods: 4, confirmed: true,
-  },
-}, context);
-if (acceptedGoal.status !== 'ok') process.exit(1);
 const failed = await sleep.execute({
   action: 'sleep-log', member_id: 'missing', params: { duration: -1 },
 }, context);

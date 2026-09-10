@@ -26,7 +26,7 @@ def is_api_mode():
     """Check if backend API mode is enabled."""
     return is_backend_mode()
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 15
 
 MEDICAL_TABLES = {
     "schema_version",
@@ -64,10 +64,6 @@ LIFESTYLE_TABLES = {
     "wearable_devices",
     "wearable_sync_log",
     "nutrition_goals",
-    "health_goals",
-    "goal_checkins",
-    "goal_milestones",
-    "goal_cards",
 }
 
 TABLE_DOMAIN = {
@@ -539,13 +535,10 @@ CREATE TABLE IF NOT EXISTS exercise_records (
     exercise_type TEXT NOT NULL,
     exercise_name TEXT,
     duration INTEGER,
-    distance_meters REAL,
     calories_burned REAL DEFAULT 0,
     exercise_date TEXT NOT NULL,
     exercise_time TEXT,
     intensity TEXT,
-    source TEXT DEFAULT 'manual',
-    source_record_id TEXT,
     note TEXT,
     created_at TEXT NOT NULL,
     is_deleted INTEGER DEFAULT 0,
@@ -732,13 +725,10 @@ CREATE TABLE IF NOT EXISTS exercise_records (
     exercise_type TEXT NOT NULL,
     exercise_name TEXT,
     duration INTEGER,
-    distance_meters REAL,
     calories_burned REAL DEFAULT 0,
     exercise_date TEXT NOT NULL,
     exercise_time TEXT,
     intensity TEXT,
-    source TEXT DEFAULT 'manual',
-    source_record_id TEXT,
     note TEXT,
     created_at TEXT NOT NULL,
     is_deleted INTEGER DEFAULT 0
@@ -794,95 +784,6 @@ CREATE TABLE IF NOT EXISTS wearable_sync_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sync_log_device ON wearable_sync_log(device_id, created_at);
-
--- User-confirmed health goals. These tables store action goals and their evidence;
--- they never infer medical targets from health readings.
-CREATE TABLE IF NOT EXISTS health_goals (
-    id TEXT PRIMARY KEY,
-    member_id TEXT NOT NULL,
-    domain TEXT NOT NULL,
-    goal_type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    target_value REAL NOT NULL,
-    target_unit TEXT NOT NULL,
-    period_type TEXT,
-    total_periods INTEGER,
-    start_date TEXT NOT NULL,
-    end_date TEXT,
-    week_start INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'active',
-    source TEXT DEFAULT 'user_defined',
-    rules TEXT,
-    version INTEGER DEFAULT 1,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    is_deleted INTEGER DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_health_goals_member
-    ON health_goals(member_id, domain, status, is_deleted);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_health_goals_one_active
-    ON health_goals(member_id, domain)
-    WHERE status='active' AND is_deleted=0;
-
-CREATE TABLE IF NOT EXISTS goal_checkins (
-    id TEXT PRIMARY KEY,
-    goal_id TEXT NOT NULL,
-    member_id TEXT NOT NULL,
-    occurred_at TEXT NOT NULL,
-    value REAL DEFAULT 1,
-    unit TEXT,
-    duration_minutes REAL,
-    source TEXT DEFAULT 'manual',
-    source_record_type TEXT,
-    source_record_id TEXT,
-    note TEXT,
-    created_at TEXT NOT NULL,
-    is_deleted INTEGER DEFAULT 0,
-    FOREIGN KEY (goal_id) REFERENCES health_goals(id)
-);
-CREATE INDEX IF NOT EXISTS idx_goal_checkins_goal
-    ON goal_checkins(goal_id, occurred_at, is_deleted);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_goal_checkins_source
-    ON goal_checkins(goal_id, source_record_type, source_record_id)
-    WHERE source_record_type IS NOT NULL AND source_record_id IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS goal_milestones (
-    id TEXT PRIMARY KEY,
-    goal_id TEXT NOT NULL,
-    member_id TEXT NOT NULL,
-    milestone_key TEXT NOT NULL,
-    milestone_type TEXT NOT NULL,
-    achieved_at TEXT NOT NULL,
-    evidence TEXT NOT NULL,
-    goal_version INTEGER DEFAULT 1,
-    claimed_at TEXT,
-    card_id TEXT,
-    created_at TEXT NOT NULL,
-    is_deleted INTEGER DEFAULT 0,
-    FOREIGN KEY (goal_id) REFERENCES health_goals(id),
-    UNIQUE(goal_id, milestone_key, goal_version)
-);
-CREATE INDEX IF NOT EXISTS idx_goal_milestones_goal
-    ON goal_milestones(goal_id, achieved_at, is_deleted);
-
-CREATE TABLE IF NOT EXISTS goal_cards (
-    id TEXT PRIMARY KEY,
-    goal_id TEXT NOT NULL,
-    milestone_id TEXT NOT NULL,
-    member_id TEXT NOT NULL,
-    style_id TEXT NOT NULL,
-    tone TEXT NOT NULL,
-    density TEXT NOT NULL,
-    seed TEXT NOT NULL,
-    html_path TEXT,
-    png_path TEXT,
-    created_at TEXT NOT NULL,
-    is_deleted INTEGER DEFAULT 0,
-    FOREIGN KEY (goal_id) REFERENCES health_goals(id),
-    FOREIGN KEY (milestone_id) REFERENCES goal_milestones(id)
-);
-CREATE INDEX IF NOT EXISTS idx_goal_cards_member
-    ON goal_cards(member_id, created_at, is_deleted);
 """
 
 
@@ -1456,26 +1357,6 @@ CREATE INDEX IF NOT EXISTS idx_chronic_disease_member
                     conn.commit()
     finally:
         conn.close()
-
-    # Lifestyle migrations are deliberately idempotent. Older versions only ran
-    # column/table migrations against medical.db, so replay the complete lifestyle
-    # schema and then add columns that CREATE TABLE cannot add to an existing table.
-    lifestyle_conn = get_lifestyle_connection()
-    try:
-        lifestyle_conn.executescript(LIFESTYLE_SCHEMA_SQL)
-        exercise_columns = {
-            row[1] for row in lifestyle_conn.execute("PRAGMA table_info(exercise_records)").fetchall()
-        }
-        if "distance_meters" not in exercise_columns:
-            lifestyle_conn.execute("ALTER TABLE exercise_records ADD COLUMN distance_meters REAL")
-        if "source" not in exercise_columns:
-            lifestyle_conn.execute("ALTER TABLE exercise_records ADD COLUMN source TEXT DEFAULT 'manual'")
-        if "source_record_id" not in exercise_columns:
-            lifestyle_conn.execute("ALTER TABLE exercise_records ADD COLUMN source_record_id TEXT")
-        lifestyle_conn.execute("UPDATE schema_version SET version=?", (SCHEMA_VERSION,))
-        lifestyle_conn.commit()
-    finally:
-        lifestyle_conn.close()
     _set_last_status(status)
     return status
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "健康目标"
-  short_description: "管理用户确认的健康目标，并只为有意义阶段生成证据卡"
-  default_prompt: "Use $health-goals to design a confirmed action goal, track check-ins, and issue a frozen-snapshot evidence card only when the records support a meaningful moment."
