@@ -6,71 +6,29 @@ templates are eligible, so two implementations would let the card and the
 briefing disagree about the same window.  That is the defect class
 `tests/test_cross_domain_render.py` locks down.
 
-`aggregate_daily_medians` travels with it because weight is the one pre-folded
-domain (`PREFOLDED = ("weight",)` in tests/test_story_frame.py): the pipeline in
-story-design/story-system.md folds weight rows *upstream* of the adapter, which
-is why `adapters/weight.py` is pass-through.  A caller holding raw weighings must
-fold them here first, or one point per weighing reaches the frame instead of one
-point per day.
+`aggregate_daily_medians` is re-read from `shared.robust_weight` rather than
+owned here because weight is the one pre-folded domain (`PREFOLDED = ("weight",)`
+in tests/test_story_frame.py): the pipeline in story-design/story-system.md folds
+weight rows *upstream* of the adapter, which is why `adapters/weight.py` is
+pass-through.  A caller holding raw weighings must fold them first, or one point
+per weighing reaches the frame instead of one point per day.  The fold and the
+date parser live with the weight analyser that has to agree with them; this
+module only imports them.
 
-Nothing here touches a database, a renderer, or any domain vocabulary.  The
-weight truth card's own state/confidence layer stays in weight-manager: that is
-truth-card copy, not part of the story frame.
+Nothing here touches a database, a renderer, or any domain vocabulary.
 """
 
 from __future__ import annotations
 
-import math
-from datetime import date, datetime
-from statistics import median
-from typing import Dict, Iterable, List, Optional
+from typing import List
 
+from ..robust_weight import aggregate_daily_medians, parse_date as _parse_date
 from .adapters import component_for, component_key_for
 from .frame import render_ready, robust_fit
 
 # Event-shaped domains conclude from two recorded days; daily-series domains need
 # three.  See 分析边界 in story-design/story-system.md.
 EVENT_SHAPED_DOMAINS = ("adherence", "family", "records")
-
-
-def _parse_date(value) -> Optional[date]:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
-    except ValueError:
-        try:
-            return datetime.strptime(text[:10], "%Y-%m-%d").date()
-        except (TypeError, ValueError):
-            return None
-
-
-def aggregate_daily_medians(records: Iterable[dict]) -> List[dict]:
-    """Collapse same-day measurements to a median before trend analysis."""
-    grouped = {}  # type: Dict[date, List[float]]
-    for record in records:
-        measured_date = _parse_date(record.get("measured_at") or record.get("date"))
-        raw_value = record.get("weight", record.get("value"))
-        try:
-            value = float(raw_value)
-        except (TypeError, ValueError):
-            continue
-        if measured_date is None or not math.isfinite(value) or not 10 <= value <= 500:
-            continue
-        grouped.setdefault(measured_date, []).append(value)
-
-    result = []
-    for measured_date in sorted(grouped):
-        values = grouped[measured_date]
-        result.append({
-            "date": measured_date.isoformat(),
-            "weight": round(float(median(values)), 3),
-            "measurement_count": len(values),
-        })
-    return result
 
 
 def domain_analysis_from_rows(domain: str, rows: List[dict], days: int) -> dict:

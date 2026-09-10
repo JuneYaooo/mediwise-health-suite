@@ -1,9 +1,8 @@
-"""Poster-frame PNG export: the one place that knows how to wait for a card.
+"""HTML/SVG card → PNG export: the one place that knows how to wait for a card.
 
-Both the static HTML card and the animated SVG set `window.__ready = true` only
-after the composition is actually parked — fonts resolved, animations held at
-`poster_time`.  A screenshot taken before that flag is a race: with animation in
-play it captures whatever frame the renderer happened to be on, which is exactly
+A card sets `window.__ready = true` only after its composition is actually
+settled — fonts resolved, layout final.  A screenshot taken before that flag is a
+race: it captures whatever state the renderer happened to be in, which is exactly
 how a locked golden digest turns non-deterministic.
 
 Two capture strategies, in order of fidelity:
@@ -12,12 +11,10 @@ Two capture strategies, in order of fidelity:
    This is the only path that observes the flag, so it is preferred whenever the
    package is importable.
 2. **Chrome headless + `--virtual-time-budget`** — no flag observation, but
-   virtual time advances timers, fonts, and animation parking to completion
-   before the frame is drawn, rather than sleeping on the wall clock.  Chrome
-   holds the screenshot until the budget is exhausted or the page goes idle, so
-   the captured frame is the settled one.
-
-See story-design/story-system.md (冻结海报帧).
+   virtual time advances timers and font loading to completion before the frame
+   is drawn, rather than sleeping on the wall clock.  Chrome holds the screenshot
+   until the budget is exhausted or the page goes idle, so the captured frame is
+   the settled one.
 """
 
 from __future__ import annotations
@@ -27,13 +24,13 @@ import shutil
 import struct
 import subprocess
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import Optional, Sequence
 
 READY_EXPRESSION = "window.__ready === true"
 
-# Generous enough to cover the longest loop (12 s) plus the trailing hold, since
-# virtual time is not wall-clock time: a larger budget costs nothing when the
-# page settles early.
+# Virtual time is not wall-clock time: a larger budget costs nothing when the
+# page settles early, and the headless render is otherwise the only thing that
+# has to finish inside it.
 VIRTUAL_TIME_BUDGET_MS = 20000
 
 # Wall-clock ceilings. These are process guards, not timing assumptions.
@@ -83,7 +80,7 @@ def chrome_command(
     """Headless flags that make the capture wait for a settled frame.
 
     `--virtual-time-budget` is the load-bearing one: without it Chrome shoots as
-    soon as load fires, which for an animated card means an arbitrary frame.
+    soon as load fires, which can be before the card's fonts and layout settle.
     `--run-all-compositor-stages-before-draw` keeps the compositor from
     presenting a partially-composited frame.
     """
@@ -174,7 +171,7 @@ def _capture_with_chrome(
     return {"status": "ok", "waited_for_ready": False, "capture": "chrome-virtual-time"}
 
 
-def capture_poster_png(
+def capture_card_png(
     source_path: str,
     output_path: str,
     *,
@@ -183,7 +180,7 @@ def capture_poster_png(
     chrome_binary: Optional[str] = None,
     expect_exact_size: bool = True,
 ) -> dict:
-    """Capture the settled poster frame of an HTML or SVG card.
+    """Capture the settled frame of an HTML or SVG card.
 
     Returns `{"status": "unavailable", ...}` rather than raising when no renderer
     is installed: a missing Chrome must not fail the HTML/SVG output the caller
@@ -233,19 +230,11 @@ def capture_poster_png(
     return outcome
 
 
-def poster_time_of(frame: Optional[Mapping[str, object]]) -> int:
-    """The instant a poster capture should represent, in ms."""
-    if not frame:
-        return 0
-    return int(frame.get("poster_time_ms") or frame.get("duration_ms") or 0)
-
-
 __all__: Sequence[str] = (
     "READY_EXPRESSION",
     "VIRTUAL_TIME_BUDGET_MS",
-    "capture_poster_png",
+    "capture_card_png",
     "chrome_command",
     "find_chrome",
     "png_dimensions",
-    "poster_time_of",
 )

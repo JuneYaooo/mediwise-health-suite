@@ -20,8 +20,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def _story_export():
-    """Import shared.story.export, adding the repo root to sys.path if needed.
+def _card_capture():
+    """Import shared.card_capture, adding the repo root to sys.path if needed.
 
     This script is executed directly as well as imported, so the root is not
     guaranteed to be importable already.
@@ -30,7 +30,7 @@ def _story_export():
         sys.path.insert(0, str(_ROOT))
     import importlib
 
-    return importlib.import_module("shared.story.export")
+    return importlib.import_module("shared.card_capture")
 
 
 def _strip_external_scripts(html_path: str) -> str:
@@ -104,10 +104,10 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
     if not chrome_binary:
         return {"status": "error", "error": "Chrome/Chromium not found"}
 
-    # Story cards park their animations and only then set window.__ready.  Waiting
-    # for a settled frame is the motion layer's concern, so the flags come from
-    # shared/story/export.py rather than being duplicated here.
-    chrome_cmd = _story_export().chrome_command(
+    # Cards are not ready to shoot until they say so.  Waiting for a settled frame
+    # is shared/card_capture.py's concern, so the flags come from there rather than
+    # being duplicated here.
+    chrome_cmd = _card_capture().chrome_command(
         chrome_binary,
         Path(render_path).resolve().as_uri(),
         output_path,
@@ -204,10 +204,10 @@ def _do_screenshot(render_path: str, output_path: str, width: int) -> dict:
 def find_chrome() -> str | None:
     """Locate Chrome/Chromium on Linux, macOS, or Windows.
 
-    One implementation, in shared/story/export.py, so the card renderer and this
+    One implementation, in shared/card_capture.py, so the card renderer and this
     generic screenshot helper can never disagree about which binary is used.
     """
-    return _story_export().find_chrome()
+    return _card_capture().find_chrome()
 
 
 # Backward-compatible alias for callers that imported the former private helper.

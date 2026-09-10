@@ -24,6 +24,12 @@ from datetime import date, timedelta
 from statistics import median as _median
 from typing import Mapping, Optional
 
+from ..robust_weight import (
+    ESTIMATOR_METHOD,
+    FIT_METHOD,
+    dated_pairwise_slopes as _dated_pairwise_slopes,
+    robust_fit,
+)
 from . import adapters as _adapters
 
 __all__ = [
@@ -36,72 +42,6 @@ __all__ = [
 ]
 
 NON_CAUSAL_NOTE = "相关线索不代表因果。"
-
-#: The estimator identifier stored in the domain-neutral Signal Frame. Same-day
-#: folding already travels separately as `series_meta.fold`; putting `daily_median`
-#: here would be false for sleep/mean, intake/sum, activity/last and event/count.
-ESTIMATOR_METHOD = "theil_sen"
-
-#: Compatibility spelling returned by the legacy weight analyser. Its input really
-#: is folded to a daily median before the shared estimator runs. New domain-neutral
-#: consumers use `ESTIMATOR_METHOD` together with `series_meta.fold`.
-FIT_METHOD = "daily_median+" + ESTIMATOR_METHOD
-
-
-def _dated_pairwise_slopes(points, value_key: str):
-    """Return parsed dated values and their calendar-day pairwise slopes.
-
-    The fit and the visual direction score must read precisely the same pairs. A
-    second loop with slightly different date or value filtering would put a needle
-    beside a number derived from different evidence.
-    """
-    if len(points) < 2:
-        return [], []
-    origin = _as_date(points[0].get("date"))
-    if origin is None:
-        return [], []
-    dated = []
-    for item in points:
-        item_date = _as_date(item.get("date"))
-        if item_date is None:
-            continue
-        try:
-            dated.append(((item_date - origin).days, float(item[value_key])))
-        except (KeyError, TypeError, ValueError):
-            continue
-    slopes = []
-    for index, (x1, y1) in enumerate(dated):
-        for x2, y2 in dated[index + 1:]:
-            if x2 != x1:
-                slopes.append((y2 - y1) / (x2 - x1))
-    return dated, slopes
-
-
-def robust_fit(points, value_key: str = "value"):
-    """Theil–Sen slope per day and median intercept over dated points.
-
-    Lifted verbatim out of `weight_truth_card.theil_sen_fit`, which is now a thin
-    delegation to this — one estimator, so 稳健估计 cannot mean two different things
-    on two cards.  `tests/test_story_frame.py::RobustFitTests` pins the two to
-    identical floats rather than approximately equal ones.
-
-    Scale-free by construction, which is what lets it serve all eight domains: the
-    x-axis is calendar-day offset from the first point and the y-axis is whatever the
-    series holds, so the same median-of-pairwise-slopes returns kg/day, 分钟/day or
-    步/day with no threshold anywhere in it.  Calendar offsets are also why a gap is
-    handled correctly — five silent days widen the run rather than counting as one.
-
-    Returns `(None, None)` rather than a flat line whenever the points cannot support
-    a fit: fewer than two of them, an unparseable first date, or every point on the
-    same day.  A fabricated zero slope would read on the card as 「长期持平」, which is
-    a claim, where an absent one reads as 暂无稳健拟合, which is the truth.
-    """
-    dated, slopes = _dated_pairwise_slopes(points, value_key)
-    if not slopes:
-        return None, None
-    slope = float(_median(slopes))
-    intercept = float(_median([value - slope * offset for offset, value in dated]))
-    return slope, intercept
 
 
 def robust_direction_strength(points, value_key: str = "value") -> Optional[float]:
@@ -127,28 +67,6 @@ def robust_direction_strength(points, value_key: str = "value") -> Optional[floa
     if scale == 0.0:
         return 0.0
     return max(-1.0, min(1.0, slope / scale))
-
-
-def _as_date(value) -> Optional[date]:
-    """Parse a date through the one parser the rest of the suite already uses.
-
-    `normalize._parse_date` accepts a bare `2026-07-09`, a full ISO timestamp and a
-    `Z` suffix, which is the range of spellings the hosts actually write.  Reused
-    rather than reimplemented because `robust_fit` has to agree with weight's fit on
-    every input, and a second date parser is a second set of edge cases to disagree
-    over.  Imported lazily: `normalize` calls `render_ready`, so importing it at
-    module scope here would close a cycle.
-    """
-    global _PARSE_DATE
-    if _PARSE_DATE is None:
-        from .normalize import _parse_date
-
-        _PARSE_DATE = _parse_date
-    return _PARSE_DATE(value)
-
-
-#: Resolved on first use by `_as_date`; see the cycle note there.
-_PARSE_DATE = None
 
 
 def _window(analysis: Mapping[str, object], series: list) -> dict:

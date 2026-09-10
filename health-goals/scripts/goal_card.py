@@ -27,7 +27,7 @@ setup_mediwise_path()
 from config import DATA_DIR
 from goal_engine import _member, evaluate_goal, get_goal, list_milestones
 from health_db import generate_id, get_lifestyle_connection, now_iso, output_json, rows_to_list, transaction
-from story.export import capture_poster_png
+from card_capture import capture_card_png
 
 
 WIDTH = 1080
@@ -449,7 +449,7 @@ def generate_card(args) -> dict:
     render = {"status": "not_requested"}
     actual_png = None
     if args.format in ("png", "both"):
-        render = capture_poster_png(str(html_path), str(png_path), width=WIDTH, height=HEIGHT)
+        render = capture_card_png(str(html_path), str(png_path), width=WIDTH, height=HEIGHT)
         if render.get("status") == "ok":
             actual_png = str(png_path)
     with transaction(domain="lifestyle") as conn:

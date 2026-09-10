@@ -5,15 +5,18 @@ everything the renderer must not know: the word 体重, the unit kg, and the eig
 weight-specific analysis states.  The renderer only ever sees `LEXICON` wording
 and a shared `shape`.
 
-It deliberately does not re-implement analysis.  `weight_truth_card.py` keeps
-owning same-day median folding and the Theil-Sen fit; this adapter translates
-that result into the domain-neutral vocabulary.
+It deliberately does not re-implement analysis.  Same-day median folding, the
+Theil-Sen fit and the eight-state mapping all come from `shared.robust_weight`,
+which is the weight analyser's own core; this adapter only translates those
+results into the domain-neutral vocabulary.
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Mapping, Optional
+
+from ...robust_weight import state_for
 
 DOMAIN = "weight"
 
@@ -71,37 +74,6 @@ NO_COMPANION_COPY = {
 # A domain that declares nothing here gets own-subject wording on the same templates
 # instead — see `companions_for`.
 COMPANIONS = ("intake", "activity", "sleep")
-
-
-def state_for(daily_delta, trend_delta, sufficient: bool) -> str:
-    """Map weight signals to the historic eight states in one canonical place."""
-    if not sufficient or trend_delta is None:
-        return "insufficient"
-    daily_direction = "stable"
-    if daily_delta is not None and daily_delta > 0.15:
-        daily_direction = "up"
-    elif daily_delta is not None and daily_delta < -0.15:
-        daily_direction = "down"
-
-    trend_direction = "stable"
-    if trend_delta > 0.2:
-        trend_direction = "up"
-    elif trend_delta < -0.2:
-        trend_direction = "down"
-
-    if daily_direction == "up" and trend_direction == "down":
-        return "daily_up_trend_down"
-    if daily_direction == "down" and trend_direction == "up":
-        return "daily_down_trend_up"
-    if trend_direction == "down":
-        return "sustained_down"
-    if trend_direction == "up":
-        return "sustained_up"
-    if daily_direction == "up":
-        return "daily_up_stable"
-    if daily_direction == "down":
-        return "daily_down_stable"
-    return "stable"
 
 
 def shape_for(analysis: Mapping[str, object]) -> str:

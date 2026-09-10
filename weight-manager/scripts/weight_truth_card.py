@@ -46,14 +46,25 @@ from health_db import (
 )
 from weight_card_preferences import get_style_profile, update_style_profile
 
+# The card's numbers and its PNG both come from shared/, which `path_setup` above
+# already put on sys.path.  `robust_weight` is weight's own analysis core: the
+# fold, the Theil-Sen fit and the eight-state mapping.  Imported rather than
+# reached through the story engine so `analyze` and `generate` do not depend on a
+# layer that has nothing to do with what they compute.
+from robust_weight import (
+    FIT_METHOD,
+    aggregate_daily_medians,
+    parse_date as _parse_date,
+    robust_fit,
+    state_for as _weight_state_for,
+)
+import card_capture as _card_capture
+
 # The storytelling engine is domain-neutral and lives in shared/story/.  Weight
 # is one registered domain there; see story-design/story-system.md.
 from _story_bootstrap import story_module, story_package
 
 _story = story_package()
-# Poster-frame capture lives with the motion layer, since knowing when a frame is
-# settled is a property of the timeline, not of this action.
-_story_export = story_module("export")
 STYLES_BY_ID = _story.STYLES_BY_ID
 analyze_weight_management = _story.analyze_weight_management
 render_weight_story_html = _story.render_weight_story_html
@@ -72,19 +83,9 @@ STORY_DISCLAIMER_TEMPLATE = story_module("render").DISCLAIMER_TEMPLATE
 story_prescription_noun_for = story_module("adapters").prescription_noun_for
 # `shape` and the coverage counts are what the renderers read; an adapter is what
 # knows them.  A weight analysis already carries both, so this only fills gaps.
-# The module itself is bound because `theil_sen_fit` below also delegates its
-# arithmetic here -- one estimator for all eight domains.
 _story_frame = story_module("frame")
-_story_weight_adapter = story_module("adapters.weight")
 story_render_ready = _story_frame.render_ready
-# Row folding and the row->analysis normalizer moved into the engine so the
-# briefing card can reach them without importing this skill; see the module
-# docstring in shared/story/normalize.py.  The names stay bound here because the
-# truth-card analysis below and the existing tests call them by these names.
-_story_normalize = story_module("normalize")
-_parse_date = _story_normalize._parse_date
-aggregate_daily_medians = _story_normalize.aggregate_daily_medians
-_domain_analysis_from_rows = _story_normalize.domain_analysis_from_rows
+_domain_analysis_from_rows = story_module("normalize").domain_analysis_from_rows
 
 
 CARD_WIDTH = 1080
@@ -151,18 +152,18 @@ STATE_COPY = {
 def theil_sen_fit(daily_records: Sequence[dict]) -> Tuple[Optional[float], Optional[float]]:
     """Return Theil-Sen slope in kg/day and a median intercept.
 
-    The arithmetic moved to `shared.story.frame.robust_fit` when the other seven domains
-    needed the same fit; this stays as the weight-shaped door onto it, reading `weight`
-    off each row where the shared version reads a caller-named key.  Delegating rather
-    than keeping a copy is the point: two implementations of 稳健估计 drifting apart
-    would put two different long-run numbers under one label, and the cards give no way
-    to tell which one you are looking at.
+    The arithmetic lives in `shared.robust_weight.robust_fit`; this stays as the
+    weight-shaped door onto it, reading `weight` off each row where the shared
+    version reads a caller-named key.  Delegating rather than keeping a copy is
+    the point: two implementations of 稳健估计 drifting apart would put two
+    different long-run numbers under one label, and the card gives no way to tell
+    which one you are looking at.
 
-    `tests/test_story_frame.py::RobustFitTests` asserts the two return identical floats
-    -- not approximately equal ones -- across a solid run, a gapped run, a two-day pair,
-    a lone point and two readings on the same day.
+    `tests/test_weight_truth_card.py::RobustFitTests` asserts the two return
+    identical floats -- not approximately equal ones -- across a solid run, a
+    gapped run, a two-day pair, a lone point and two readings on the same day.
     """
-    return _story_frame.robust_fit(daily_records, value_key="weight")
+    return robust_fit(daily_records, value_key="weight")
 
 
 def _confidence(recorded_days: int, span_days: int) -> Tuple[str, str, bool]:
@@ -176,7 +177,7 @@ def _confidence(recorded_days: int, span_days: int) -> Tuple[str, str, bool]:
 
 
 def _state_for(daily_delta: Optional[float], trend_delta: Optional[float], sufficient: bool) -> str:
-    return _story_weight_adapter.state_for(daily_delta, trend_delta, sufficient)
+    return _weight_state_for(daily_delta, trend_delta, sufficient)
 
 
 def analyze_weight_records(records: Iterable[dict], days: int = DEFAULT_DAYS) -> dict:
@@ -211,7 +212,7 @@ def analyze_weight_records(records: Iterable[dict], days: int = DEFAULT_DAYS) ->
             "trend_claim_allowed": sufficient,
             "state": state,
             "copy": dict(STATE_COPY[state]),
-            "method": _story_frame.FIT_METHOD,
+            "method": FIT_METHOD,
         }
 
     first_date = _parse_date(daily[0]["date"])
@@ -262,7 +263,7 @@ def analyze_weight_records(records: Iterable[dict], days: int = DEFAULT_DAYS) ->
         "trend_claim_allowed": sufficient,
         "state": state,
         "copy": dict(STATE_COPY[state]),
-        "method": _story_frame.FIT_METHOD,
+        "method": FIT_METHOD,
     }
 
 
@@ -518,12 +519,11 @@ def render_card_html(
     )
 
 
-_find_chrome = _story_export.find_chrome
-_png_dimensions = _story_export.png_dimensions
+_find_chrome = _card_capture.find_chrome
+_png_dimensions = _card_capture.png_dimensions
 
-
-# `both` predates the motion layer and meant html+png.  It keeps that meaning so
-# existing callers are unaffected; `all` is the opt-in that adds the animated SVG.
+# `both` means html+png and is what callers have always asked for; `all` adds the
+# SVG.  Both spellings are kept so existing callers see no change.
 CARD_FORMATS = ("html", "png", "svg", "both", "all")
 _FORMAT_ARTIFACTS = {
     "html": ("html",),
@@ -552,13 +552,13 @@ def wants(fmt: str, artifact: str) -> bool:
 def render_png_fixed(html_path: str, output_path: str, chrome_binary: Optional[str] = None) -> dict:
     """Render exactly 1080x1440 from the *settled* frame.
 
-    Capture is delegated to shared/story/export.py, which waits for
+    Capture is delegated to `shared.card_capture`, which waits for
     `window.__ready` (Playwright) or advances virtual time until the composition
-    parks (Chrome).  Before that, this function shot the page the instant load
-    fired — fine for a static card, but with the motion layer in place it would
-    capture an arbitrary animation frame and make the golden digests drift.
+    settles (Chrome).  Before that, this function shot the page the instant load
+    fired, which on a slow font load meant capturing a half-composed card and
+    letting the size check reject an otherwise good render.
     """
-    return _story_export.capture_poster_png(
+    return _card_capture.capture_card_png(
         html_path,
         output_path,
         width=CARD_WIDTH,
@@ -1012,10 +1012,16 @@ def run(command: str, args: argparse.Namespace) -> dict:
                 days=days,
                 as_of=as_of,
             )
-    # After the analysis, not before it: for vitals, intake and activity the wording
+    # Only the story commands read a domain lexicon; the truth card's own copy is
+    # curated in STATE_COPY.  Gated rather than computed unconditionally, and after
+    # the analysis rather than before it: for vitals, intake and activity the wording
     # depends on which component the window turned out to hold, and that is only
-    # known once the rows have been read.
-    lexicon = story_lexicon_for_analysis(domain, analysis)
+    # known once the rows have been read.  `analyze` and `generate` never call it.
+    lexicon = (
+        story_lexicon_for_analysis(domain, analysis)
+        if command in ("select-style", "generate-story")
+        else None
+    )
     base_result = {
         "status": "ok",
         "domain": domain,
