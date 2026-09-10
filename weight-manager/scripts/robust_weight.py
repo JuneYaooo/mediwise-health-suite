@@ -19,15 +19,14 @@ There is exactly one implementation of each on purpose:
   would both be wrong, and one point per *weighing* reaching the fit is a
   different series from one point per *day*.
 
-The story engine shared all three while it existed, which is how they ended up
-outside weight-manager in the first place.  Nothing here imports a renderer, a
-template, or any narrative vocabulary.
+Nothing here imports a renderer or a template: this module decides what the
+numbers support, the card decides how to say it.
 
 Scale-free by construction: the fit's x-axis is calendar-day offset from the
-first point and its y-axis is whatever the series holds, so the same
-median-of-pairwise-slopes serves kg/day, 分钟/day or 步/day with no threshold
-anywhere in it.  Calendar offsets are also why a gap is handled correctly — five
-silent days widen the run rather than counting as one.
+first point and its y-axis is whatever the series holds, so the
+median-of-pairwise-slopes carries no threshold in it and the same arithmetic
+would serve any per-day rate.  Calendar offsets are also why a gap is handled
+correctly — five silent days widen the run rather than counting as one.
 """
 
 from __future__ import annotations
@@ -140,15 +139,14 @@ def robust_fit(points, value_key: str = "value"):
     """Theil–Sen slope per day and median intercept over dated points.
 
     `weight_truth_card.theil_sen_fit` is a thin delegation to this, so the card
-    and any other reader of the same window cannot report different directions
-    for it.  `tests/test_weight_truth_card.py` pins the two to identical floats
-    rather than approximately equal ones.
+    cannot report a direction that no estimator produced.
 
     Returns `(None, None)` rather than a flat line whenever the points cannot
     support a fit: fewer than two of them, an unparseable first date, or every
     point on the same day.  A fabricated zero slope would read on the card as
     「长期持平」, which is a claim, where an absent one reads as 暂无稳健拟合, which
-    is the truth.
+    is the truth.  `tests/test_robust_weight.py` pins both the refusal and the
+    slope.
     """
     dated, slopes = dated_pairwise_slopes(points, value_key)
     if not slopes:
