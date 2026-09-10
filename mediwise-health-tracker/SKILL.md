@@ -266,7 +266,7 @@ dream.py unlock   → 释放锁，标记完成
 当用户说“帮我生成最近 7 天的健康卡片”“给我看近期健康简报”“今天身体怎么样”等口语表达时，统一按“健康卡片”能力处理：
 
 1. 个人版先按姓名与身份规则调用 `resolve-member`。只有唯一“本人”档案时可以默认本人；有多位成员且用户未说明姓名时必须先询问。明确请求家庭版时跳过单成员解析。
-2. 个人版调用 `generate-health-card`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。用户明确问指标趋势、饮食运动、医疗记录、用药或某一类健康卡片时，再分别传 `focus=metrics|lifestyle|care|medications|story`；普通概览保持 `focus=auto`。
+2. 个人版调用 `generate-health-card`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。用户明确问指标趋势、饮食运动、医疗记录、用药或某一类健康卡片时，再分别传 `focus=metrics|lifestyle|care|medications`；普通概览保持 `focus=auto`。
 3. 将生成的 PNG 作为图片消息发送，只用一句自然语言概括最重要的提醒，不粘贴 JSON 或 HTML。
 4. 用户明确说“家庭健康卡片”“全家健康卡片”时，调用 `generate-health-card` 并传入 `view=family`，不要传 `member_id`。家庭版用于一个本地用户管理本人及家人的概览，不代表多人共享服务。
 5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。个人版对外名称统一为 “Health Card” / “健康卡片”，家庭版统一为 “Family Health Card” / “家庭健康卡片”。“健康简报”“健康小报”等只作为意图触发词，不作为回复或卡片标题。
