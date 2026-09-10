@@ -78,7 +78,7 @@ MediWise 在 OpenClaw 中只支持个人本地实例：一个本地用户管理�
 3. 把生成的 PNG 作为图片发送，不粘贴 JSON 或 HTML。
 4. 没有数据的项目显示暂无数据，不推测或补造指标。
 
-若用户点名体重、睡眠、生命体征、摄入、活动、服药记录、记录行为或家庭记录中的某一域，走体重管理 Skill 的 `generate-domain-health-card` 并传对应 `domain`。旧 action `generate-weight-story-card` 仅为兼容。普通健康数据始终生成静态健康卡片，不生成视频；目标证据卡则由 `health-goals` Skill 在用户确认目标且记录中出现新的行为含义后生成，普通打卡不发卡。
+身高体重、围度、运动、热量收支等体重管理能力走体重管理 Skill；用户点名体重波动或需要可保存的体重图片时，用 `weight-truth` 做分析、用 `generate-weight-card` 生成默认脱敏的体重真相卡。
 
 ## 安全要求
 

@@ -15,7 +15,7 @@ Keep personal and family health records in one place, including chat notes, medi
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[How it works](#how-mediwise-works) · [Health cards and goals](#health-cards-and-goals) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
+[How it works](#how-mediwise-works) · [Health cards](#health-cards) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
 
 </div>
 
@@ -79,7 +79,7 @@ The card highlights recent records and reminders. Food averages use logged days 
 MediWise also has a compact family card for one local user who manages several family profiles. It shows each person's current status, active medications and medication schedules, due or upcoming reminders, and explicit attention items. It does not include a family timeline. Members with alerts, flagged results, or due reminders appear first. Ask for it explicitly:
 
 ```text
-Create a family health record card for the last 7 days.
+Create a family health card for the last 7 days.
 ```
 
 The example uses a fictional member and fictional health data. It was produced by the same local card generation path used by the skill. Its trend charts are inline SVG and do not require a chart service or CDN.
@@ -92,21 +92,23 @@ Create Zhang Jianguo's health card for the last 30 days.
 
 Missing measurements are shown as missing. MediWise does not invent values to fill the card.
 
-## Health cards and goals
+## Health cards
 
-Ordinary health data produces a static Health Card. The eight-domain observation engine covers weight, sleep, vital signs, intake, activity, medication records, recording activity, and family records. Each domain defines which records it may read, how same-day entries are folded, and which neutral direction words describe the numbers. A card states what was recorded, where dates are blank, and how the recorded values moved; it does not turn correlation into a cause or make a medical judgment.
+**Turning what was recorded into a recent picture that is legible and worth keeping.**
 
-The weight health card is the engine's showcase, not its boundary. It folds same-day measurements to a median, uses a robust Theil–Sen trend to separate a latest-day change from the longer recorded direction, and can place recorded intake, activity, and sleep beside that direction as contemporaneous observations.
+MediWise produces two kinds of card:
 
-All eight domains use the same 24 card templates. Missing days remain absent instead of becoming zero. Family cards read only opaque member IDs and dates, never names or profile details, and never compare family members. By default, cards are share-safe and can be exported as self-contained HTML, SVG, or a 1080×1440 PNG. Video output is not part of the product.
+- **Personal and family health cards**: a recent overview built from the recorded metrics, diet and exercise, sleep, medical records, and medication. The family card shows each member's current state, active medication, medication or follow-up reminders, and recorded notes; it has no timeline.
+- **Weight truth card**: folds same-day measurements to a median, uses a robust Theil–Sen trend to separate a latest-day change from the longer recorded direction, and states how far the latest weigh-in sits from that trend. When the records cannot support a trend, the card says the picture is still filling in rather than drawing a line the numbers do not support.
 
-Goal management starts only after the user explicitly confirms an action goal. MediWise then tracks voluntary check-ins and periodic or cumulative progress. It issues a static goal evidence card only when the records demonstrate a new rhythm, recovery, sustained consistency, a substantial halfway point, or completion. Ordinary check-ins, arbitrary percentages, steps, weight, heart rate, and other readings do not silently create a goal or a card.
+Both kinds state only what was recorded, where dates are blank, and how the recorded values moved; neither turns correlation into a cause or makes a medical judgment. Each states the shape of the record first, then lists days, counts, and the latest date.
+
+The record cards are local artifacts meant for you: they show member names and exact dates, so review one before sharing it. The weight truth card is share-safe by default, hiding names, absolute and goal weight, and exact dates. Cards export as self-contained HTML and a 1080×1440 PNG, which needs Chrome or Chromium locally.
 
 ```text
-Create a share-safe health card from my last 30 days of sleep records.
-Use the weight showcase to display my recorded weight, intake, activity, and sleep over the same period.
-Create a family health card without names or member comparisons.
-Help me design a goal to exercise three times per week for four weeks. Ask me to confirm it before tracking begins.
+Create my health record card for the last 7 days.
+Generate a weight truth card — has the recent movement actually changed direction?
+Generate a share-safe weight truth card with just the trend and movement.
 ```
 
 ## Features
@@ -120,8 +122,7 @@ Help me design a goal to exercise three times per week for four weeks. Ask me to
 | Diet | Meal records, traceable nutrition sources, daily totals, and nutrition goals | Implemented |
 | Weight and exercise | Weight trends, BMI, BMR, TDEE, body measurements, activity, and goals | Implemented |
 | Sleep | Duration, deep sleep, light sleep, REM, awake periods, daily summaries, and weekly trends | Implemented |
-| Health cards | Eight observation domains using 24 templates; share-safe HTML, SVG, and PNG output, with weight as the showcase | Implemented |
-| Health goals | Explicitly confirmed action goals, voluntary check-ins, progress, and frozen-snapshot evidence cards for meaningful moments | Implemented |
+| Health cards | Personal and family overviews, plus a weight truth card separating daily noise from the recorded direction; HTML and PNG output | Implemented |
 | Wearable imports | Apple Health and Gadgetbridge file imports with normalization and deduplication | Verified |
 | Monitoring | On-demand custom thresholds, anomaly checks, alerts, dashboards, and trend review | Implemented on demand |
 | Visit preparation | Recent symptoms, measurements, medication, and history exported as text, image, or PDF | Implemented |
@@ -255,7 +256,7 @@ Family members are records managed by the current local user. They are not separ
 - API keys, passwords, and tokens should not pass through chat.
 - Node action logs omit complete parameters, health content, and OAuth credentials.
 - Git ignore rules exclude databases, attachments, configuration, exports, and backups.
-- Health cards are share-safe by default. Family cards read no names or profile details and do not compare members; milestone cards display the user-confirmed goal but hide the member name and exact date by default.
+- Health cards are written to the local data directory. Record cards show member names and exact dates; the weight truth card hides names, absolute and goal weight, and exact dates by default. Open any card before sharing it.
 
 ### Optional external services
 
@@ -307,7 +308,7 @@ Backups contain complete health records and are not encrypted. Keep them in a pr
 - Python 3.8 or newer
 - Node.js 18 or newer
 - SQLite 3.x
-- Chrome or Chromium for local PNG health cards, milestone cards, and PDF rendering; HTML, SVG, text records, and queries do not require it
+- Chrome or Chromium for local PNG health cards, the weight truth card, and PDF rendering; HTML, text records, and queries do not require it
 - An agent that can load Skills, access local files, and run scripts
 - OpenClaw 2026.3.0 or newer when using OpenClaw
 - Linux, macOS, or Windows

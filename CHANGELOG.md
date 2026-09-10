@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Removed the health-story engine: the eight-domain observation layer, the 24 narrative templates and style selector, per-member style preferences, the animated SVG renderer, and the MP4 video pipeline with its FFmpeg dependency.
+- Removed the `health-goals` Skill and its shared goal engine: confirmed action goals, check-ins, progress, milestones, and goal evidence cards are no longer part of the product.
+- `add-exercise` and device sync no longer link records to a goal, and the `exercise_records` distance and source columns were reverted with them.
+- Retired the story action ids (`generate-weight-story-card`, `select-weight-card-style`, `weight-card-preferences`, `update-weight-card-preferences`, `generate-domain-health-card`, `select-health-card-style`); they now report `Unknown action`.
+- The record cards no longer render a per-domain story panel, and `focus=story` is no longer accepted.
+
 ### Added
-- Added the `health-goals` Skill for explicitly confirmed action goals, voluntary check-ins, progress, and frozen-snapshot evidence cards issued only for meaningful behavior moments.
-- New committed manual exercises and explicit wearable workout rows can update an active activity goal without treating ordinary step totals as check-ins.
 - Added complete member profile, medical record, date-filtered metric, and daily snapshot save/query action routes.
 - Wearable sync results now include provider, target member, metric types, per-type counts, and the imported time range.
 - Added cross-module Node action tests plus Apple Health interval, ZIP/XML validation, and PDF renderer regression tests.
@@ -25,14 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected the weight workflow text that incorrectly said MediWise automatically derives a calorie target.
 
 ### Changed
-- Ordinary health data and domain observations are now presented consistently as Health Cards; goal achievements use static Milestone Cards.
-- Removed the MP4 health-story pipeline, FFmpeg dependency, and video action/artifact surface.
-- Installation checks now validate runtime versions, SQLite, all Python scripts, all seven JavaScript action entries, and local Chrome/Chromium rendering availability.
-- Documentation now distinguishes local reminder records from host-Agent proactive delivery and states the nutrition-source requirement for photo meal logging.
+- Health Cards are now the two cards the product actually generates: the personal and family record cards, and the weight truth card. The weight truth card keeps its deterministic path — same-day medians, a Theil–Sen robust trend, and an explicit refusal to draw a line the records cannot support.
+- Weight Card analysis moved out of the shared story package into `weight-manager/scripts/robust_weight.py`, where `theil_sen_fit` delegates to the single estimator rather than keeping a second copy.
+- Family health cards now organize each member by current status, active medications and schedules, reminders, and explicit attention items. The family timeline has been removed.
+- Installation checks now validate six JavaScript action entries instead of seven.
 - Health Card typography is now larger throughout personal and family views, with more readable labels, medication schedules, timeline details, and disclaimers at both desktop and narrow widths.
 - Health Cards now use a clearer medical-blue visual system with improved contrast, blue metric charts, and a compact full-width layout for the final member in odd-sized family cards.
+- Documentation now distinguishes local reminder records from host-Agent proactive delivery and states the nutrition-source requirement for photo meal logging.
 - Clarified that MediWise works with Hermes, OpenClaw, Claude Code, Codex, WorkBuddy, and other Skills-compatible agents; OpenClaw-specific workspace and channel instructions remain documented as an adapter path rather than a product requirement.
-- Family health record cards now organize each member by current status, active medications and schedules, reminders, and explicit attention items. The family timeline has been removed.
 - Image and PDF intake now uses the current Agent's attachment-reading ability first. OCR and standalone vision services are optional fallbacks and are no longer required for installation.
 - Product and Skill boundaries now explicitly limit MediWise to recording, organizing, displaying, summarizing, and reminding. Health, nutrition, weight, sleep, cycle, and monitoring outputs no longer generate treatment, medication, diet, exercise, or lifestyle instructions.
 - Added a documentation center with audience-based navigation, a maintained project directory map, and clearer ownership for README, installation, Agent, and module documentation.

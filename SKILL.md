@@ -1,13 +1,13 @@
 ---
 name: mediwise-health-suite
-description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, static health cards, user-confirmed goals, check-ins, milestone cards, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
+description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, static health cards, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
 ---
 
 # MediWise Health Suite
 
 面向支持 Skills 的 AI Agent 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。支持 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具。
 
-对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。普通健康数据生成“健康卡片”，家庭概览称“家庭健康卡片”；用户明确设定目标且记录中出现节奏、恢复、连续稳定、半程或完成等新含义后，生成“目标证据卡”。普通文字查询结果称为“文字健康摘要”。
+对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。普通健康数据生成“健康卡片”，家庭概览称“家庭健康卡片”；体重观察结果称“体重真相卡”。普通文字查询结果称为“文字健康摘要”。
 
 ## 核心能力
 
@@ -20,13 +20,14 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - 查询能力：文字健康摘要、时间线、在用药、全家概览
 - **就医前摘要**：自动整理病情、既往史、在用药，生成文本/图片/PDF
 
-### 健康卡片：八域观察与展示
-- 体重、睡眠、生命体征、摄入、活动、服药记录、记录行为和家庭记录共用 24 套叙事模板
-- 各域只读取自己的记录边界，陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
-- 体重健康卡片是展示案例，不是能力边界；原有体重分析和经典卡片入口继续兼容
-- 默认脱敏；单域可导出自包含 HTML、SVG 和 1080×1440 PNG；家庭记录域不读取姓名，不比较成员
+### 健康卡片：记录概览与体重真相卡
+- 个人卡片汇总已记录的指标、饮食运动、睡眠、医疗记录和用药；家庭卡片只展示每位成员的当前状态、在用药、服药或复查提醒和已记录的注意事项，不含时间轴
+- 体重真相卡把同日多次测量折叠为中位数，用 Theil–Sen 稳健趋势区分单日波动与长期方向，并说明最新一次称重与趋势相差多少；记录不足以支撑趋势时只说明线索仍在积累
+- 只陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
+- 记录卡片是本地自用产物，会显示成员姓名和真实日期；体重真相卡默认脱敏，可对外分享
+- 卡片导出为自包含 HTML 和 1080×1440 PNG
 
-调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-health-card`（兼容动作 `generate-report`）；用户点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的 `generate-domain-health-card` 并传对应 `domain`。`generate-weight-story-card` 仅作为旧 action ID 兼容。所有输出都是静态健康卡片，不生成视频。
+调用边界：用户要近期整体健康概览或家庭概览时，走 `mediwise-health-tracker` 的 `generate-health-card`（兼容动作 `generate-report`）；用户点名体重趋势或体重真相卡时，走 `weight-manager` 的 `weight-truth` 和 `generate-weight-card`。
 
 ### ✅ 2. 饮食追踪 (diet-tracker)
 - 每餐记录与食物条目管理
@@ -37,8 +38,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 ### ✅ 3. 体重管理 (weight-manager)
 - 目标设定：减重/增重/维持
 - 体重翻译器：区分单日波动与稳健长期趋势
-- 「MediWise 体重健康卡片」展示案例：观察体重稳健方向与同期已有的摄入、活动、睡眠记录，生成默认脱敏的本地 HTML、SVG 和 1080×1440 PNG
-- 24 套差异化模板的可解释选择：按可用信号、场景、偏好、历史和探索概率推荐；每套有独立构图与主导内容，原经典航向版兼容入口继续保留
+- 体重真相卡：区分单日波动与稳健长期方向，说明最新称重与趋势的偏差，生成默认脱敏的本地 HTML 和 1080×1440 PNG
 - BMI/BMR/TDEE 计算
 - 运动记录与消耗追踪
 - 身体围度记录
@@ -59,12 +59,6 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 ### ✅ 6. 睡眠追踪 (sleep-tracker)
 - 睡眠时长与深睡、浅睡、REM、清醒分期记录
 - 每日分析、周趋势与历史查询
-
-### ✅ 7. 健康目标 (health-goals)
-- 仅在用户明确确认后创建行动目标，不根据普通健康读数推导目标
-- 自愿打卡、周期与累计进度、幂等里程碑
-- 手动运动和明确的设备活动记录可关联活动目标；普通步数不会自动打卡
-- 只在出现新行为含义时生成默认脱敏、使用冻结快照的静态目标证据卡；普通打卡不发卡
 
 ## 快速开始
 
@@ -105,11 +99,10 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
    "帮我设定一个减重目标，从 70kg 减到 65kg"
    ```
 
-6. **生成个性化单域健康卡片**
+6. **生成健康卡片或体重真相卡**
    ```
-   "根据最近 14 天的睡眠记录生成一张默认脱敏的健康卡片"
-   "用体重展示案例观察同期已有的体重、摄入、活动和睡眠记录"
-   "生成家庭健康卡片，不显示姓名，也不比较成员"
+   "帮我生成最近 7 天的健康卡片"
+   "生成一张体重真相卡，看看最近的波动是不是已经改了方向"
    ```
 
 7. **就医前准备**
@@ -125,7 +118,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
-- **Chrome / Chromium**: 生成本地 PNG 健康卡片、目标证据卡、旧体重真相卡或 PDF 时需要；HTML、SVG 和纯文字记录、查询不需要
+- **Chrome / Chromium**: 生成本地 PNG 健康卡片、体重真相卡或 PDF 时需要；HTML 和纯文字记录、查询不需要
 
 ## 数据隐私
 
@@ -232,7 +225,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **数据库**: SQLite（`medical.db` 与 `lifestyle.db` 分域存储，兼容旧版 `health.db`）
 - **脚本语言**: Python 3.8+
 - **Skill 框架**: 支持 Skills 的 AI Agent；OpenClaw 另有 action 路由适配
-- **模块化设计**: 7 个 skills（健康档案、饮食、体重、睡眠、目标、监测、可穿戴）
+- **模块化设计**: 6 个 skills（健康档案、饮食、体重、睡眠、监测、可穿戴）
 - **可选功能**: 后端 API、向量搜索（默认关闭）
 
 ## 许可证
@@ -245,4 +238,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**关键词**: 健康管理、医疗记录、家庭健康、健康卡片、健康目标、打卡、目标证据卡、饮食追踪、体重管理、health management, medical records, family health, health cards, goals, check-ins, evidence cards, diet tracking, weight management
+**关键词**: 健康管理、医疗记录、家庭健康、健康卡片、体重真相卡、饮食追踪、体重管理、health management, medical records, family health, health cards, weight truth card, diet tracking, weight management
