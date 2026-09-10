@@ -1,11 +1,11 @@
-# Drug Safety and Health Record Card
+# Drug Safety and Health Card
 
 ## 目录
 
 - 药物安全查询规则
 - DDInter / openFDA / 网页搜索
 - 结果呈现
-- 状态提醒与健康记录卡片
+- 状态提醒与健康卡片
 - 数据导出
 
 ## 药物安全查询规则
@@ -65,16 +65,16 @@ python3 {baseDir}/scripts/openfda_query.py search --name "metformin"
 
 查不到时，直接说“未查到标准交互数据；MediWise 无法据此判断是否适合合用，请咨询医生或药师”。
 
-## 状态提醒与健康记录卡片
+## 状态提醒与健康卡片
 
 ```bash
 python3 {baseDir}/scripts/health_advisor.py tips --member-id <id>
 python3 {baseDir}/scripts/health_advisor.py briefing
 ```
 
-### 强制：健康记录卡片默认发送 PNG
+### 强制：健康卡片默认发送 PNG
 
-当用户要“健康记录卡片”，或使用“健康简报”“健康小报”等口语表达时，统一生成 PNG 健康记录卡片：
+当用户要“健康卡片”，或使用“健康简报”“健康小报”等口语表达时，统一生成 PNG 健康卡片：
 
 ```bash
 python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
@@ -83,7 +83,7 @@ python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 拿到 `image_path` 后，使用当前 Agent 客户端的图片或附件发送能力发送：
 
 ```text
-这是你的健康记录卡片：
+这是你的健康卡片：
 [发送 image_path 指向的 PNG]
 ```
 
@@ -95,7 +95,7 @@ python3 {baseDir}/scripts/briefing_report.py screenshot --member-id <id>
 
 布局按以下优先级决定：
 
-1. 用户明确意图优先。用户问“血压趋势”“最近吃得怎么样”“最近检查结果”“现在吃什么药”“生成个性化健康译报”时，分别传 `focus=metrics|lifestyle|care|medications|story`。
+1. 用户明确意图优先。用户问“血压趋势”“最近吃得怎么样”“最近检查结果”“现在吃什么药”“生成个性化健康卡片”时，分别传 `focus=metrics|lifestyle|care|medications|story`。
 2. 未指定重点时，alert 高于 warning，明确标记异常和到期提醒高于单纯记录量。
 3. 没有风险信号时，比较指标、生活方式、医疗记录和用药的实际覆盖量；只有明显领先时才选择单一重点，否则使用均衡布局。
 4. 重点模块前置。指标重点时把被告警点名的指标优先并放大；生活方式重点时放大饮食、运动或睡眠中记录覆盖最多的面板；医疗重点时把个人时间轴前置；用药重点时把在用药表前置。

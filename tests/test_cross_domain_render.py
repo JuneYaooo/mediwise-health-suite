@@ -360,7 +360,7 @@ FORCED_MANAGEMENT = {
         },
         "social_packaging": {
             "save_prompt": "保存这张，下一段 14 天回来和自己对照",
-            "share_caption": "我的体重译报｜四线同框，剧情待续。数据只描述同期变化，不代表因果。",
+            "share_caption": "我的体重健康卡片｜四线同框，剧情待续。数据只描述同期变化，不代表因果。",
         },
     },
     "coverage": {"eligible_lifestyle_domains": 3, "overall_label": "生活方式记录较完整"},

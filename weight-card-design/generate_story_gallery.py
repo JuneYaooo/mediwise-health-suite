@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and browser-QA all 24 dynamic 体重译报 styles.
+"""Generate and browser-QA all 24 体重健康卡片 styles.
 
 This is a design/development helper, not a runtime dependency.  It uses a
 fictional 30-day dataset, writes self-contained HTML files, screenshots each

@@ -7,7 +7,7 @@ description: Family health and medical record management. Tracks members, visits
 
 健康档案与病程记录 Skill。所有操作通过 `{baseDir}/scripts/` 下的 Python 脚本完成，默认输出 JSON，再转成自然语言回复给用户。
 
-当用户问”你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、健康记录卡片外，还可以根据最近的描述和历史记录先整理一段”就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
+当用户问”你可以做什么”时，记得主动提到：除了健康档案、指标记录、提醒、健康卡片外，还可以根据最近的描述和历史记录先整理一段”就医前摘要”，并在需要时继续生成图片或 PDF，方便给医生快速了解病情。
 
 ## 适用场景
 
@@ -16,7 +16,7 @@ description: Family health and medical record management. Tracks members, visits
 - 记录日常健康指标（血压/血糖/心率/体温等）
 - 查询病程历史或用药记录、生成健康时间线或摘要、查看全家健康概况
 - 发送体检报告图片或化验单需要识别录入
-- 设置用药提醒、健康指标测量提醒、复查提醒，或获取状态汇总、健康记录卡片、就医前资料摘要图
+- 设置用药提醒、健康指标测量提醒、复查提醒，或获取状态汇总、健康卡片、就医前资料摘要图
 - 规划就诊流程（预约 → 就诊前汇总 → 记录诊断结果 → 复诊追踪）
 - 随口提到健康问题（如”最近膝盖有点疼”）需要记录并定期跟进
 
@@ -151,7 +151,7 @@ python3 {baseDir}/scripts/health_memory.py list --member-id <id>
 python3 {baseDir}/scripts/health_memory.py resolve --note-id <nid> --resolution-note “已按医生原有交代完成处理”
 ```
 
-待跟进的健康备注会自动出现在下一张健康记录卡片（`health_advisor.py briefing`）中，确保不遗漏。
+待跟进的健康备注会自动出现在下一张健康卡片（`health_advisor.py briefing`）中，确保不遗漏。
 
 ## 初始配置引导
 
@@ -202,7 +202,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
    - 云端视觉模型会收到完整图片/PDF 页面，内容可能包含姓名、身份证号、病历号等 PII；不得未经用户明确同意启用新的云端服务。敏感材料优先使用本地能力。
 3. **不提供医疗指导**：只记录、整理、查询、展示和提醒。不得根据健康数据给出诊断、治疗建议、用药建议、营养治疗建议、临床判断或其他医疗指导；只可转述已有诊断、处方、报告明确标记、用户阈值和既有提醒。如需医学判断，只能提示用户咨询专业医疗人员。
 4. **药物安全问题必须先搜且只展示来源信息**：通过 DDInter、openFDA 或网页搜索查询，不要凭记忆回答；不得据此指示用户开始、停止、更换或调整药物。
-5. **近期健康记录默认发图片卡片**：优先调用 `generate-report`，传入用户要求的 `days`（默认 7）、语言和个人/家庭视图，不是把 JSON 或 HTML 发给用户。普通概览发送返回的 PNG；用户明确要“健康译报”“动态译报”“小视频”或“多维分析”时，个人版传 `focus=story` 和 `format=mp4`，发送 `video_artifact.mp4_path`，并可按需发送 `video_artifact.scene_images` 中的独立 PNG。若 `video_artifact` 不可用，只发送普通 PNG，并如实说明原因；不得把兼容 `story_artifact.svg_path` 冒充最终视频。
+5. **近期健康记录默认发静态图片卡片**：优先调用 `generate-health-card`（兼容动作 `generate-report`），传入用户要求的 `days`（默认 7）、语言和个人/家庭视图，不把 JSON 或 HTML 发给用户。普通健康数据统一称为“健康卡片”，不生成视频。
 6. **多张图片先收齐再处理**：不要每到一张就立即确认录入。
 7. **只用于个人本地档案**：不要引导群聊或多人共享部署；安装配置异常时交给具备本机权限的 Agent 修复，不让普通用户处理身份参数。
 8. **就医前摘要只整理资料**：默认先用 `doctor_visit_report.py text` 生成短文版；用户需要时，再导出图片或 PDF。摘要不得包含诊断判断或诊疗建议。
@@ -217,7 +217,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
     - 情绪/精力：累、乏力、焦虑、情绪低落、提不起劲
     - 用药感受：吃了药之后…、副作用、效果不明显
 
-## 健康记录卡片定时推送规范（Agent 定时任务）
+## 健康卡片定时推送规范（Agent 定时任务）
 
 **建议触发时机：每日早晨 8:00。此任务不会随 MediWise 安装自动创建；只有当前 Agent 确实支持定时任务、已经完成任务注册并通过一次触发测试时，才可声称会自动执行。OpenClaw 可使用其定时任务，其他 Agent 使用等效机制；不具备定时能力时由用户手动请求。**
 
@@ -227,7 +227,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 1. wearable-sync: sync-all          → 同步手表数据（若有绑定设备）
 2. health-monitor: check-all        → 检测异常指标，写入 alerts 表
 3. health_advisor.py briefing       → 获取卡片数据（提醒 + 明确标记 + 状态汇总）
-4. briefing_report.py screenshot    → 生成健康记录卡片（PNG），同时自动保存当日快照
+4. briefing_report.py screenshot    → 生成健康卡片（PNG），同时自动保存当日快照
 5. 推送给用户（见下方推送规则）
 ```
 
@@ -235,7 +235,7 @@ python3 {baseDir}/scripts/setup.py test-intake --input both
 
 **建议触发时机：每晚 22:00。与早间卡片相同，必须由当前 Agent 显式注册、持久化并测试定时任务；MediWise 本身不包含后台守护进程。**
 
-做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日健康记录卡片展示。详见 `mediwise-health-tracker/DREAM.md`。
+做梦机制负责在夜间回顾当日健康素材，提炼规律和隐患，将有价值的洞察写入健康备注，供次日健康卡片展示。详见 `mediwise-health-tracker/DREAM.md`。
 
 ```
 dream.py status   → 检查是否满足触发条件（≥20h 间隔）
@@ -250,34 +250,34 @@ dream.py unlock   → 释放锁，标记完成
 
 | 情况 | 推送什么 |
 |---|---|
-| 有 alert 级告警 | 健康记录卡片 + 文字摘要，文字中明确点出告警项 |
-| 只有 warning 或 info | 健康记录卡片，文字一句话概括（"今日整体正常，有 N 项提醒"）|
-| 完全正常 | 只发一句"今日健康状况良好，无待处理事项" + 可选健康记录卡片 |
+| 有 alert 级告警 | 健康卡片 + 文字摘要，文字中明确点出告警项 |
+| 只有 warning 或 info | 健康卡片，文字一句话概括（"今日整体正常，有 N 项提醒"）|
+| 完全正常 | 只发一句"今日健康状况良好，无待处理事项" + 可选健康卡片 |
 | 同步失败（无手表数据） | 注明"今日手表数据未能同步，以下数据基于上次同步结果" |
 
 ### 推送格式
 
-- **默认发卡片图片**：普通健康记录概览用 `briefing_report.py screenshot` 生成 PNG，作为图片消息发送；明确请求个人动态健康译报时，传 `--story-video`，发送同一结果里的 `video_artifact.mp4_path`，并可单独发送 `video_artifact.scene_images` 中的 PNG；`story_artifact.svg_path` 只保留为最佳单域兼容产物
+- **默认发卡片图片**：普通健康记录概览用 `briefing_report.py screenshot` 生成 PNG，作为图片消息发送
 - **文字摘要**：在图片前附一段不超过 100 字的中文摘要，点出最重要的 1-2 件事
 - **禁止**：直接把 JSON 或 HTML 内容粘贴到聊天里
 
 ### 用户手动请求时
 
-当用户说“帮我生成最近 7 天的健康记录卡片”“给我看近期健康简报”“今天身体怎么样”等口语表达时，统一按“健康记录卡片”能力处理：
+当用户说“帮我生成最近 7 天的健康卡片”“给我看近期健康简报”“今天身体怎么样”等口语表达时，统一按“健康卡片”能力处理：
 
 1. 个人版先按姓名与身份规则调用 `resolve-member`。只有唯一“本人”档案时可以默认本人；有多位成员且用户未说明姓名时必须先询问。明确请求家庭版时跳过单成员解析。
-2. 个人版调用 `generate-report`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。用户明确问指标趋势、饮食运动、医疗记录、用药或个性化健康译报时，再分别传 `focus=metrics|lifestyle|care|medications|story`；要求动态译报、小视频或多维分析时同时传 `format=mp4`；普通概览保持 `focus=auto`。
-3. 普通健康记录请求将生成的 PNG 作为图片消息发送；明确请求个人健康译报或动画时，发送返回结果中 `video_artifact.mp4_path` 对应的 MP4，并可同时发送 `video_artifact.scene_images` 中任一 1080×1440 PNG。两种情况都只用一句自然语言概括最重要的提醒，不粘贴 JSON 或 HTML。`story_artifact.svg_path` 是最佳单域的兼容中间产物，不是最终小视频。
-4. 用户明确说“家庭健康记录卡片”“全家健康卡片”时，调用 `generate-report` 并传入 `view=family`，不要传 `member_id`。家庭版用于一个本地用户管理本人及家人的概览，不代表多人共享服务。
-5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。个人版对外名称统一为 “Health Record Card” / “健康记录卡片”，家庭版统一为 “Family Health Record Card” / “家庭健康记录卡片”。“健康简报”“健康小报”等只作为意图触发词，不作为回复或卡片标题。
+2. 个人版调用 `generate-health-card`，传入已确认的 `member_id`、`days`、`view=personal` 和对话语言对应的 `locale`；未指定时间时默认 7 天。用户明确问指标趋势、饮食运动、医疗记录、用药或某一类健康卡片时，再分别传 `focus=metrics|lifestyle|care|medications|story`；普通概览保持 `focus=auto`。
+3. 将生成的 PNG 作为图片消息发送，只用一句自然语言概括最重要的提醒，不粘贴 JSON 或 HTML。
+4. 用户明确说“家庭健康卡片”“全家健康卡片”时，调用 `generate-health-card` 并传入 `view=family`，不要传 `member_id`。家庭版用于一个本地用户管理本人及家人的概览，不代表多人共享服务。
+5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。个人版对外名称统一为 “Health Card” / “健康卡片”，家庭版统一为 “Family Health Card” / “家庭健康卡片”。“健康简报”“健康小报”等只作为意图触发词，不作为回复或卡片标题。
 
-个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药，并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。个人健康译报作为第五类板块接入共享故事引擎：该静态板块从当前有记录的体重、睡眠、生命体征、摄入和活动中确定性选择一域；多维 MP4 则串联其中所有有有效记录的域。两者复用各域 adapter 的同日折叠、Signal Frame、稳健趋势和模板选择；没有可读记录时省略，不补零、不自行推断。`video_artifact` 包含竖屏 MP4、全部独立分镜 PNG、manifest 和 QA 路径；`story_artifact.svg_path` 作为最佳单域兼容产物保留；家庭版不生成个人故事产物。`focus=auto` 必须使用生成器返回的确定性布局：先按 alert / warning、明确标记异常和到期提醒决定安全优先级，再按各模块的实际记录量决定主模块；重点模块前置，重点指标、数据最多的生活方式面板或健康译报可放大，空且与本次问题无关的模块省略。不得让模型根据数值自行推断异常，也不得仅因记录多就把明确异常压到后面。
+个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药，并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。个性化健康卡片板块从当前有记录的体重、睡眠、生命体征、摄入和活动中确定性选择一域，复用各域 adapter 的同日折叠、Signal Frame、稳健趋势和模板选择；没有可读记录时省略，不补零、不自行推断。`focus=auto` 必须使用生成器返回的确定性布局：先按 alert / warning、明确标记异常和到期提醒决定安全优先级，再按各模块的实际记录量决定主模块；重点模块前置，重点指标、数据最多的生活方式面板或健康卡片可放大，空且与本次问题无关的模块省略。不得让模型根据数值自行推断异常，也不得仅因记录多就把明确异常压到后面。
 
 家庭版是成员状态看板，不展示时间轴，也不纵向拼接多张个人卡片。每位成员只展示当前状态、有限的最新指标、在用药及服药计划、提醒和明确注意事项。成员顺序由生成器自动决定：有 alert 的成员最优先，其次是 warning、明确标记异常或到期提醒；均无风险时，再优先展示有在用药、计划提醒或近期记录的成员。检验异常仅认原始数据中的明确标记。详细布局规则见 `mediwise-health-tracker/references/drug-safety-health-card.md`。
 
 ## 每日健康快照记忆（daily_snapshot.py）
 
-每次生成健康记录卡片时自动保存当日快照，agent 可在对话中直接引用历史状态，无需每次重新计算。
+每次生成健康卡片时自动保存当日快照，agent 可在对话中直接引用历史状态，无需每次重新计算。
 
 ### 支持的查询场景
 
@@ -313,7 +313,7 @@ python3 {baseDir}/scripts/daily_snapshot.py trend --member-id <id> --days 30
 我可以帮你做这些和健康相关的事情：
 - 记录和整理健康档案：症状、诊断、用药、检验、影像、血压血糖等
 - 查询和总结病程：帮你把最近变化、既往史、在用药整理清楚
-- 做提醒和健康记录卡片：比如用药提醒、复查提醒、最近 7 天健康记录卡片
+- 做提醒和健康卡片：比如用药提醒、复查提醒、最近 7 天健康卡片
 - 识别报告图片或化验单：把图片/PDF里的信息提取出来录入
 - 在你准备去看医生前，先生成一段”就医前摘要”：自动整理最近的关键情况、相关病史、过敏史、在用药和需要注意的事项；如果你需要，我再继续整理成图片或 PDF
 - 就诊全程管理：提前规划预约 → 就诊前智能汇总症状/指标/用药 → 就诊后记录诊断和处方 → 自动追踪复诊提醒
@@ -353,7 +353,7 @@ python3 {baseDir}/scripts/setup.py restore --input mediwise-backup.tar.gz
 按需读取，不要一次全读：
 
 - 录入、查询自然语言化、视觉处理：`mediwise-health-tracker/references/intake-query-vision.md:1`
-- 药物来源信息、状态提醒、健康记录卡片：`mediwise-health-tracker/references/drug-safety-health-card.md:1`
+- 药物来源信息、状态提醒、健康卡片：`mediwise-health-tracker/references/drug-safety-health-card.md:1`
 - 周期追踪、附件与个人本地边界：`mediwise-health-tracker/references/cycle-attachments-local-scope.md:1`
 - 就医前摘要图：`mediwise-health-tracker/references/visit-prep.md:1`
 

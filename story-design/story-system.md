@@ -1,4 +1,4 @@
-# MediWise 健康译报叙事系统
+# MediWise 健康卡片叙事系统
 
 > 本文是域中立的叙事契约。它取代 `weight-card-design/style-system.md` 的通用部分；体重作为其中一个域的案例，见文末附录与 `story-design/cases/weight.md`。
 
@@ -21,7 +21,7 @@ Signal Frame IR（story-design/signal-frame.schema.json）
         ↓  render/：artboard + families/*（静态海报帧 与 动画帧 同源）
 单域：自包含 .svg（动态卡） / .html（预览） / .png（冻结海报帧）
         ↓  video.py：只串联各域已完成的 Signal Frame，不做跨域计算
-个人综合译报：1080×1440 逐镜头 .png + 1080×1920 H.264 .mp4 + manifest / QA
+个人健康卡片：1080×1440 HTML / SVG / PNG；不生成视频
 ```
 
 渲染层不认识任何具体域。它只认识 Signal Frame。凡是渲染器里出现「体重」「秤面」「kg」这类词，都属于契约违规，应改为从 `lexicon` 取词。视频层同样不得按域分支：它可以串联多个完成的 frame，但只能逐域展示各自单位，不能归一化后比较、相减或生成因果叙述。

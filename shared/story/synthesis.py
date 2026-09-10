@@ -1,4 +1,4 @@
-"""Deterministic multi-signal analysis for MediWise 体重译报.
+"""Deterministic multi-signal analysis for MediWise 体重健康卡片.
 
 Weight is treated as an outcome signal, while recorded food intake, exercise
 and sleep are described as parallel observations from the same time window.
@@ -363,7 +363,7 @@ def _social_packaging(portrait: Mapping[str, object], days: int) -> dict:
         "hook_mechanisms": mechanisms,
         "proof_points": list(portrait.get("evidence") or [])[:3],
         "save_prompt": "保存这张，下一段 %d 天回来和自己对照" % days,
-        "share_caption": "我的体重译报｜%s。%s数据只描述同期变化，不代表因果。" % (title, hook),
+        "share_caption": "我的体重健康卡片｜%s。%s数据只描述同期变化，不代表因果。" % (title, hook),
         "share_reason": "结论先行、证据可核对、默认隐藏身份与绝对体重",
         "clickbait": False,
         "privacy_safe": True,

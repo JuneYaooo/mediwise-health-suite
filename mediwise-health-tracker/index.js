@@ -215,9 +215,6 @@ const ROUTES = {
     if (inputs.params?.focus) {
       args.push('--focus', String(inputs.params.focus));
     }
-    if (inputs.params?.story_video === true || ['mp4', 'package'].includes(inputs.params?.format)) {
-      args.push('--story-video');
-    }
     return { script: 'briefing_report.py', args };
   },
   'snapshot-save': (inputs) => ({
@@ -623,6 +620,9 @@ const ROUTES = {
     return { script: 'checkup_report.py', args };
   },
 };
+
+// User-facing alias: ordinary records produce a static health card.
+ROUTES['generate-health-card'] = ROUTES['generate-report'];
 
 /**
  * Run a Python script and return parsed JSON output.

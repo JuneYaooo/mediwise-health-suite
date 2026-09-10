@@ -1140,7 +1140,7 @@ def run(command: str, args: argparse.Namespace) -> dict:
                 )
                 _write_private(svg_path, card_svg)
         except (OSError, ValueError) as exc:
-            return {"status": "error", "message": "体重译报生成失败：%s" % exc}
+            return {"status": "error", "message": "体重健康卡片生成失败：%s" % exc}
 
         card = {
             "product_name": story_product_name_for(domain),

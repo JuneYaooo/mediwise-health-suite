@@ -1,4 +1,4 @@
-"""Domain-neutral narrative engine for MediWise 健康译报.
+"""Domain-neutral narrative engine for MediWise 健康卡片.
 
 Layering (see story-design/story-system.md):
 

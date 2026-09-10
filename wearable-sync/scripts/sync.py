@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 logger = logging.getLogger(__name__)
 
 import health_db
+from goal_engine import record_activity_source
 from normalize import normalize_metrics
 from providers.gadgetbridge import GadgetbridgeProvider
 from providers.huawei import HuaweiProvider
@@ -92,6 +93,45 @@ def _check_duplicate(conn, member_id, metric_type, measured_at, source):
         (member_id, metric_type, measured_at, source)
     ).fetchone()
     return row is not None
+
+
+def _activity_duration_minutes(value):
+    """Read an explicit workout duration without inferring it from steps or calories."""
+    if isinstance(value, dict):
+        payload = value
+    else:
+        try:
+            payload = json.loads(value)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+    if not isinstance(payload, dict):
+        return None
+    for key in ("duration_min", "duration_minutes"):
+        try:
+            duration = float(payload.get(key))
+        except (TypeError, ValueError):
+            continue
+        if 0 < duration <= 1440:
+            return duration
+    for key in ("duration_sec", "duration_seconds"):
+        try:
+            duration = float(payload.get(key)) / 60.0
+        except (TypeError, ValueError):
+            continue
+        if 0 < duration <= 1440:
+            return round(duration, 2)
+    return None
+
+
+def _activity_goal_candidate(metric_id, metric):
+    """Return a post-commit goal-link candidate only for an explicit workout row."""
+    if metric.get("metric_type") != "activity":
+        return None
+    return {
+        "id": metric_id,
+        "measured_at": metric["measured_at"],
+        "duration_minutes": _activity_duration_minutes(metric.get("value")),
+    }
 
 
 def sync_device(device_id, owner_id=None):
@@ -202,6 +242,7 @@ def sync_device(device_id, owner_id=None):
     synced = 0
     skipped = 0
     metric_stats = {}
+    inserted_activities = []
     for metric in normalized:
         stats = metric_stats.setdefault(
             metric["metric_type"], {"normalized": 0, "synced": 0, "skipped": 0}
@@ -226,7 +267,26 @@ def sync_device(device_id, owner_id=None):
             )
             synced += 1
             metric_stats[metric["metric_type"]]["synced"] += 1
+            activity_candidate = _activity_goal_candidate(metric_id, metric)
+            if activity_candidate:
+                inserted_activities.append(activity_candidate)
         conn.commit()
+
+    goal_updates = []
+    for activity in inserted_activities:
+        try:
+            linked = record_activity_source(
+                member_id,
+                source_record_type="health_metric_activity",
+                source_record_id=activity["id"],
+                occurred_at=activity["measured_at"],
+                duration_minutes=activity["duration_minutes"],
+                owner_id=owner_id,
+            )
+            if linked:
+                goal_updates.append({"metric_id": activity["id"], "updates": linked})
+        except Exception as exc:
+            logger.warning("Activity goal link failed for metric %s: %s", activity["id"], exc)
 
     # Update device last_sync_at in lifestyle domain (separate transaction)
     with health_db.transaction(domain="lifestyle") as conn:
@@ -258,6 +318,7 @@ def sync_device(device_id, owner_id=None):
             "latest": max((metric["measured_at"] for metric in normalized), default=None),
         } if normalized else None,
         "metric_stats": metric_stats,
+        "goal_updates": goal_updates,
     }
 
 

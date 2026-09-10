@@ -7,7 +7,7 @@ expenditure model, it must not imply a calorie deficit or clinical fluid I/O.
 Usage:
   python3 scripts/briefing_report.py generate [--member-id <id>]
       [--days 7] [--locale zh-CN|en-US] [--view auto|personal|family]
-      [--focus auto|metrics|lifestyle|care|medications|story] [--story-video]
+      [--focus auto|metrics|lifestyle|care|medications|story]
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ LOG = logging.getLogger(__name__)
 
 COPY = {
     "zh-CN": {
-        "lang": "zh-CN", "title": "健康记录卡片", "family_title": "家庭健康记录卡片",
+        "lang": "zh-CN", "title": "健康卡片", "family_title": "家庭健康卡片",
         "last_days": "最近 {days} 天", "period": "{start} 至 {end}",
         "local_profile": "个人本地档案", "local_family": "本地家庭档案",
         "members": "{count} 位成员", "attention_people": "{count} 人需要关注",
@@ -63,7 +63,7 @@ COPY = {
         "more_meds": "另有 {count} 种在用药", "more_attention": "另有 {count} 项提醒或注意事项",
         "due_prefix": "待处理", "upcoming_prefix": "计划提醒",
         "health_timeline": "个人健康时间轴",
-        "health_story": "个人健康译报", "story_pattern": "本期版式：{name}",
+        "health_story": "个人健康卡片", "story_pattern": "本期版式：{name}",
         "story_observation": "根据最近 {days} 天有记录的数据，观察{subject}的记录形状。",
         "story_recorded_days": "有记录日", "story_measurements": "记录次数",
         "story_long_run": "长期变化", "story_not_enough": "记录不足，暂不判断",
@@ -80,7 +80,7 @@ COPY = {
         "unknown": "未填写", "day": "天",
     },
     "en-US": {
-        "lang": "en", "title": "Health Record Card", "family_title": "Family Health Record Card",
+        "lang": "en", "title": "Health Card", "family_title": "Family Health Card",
         "last_days": "Last {days} days", "period": "{start} to {end}",
         "local_profile": "Private local profile", "local_family": "Private local family record",
         "members": "{count} members", "attention_people": "{count} need attention",
@@ -114,7 +114,7 @@ COPY = {
         "more_meds": "{count} more active medications", "more_attention": "{count} more reminders or attention items",
         "due_prefix": "Due", "upcoming_prefix": "Planned",
         "health_timeline": "Personal health timeline",
-        "health_story": "Personal Health Story", "story_pattern": "Pattern: {name}",
+        "health_story": "Personal Health Card", "story_pattern": "Pattern: {name}",
         "story_observation": "An observation of the recorded {subject} pattern across the last {days} days.",
         "story_recorded_days": "Recorded days", "story_measurements": "Records",
         "story_long_run": "Long-run change", "story_not_enough": "Not enough records to infer a direction",
@@ -178,7 +178,6 @@ def _story_api():
         from shared.story.normalize import aggregate_daily_medians, domain_analysis_from_rows
         from shared.story.render import _signed
         from shared.story.svg import render_story_svg
-        from shared.story.video import render_health_story_video
 
         _STORY_API = {
             "aggregate_daily_medians": aggregate_daily_medians,
@@ -189,7 +188,6 @@ def _story_api():
             "select_story_style": select_story_style,
             "signed": _signed,
             "render_story_svg": render_story_svg,
-            "render_health_story_video": render_health_story_video,
         }
     return _STORY_API
 
@@ -458,7 +456,7 @@ def _build_personal_stories(member_id: str, trends: dict, lifestyle: dict,
             # One malformed legacy stream must not erase a valid story from a
             # different domain. The full health card remains best-effort, while
             # each adapter still fails loudly in its own direct tests and CLI.
-            LOG.warning("Personal health story skipped %s domain: %s", domain, exc)
+            LOG.warning("Personal health card skipped %s domain: %s", domain, exc)
             continue
         frame = ready["frame"]
         # Rows can exist while every value is rejected by an adapter.  Such a
@@ -1231,8 +1229,7 @@ section{{background:var(--surface);border:1px solid var(--line);border-radius:19
 
 
 def generate_report(member_id: str | None = None, owner_id: str | None = None, days: int = 7,
-                    locale: str = "zh-CN", view: str = "auto", focus: str = "auto",
-                    story_video: bool = False) -> dict:
+                    locale: str = "zh-CN", view: str = "auto", focus: str = "auto") -> dict:
     """Generate a personal or family card and return its local HTML path."""
     if locale not in COPY:
         return {"status": "error", "message": f"Unsupported locale: {locale}", "supported_locales": list(COPY)}
@@ -1285,7 +1282,7 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
             except (ImportError, KeyError, TypeError, ValueError) as exc:
                 # The health record card remains available if an optional narrative
                 # cannot be assembled from malformed legacy rows.
-                LOG.warning("Personal health story unavailable: %s", exc)
+                LOG.warning("Personal health card unavailable: %s", exc)
         all_data.append({"member": member, "member_data": member_data, "trends": trends,
                          "lifestyle": lifestyle, "sleep": sleep, "story": story,
                          "stories": stories,
@@ -1346,7 +1343,7 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
     story_artifact = None
     if resolved_view == "personal" and all_data[0].get("story"):
         story = all_data[0]["story"]
-        story_filename = (f'health_story_{story["domain"]}_{end}_{member_id}.svg')
+        story_filename = (f'health_card_{story["domain"]}_{end}_{member_id}.svg')
         story_path = os.path.join(reports_dir, story_filename)
         try:
             with open(story_path, "w", encoding="utf-8") as handle:
@@ -1362,24 +1359,7 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
                 "share_safe": True,
             }
         except (OSError, KeyError, TypeError, ValueError) as exc:
-            LOG.warning("Personal health story SVG unavailable: %s", exc)
-    video_artifact = None
-    if resolved_view == "personal" and story_video and all_data[0].get("stories"):
-        video_dir = os.path.join(reports_dir, f'health_story_video_{end}_{member_id}')
-        try:
-            video_artifact = _story_api()["render_health_story_video"](
-                all_data[0]["stories"],
-                video_dir,
-                days=days,
-                locale=locale,
-                # Chinese adapter lexicons may name a selected component (心率、
-                # 热量、步数), which is more precise than the host's broad domain
-                # label. English still needs the host translation table.
-                domain_labels=STORY_DOMAIN_NAMES[locale] if locale == "en-US" else {},
-            )
-        except (OSError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-            LOG.warning("Personal multi-domain story video unavailable: %s", exc)
-            video_artifact = {"status": "unavailable", "message": str(exc)}
+            LOG.warning("Personal domain health card SVG unavailable: %s", exc)
     try:
         import daily_snapshot
         for member in members:
@@ -1388,8 +1368,7 @@ def generate_report(member_id: str | None = None, owner_id: str | None = None, d
         LOG.warning("daily_snapshot save failed: %s", exc)
     return {"status": "ok", "report_path": path, "file_size": os.path.getsize(path), "date": end,
             "member_count": len(members), "days": days, "locale": locale, "view": resolved_view,
-            "layout_profile": layout_profile, "story_artifact": story_artifact,
-            "video_artifact": video_artifact}
+            "layout_profile": layout_profile, "story_artifact": story_artifact}
 
 
 def _parser(command: str) -> argparse.ArgumentParser:
@@ -1400,7 +1379,6 @@ def _parser(command: str) -> argparse.ArgumentParser:
     parser.add_argument("--locale", choices=sorted(COPY), default="zh-CN")
     parser.add_argument("--view", choices=("auto", "personal", "family"), default="auto")
     parser.add_argument("--focus", choices=FOCUS_CHOICES, default="auto")
-    parser.add_argument("--story-video", action="store_true")
     if command == "screenshot":
         parser.add_argument("--width", type=int, default=1040)
     return parser
@@ -1413,7 +1391,7 @@ def main():
     command = sys.argv[1]
     args = _parser(command).parse_args(sys.argv[2:])
     report = generate_report(args.member_id, args.owner_id, args.days, args.locale, args.view,
-                             args.focus, args.story_video)
+                             args.focus)
     if command == "generate" or report.get("status") != "ok":
         health_db.output_json(report)
         return
@@ -1423,7 +1401,6 @@ def main():
     png.update({key: report[key] for key in ("locale", "view", "member_count", "days")})
     png["layout_profile"] = report["layout_profile"]
     png["story_artifact"] = report.get("story_artifact")
-    png["video_artifact"] = report.get("video_artifact")
     health_db.output_json(png)
 
 

@@ -69,16 +69,16 @@ MediWise 在 OpenClaw 中只支持个人本地实例：一个本地用户管理�
 
 导入时先解析成员，再检查文件格式；返回新增数、重复跳过数、指标类型和时间范围。不要要求普通用户运行导入脚本，也不要索取设备账号密码。
 
-## 健康记录卡片
+## 健康卡片
 
-用户请求“最近 N 天健康记录卡片”时：
+用户请求“最近 N 天健康卡片”时：
 
 1. 按成员规则解析目标；多成员时要求姓名。
-2. 调用健康档案 Skill 的 `generate-report`，传入 `member_id` 和 `days`，未指定时使用 7 天。
+2. 调用健康档案 Skill 的 `generate-health-card`（兼容动作 `generate-report`），传入 `member_id` 和 `days`，未指定时使用 7 天。
 3. 把生成的 PNG 作为图片发送，不粘贴 JSON 或 HTML。
 4. 没有数据的项目显示暂无数据，不推测或补造指标。
 
-用户明确请求个人“健康译报”“动态译报”“小视频”或“多维分析”时，`generate-report` 传 `focus=story` 和 `format=mp4`，发送返回结果中 `video_artifact.mp4_path` 对应的 MP4；需要单独分享某张卡时，从 `video_artifact.scene_images` 发送对应 PNG。`story_artifact.svg_path` 是最佳单域的兼容中间产物，不得冒充最终视频。若用户点名体重、睡眠、生命体征、摄入、活动、服药记录、记录行为或家庭记录中的某一域，改走体重管理 Skill 的兼容动作 `generate-weight-story-card` 并传对应 `domain`。家庭健康记录卡本身不生成个人故事产物。
+若用户点名体重、睡眠、生命体征、摄入、活动、服药记录、记录行为或家庭记录中的某一域，走体重管理 Skill 的 `generate-domain-health-card` 并传对应 `domain`。旧 action `generate-weight-story-card` 仅为兼容。普通健康数据始终生成静态健康卡片，不生成视频；目标证据卡则由 `health-goals` Skill 在用户确认目标且记录中出现新的行为含义后生成，普通打卡不发卡。
 
 ## 安全要求
 

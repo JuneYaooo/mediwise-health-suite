@@ -29,7 +29,7 @@ https://github.com/JuneYaooo/mediwise-health-suite
 
 只有检查确实通过后，Agent 才能声称安装完成。
 
-本地 PNG 健康记录卡片和 PDF 使用 Chrome/Chromium 渲染。没有浏览器时，文字记录、查询和 HTML 报告仍可使用，但 Agent 应明确说明 PNG/PDF 暂不可用。
+本地 PNG 健康卡片和 PDF 使用 Chrome/Chromium 渲染。没有浏览器时，文字记录、查询和 HTML 报告仍可使用，但 Agent 应明确说明 PNG/PDF 暂不可用。
 
 ## 运行范围
 
@@ -121,7 +121,7 @@ Garmin Connect 是实验性来源，不作为普通用户默认配置；Huawei H
 请检查 MediWise 是否已正确加载，但先不要创建任何测试健康记录。告诉我个人本地模式和基础依赖是否正常。
 ```
 
-随后可以创建本人档案，并请求生成最近 7 天健康记录卡片。没有指标时，卡片应明确显示暂无数据，不应编造内容。
+随后可以创建本人档案，并请求生成最近 7 天健康卡片。没有指标时，卡片应明确显示暂无数据，不应编造内容。
 
 图片/PDF 不是安装成功的前置条件。只有用户要求配置 fallback 时，才需要额外报告 PaddleOCR 或可选视觉服务的实际测试状态。
 

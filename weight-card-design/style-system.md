@@ -1,4 +1,4 @@
-# MediWise 体重译报叙事系统
+# MediWise 体重健康卡片叙事系统
 
 ## 一句话原则
 
@@ -240,7 +240,7 @@ Node action：`select-weight-card-style`。主要输入：
 
 - `weight-truth`：保留原结构化分析结果。
 - `generate-weight-card`：保留原「体重真相卡」经典航向版、参数和输出结构。
-- `generate-weight-story-card`：新的「体重译报」完整个性化生成链路。
+- `generate-domain-health-card`：新的健康卡片完整个性化生成链路；`generate-weight-story-card` 为兼容 action ID。
 
 新功能没有替换旧动作，也没有改变旧分析阈值或健康数据库 Schema。
 

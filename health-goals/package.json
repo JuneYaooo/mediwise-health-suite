@@ -1,0 +1,10 @@
+{
+  "name": "@mediwise/health-goals-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "MediWise user-confirmed health goals, check-ins, progress, and meaning-gated evidence cards",
+  "author": "MediWise Team",
+  "license": "MIT",
+  "keywords": ["agent-skills", "health", "goals", "check-in", "milestones", "cards"]
+}

@@ -107,7 +107,7 @@ class FamilyHealthCardTest(unittest.TestCase):
 class HealthCardThemeTest(unittest.TestCase):
     def test_health_card_uses_blue_visual_system(self):
         html = briefing_report._render_html(
-            "健康记录卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
+            "健康卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
         )
 
         self.assertIn("--page:#F3F7FC", html)
@@ -118,7 +118,7 @@ class HealthCardThemeTest(unittest.TestCase):
 
     def test_health_card_uses_readable_typography(self):
         html = briefing_report._render_html(
-            "健康记录卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
+            "健康卡片", "最近 7 天", "个人本地档案", "", "", "zh-CN"
         )
 
         self.assertIn('font:16px/1.65', html)
@@ -193,7 +193,7 @@ class PersonalHealthStoryTest(unittest.TestCase):
         self.assertIsNotNone(story["selection"]["selected_style"]["id"])
         svg = briefing_report._personal_story_svg(story)
         self.assertIn("<svg", svg)
-        self.assertIn("MediWise 睡眠译报", svg)
+        self.assertIn("MediWise 睡眠健康卡片", svg)
         self.assertIn('data-story-domain="sleep"', svg)
         self.assertIn('data-motion-mode="', svg)
         self.assertIn('data-duration-ms="', svg)
@@ -291,9 +291,9 @@ class PersonalHealthStoryTest(unittest.TestCase):
             {"id": "member-1"}, member_data, {}, lifestyle, sleep, care, [],
             "en-US", layout, story=story,
         )
-        self.assertIn("个人健康译报", zh)
+        self.assertIn("个人健康卡片", zh)
         self.assertIn('data-story-domain="sleep"', zh)
-        self.assertIn("Personal Health Story", en)
+        self.assertIn("Personal Health Card", en)
         self.assertIn("sleep duration", en)
 
     def test_no_recorded_domain_means_no_story_section(self):

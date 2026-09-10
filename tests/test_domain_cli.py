@@ -166,10 +166,10 @@ class DomainCliTests(unittest.TestCase):
                 subject = weight_truth_card.story_lexicon_for(domain)["subject"]
                 self.assertEqual(
                     weight_truth_card.story_product_name_for(domain),
-                    f"MediWise {subject}译报",
+                    f"MediWise {subject}健康卡片",
                 )
         self.assertEqual(
-            weight_truth_card.story_product_name_for("weight"), "MediWise 体重译报"
+            weight_truth_card.story_product_name_for("weight"), "MediWise 体重健康卡片"
         )
 
 

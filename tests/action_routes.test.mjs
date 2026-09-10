@@ -20,6 +20,7 @@ const weight = await import('../weight-manager/index.js');
 const sleep = await import('../sleep-tracker/index.js');
 const monitor = await import('../health-monitor/index.js');
 const wearable = await import('../wearable-sync/index.js');
+const goals = await import('../health-goals/index.js');
 const context = { log: () => {} };
 
 test('action adapters preserve fields, propagate errors, and complete core workflows', async () => {
@@ -51,6 +52,25 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   }, context);
   assert.equal(fetchedMember.status, 'ok');
   assert.equal(fetchedMember.result.member.name, '测试成员');
+
+  const rejectedGoal = await goals.execute({
+    action: 'create-health-goal', member_id: member.id,
+    params: {
+      domain: 'activity', goal_type: 'weekly_frequency', title: '每周运动两次',
+      target_value: 2, total_periods: 4, start_date: '2026-07-20', confirmed: false,
+    },
+  }, context);
+  assert.equal(rejectedGoal.status, 'error');
+
+  const createdGoal = await goals.execute({
+    action: 'create-health-goal', member_id: member.id,
+    params: {
+      domain: 'activity', goal_type: 'weekly_frequency', title: '每周运动两次',
+      target_value: 2, total_periods: 4, start_date: '2026-07-20', confirmed: true,
+    },
+  }, context);
+  assert.equal(createdGoal.status, 'ok');
+  const activityGoal = createdGoal.result.goal;
 
   for (const [date, value] of [['2026-07-20 08:00', 60], ['2026-07-22 08:00', 62]]) {
     const metric = await health.execute({
@@ -114,11 +134,11 @@ test('action adapters preserve fields, propagate errors, and complete core workf
     action: 'generate-weight-story-card', member_id: member.id,
     params: {
       days: 14, as_of: '2026-07-24', format: 'html', output_dir: weightStoryDir,
-      context_lines: ['仅用于译报路由测试'], seed: 'story-route-test',
+      context_lines: ['仅用于健康卡片路由测试'], seed: 'story-route-test',
     },
   }, context);
   assert.equal(weightStory.status, 'ok');
-  assert.equal(weightStory.result.product_name, 'MediWise 体重译报');
+  assert.equal(weightStory.result.product_name, 'MediWise 体重健康卡片');
   assert.equal(weightStory.result.analysis.management.method, 'daily_weight_median+theil_sen+parallel_recorded_lifestyle_summary');
   assert.equal(weightStory.result.analysis.management.synthesis.causal_claim, false);
   assert.equal(weightStory.result.card.style, weightStory.result.style_selection.selected_style.id);
@@ -127,7 +147,7 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   assert.equal(weightStory.result.style_history.saved, true);
   assert.equal(existsSync(weightStory.result.card.html_path), true);
   const weightStoryHtml = readFileSync(weightStory.result.card.html_path, 'utf8');
-  assert.match(weightStoryHtml, /MediWise 体重译报/);
+  assert.match(weightStoryHtml, /MediWise 体重健康卡片/);
   assert.match(weightStoryHtml, /class="analysis-note analysis-/);
   assert.match(weightStoryHtml, new RegExp(`data-style-id="${weightStory.result.card.style}"`));
   assert.doesNotMatch(weightStoryHtml, /测试成员/);
@@ -187,9 +207,42 @@ test('action adapters preserve fields, propagate errors, and complete core workf
 
   const exercise = await weight.execute({
     action: 'add-exercise', member_id: member.id,
-    params: { exercise_type: 'walking', duration: 30, calories_burned: 120 },
+    params: {
+      exercise_type: 'walking', duration: 30, distance_meters: 2400,
+      calories_burned: 120, exercise_date: '2026-07-22',
+    },
   }, context);
   assert.equal(exercise.status, 'ok');
+  assert.equal(exercise.result.record.distance_meters, 2400);
+  assert.equal(exercise.result.goal_updates.length, 1);
+  assert.equal(exercise.result.goal_updates[0].progress.checkin_count, 1);
+
+  const goalProgress = await goals.execute({
+    action: 'health-goal-progress', params: { goal_id: activityGoal.id, as_of: '2026-07-22' },
+  }, context);
+  assert.equal(goalProgress.status, 'ok');
+  assert.equal(goalProgress.result.progress.current_value, 1);
+
+  const secondGoalCheckin = await goals.execute({
+    action: 'health-goal-checkin',
+    params: { goal_id: activityGoal.id, occurred_at: '2026-07-24' },
+  }, context);
+  assert.equal(secondGoalCheckin.status, 'ok');
+  assert.equal(secondGoalCheckin.result.feedback.card_available, true);
+  assert.equal(secondGoalCheckin.result.new_milestones[0].milestone_type, 'rhythm');
+
+  const goalCardDir = join(dataDir, 'goal-card-test');
+  const goalCard = await goals.execute({
+    action: 'generate-goal-card',
+    params: { goal_id: activityGoal.id, format: 'html', output_dir: goalCardDir },
+  }, context);
+  assert.equal(goalCard.status, 'ok');
+  assert.equal(goalCard.result.card.product_name, 'MediWise 目标证据卡');
+  assert.equal(goalCard.result.card.meaning, 'rhythm');
+  assert.equal(goalCard.result.card.snapshot_frozen, true);
+  assert.equal(goalCard.result.card.share_safe, true);
+  assert.equal(existsSync(goalCard.result.card.html_path), true);
+  assert.doesNotMatch(readFileSync(goalCard.result.card.html_path, 'utf8'), /测试成员/);
 
   const sleepLog = await sleep.execute({
     action: 'sleep-log', member_id: member.id, params: { duration: 420, date: '2026-07-21' },
@@ -213,10 +266,10 @@ test('action adapters preserve fields, propagate errors, and complete core workf
   }, context);
   assert.equal(sleepStory.status, 'ok');
   assert.equal(sleepStory.result.domain, 'sleep');
-  assert.equal(sleepStory.result.product_name, 'MediWise 睡眠译报');
-  assert.equal(sleepStory.result.card.product_name, 'MediWise 睡眠译报');
+  assert.equal(sleepStory.result.product_name, 'MediWise 睡眠健康卡片');
+  assert.equal(sleepStory.result.card.product_name, 'MediWise 睡眠健康卡片');
   assert.equal(existsSync(sleepStory.result.card.svg_path), true);
-  assert.match(readFileSync(sleepStory.result.card.svg_path, 'utf8'), /MediWise 睡眠译报/);
+  assert.match(readFileSync(sleepStory.result.card.svg_path, 'utf8'), /MediWise 睡眠健康卡片/);
 
   const lab = await health.execute({
     action: 'add-lab-result', member_id: member.id,

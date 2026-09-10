@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/JuneYaooo/mediwise-health-suite/story-design/signal-frame.schema.json",
   "title": "MediWise Signal Frame",
-  "description": "Domain-neutral intermediate representation for MediWise 健康译报. Produced by shared/story/adapters/<domain>.py, consumed by the selector, the motion layer, and the renderers. Renderers must read all domain wording from `lexicon` and must never reference a specific domain, unit, or metric name directly.",
+  "description": "Domain-neutral intermediate representation for MediWise 健康卡片. Produced by shared/story/adapters/<domain>.py, consumed by the selector, the motion layer, and the renderers. Renderers must read all domain wording from `lexicon` and must never reference a specific domain, unit, or metric name directly.",
   "type": "object",
   "required": ["domain", "lexicon", "window", "series", "series_meta", "shape", "trend", "coverage", "facts", "limits"],
   "additionalProperties": false,

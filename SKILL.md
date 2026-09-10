@@ -1,13 +1,13 @@
 ---
 name: mediwise-health-suite
-description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, health cards, eight-domain health stories, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
+description: "Private local health assistant for Skills-compatible AI agents. Use for personal or family health records, medical files, metrics, medications, reminders, diet, weight, exercise, sleep, static health cards, user-confirmed goals, check-ins, milestone cards, pre-visit summaries, backups, and Apple Health or Gadgetbridge imports. Local SQLite storage is the default; optional cloud features require explicit setup."
 ---
 
 # MediWise Health Suite
 
 面向支持 Skills 的 AI Agent 的个人本地健康助手：记录、整理和追踪本人及家人的健康数据。支持 Hermes、OpenClaw、Claude Code、Codex、WorkBuddy，以及其他能够加载 Skills、访问本地文件并执行脚本的 Agent 工具。
 
-对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。图片汇总能力统一称为“健康记录卡片”，家庭概览版本称为“家庭健康记录卡片”；普通文字查询结果称为“文字健康摘要”，不要与图片卡片混称。
+对用户统一使用产品全名 **MediWise Health Suite**，首次提及后可简称 **MediWise**。`mediwise-health-tracker`、`diet-tracker` 等仅是内部模块 ID，不得作为产品别名。普通健康数据生成“健康卡片”，家庭概览称“家庭健康卡片”；用户明确设定目标且记录中出现节奏、恢复、连续稳定、半程或完成等新含义后，生成“目标证据卡”。普通文字查询结果称为“文字健康摘要”。
 
 ## 核心能力
 
@@ -20,13 +20,13 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - 查询能力：文字健康摘要、时间线、在用药、全家概览
 - **就医前摘要**：自动整理病情、既往史、在用药，生成文本/图片/PDF
 
-### 健康译报：八域观察与叙事
+### 健康卡片：八域观察与展示
 - 体重、睡眠、生命体征、摄入、活动、服药记录、记录行为和家庭记录共用 24 套叙事模板
 - 各域只读取自己的记录边界，陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
-- 体重译报是展示案例，不是能力边界；原有体重分析和经典卡片入口继续兼容
-- 默认脱敏；单域可导出自包含 HTML、动画 SVG 和 1080×1440 冻结 PNG，个人综合译报可把所有有记录域编成 1080×1920 MP4，并同时保留每个镜头的独立 PNG；家庭记录域不读取姓名，不比较成员
+- 体重健康卡片是展示案例，不是能力边界；原有体重分析和经典卡片入口继续兼容
+- 默认脱敏；单域可导出自包含 HTML、SVG 和 1080×1440 PNG；家庭记录域不读取姓名，不比较成员
 
-调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-report`；明确要个性化动态健康译报、小视频或多维分析但未点名域时，同一动作传 `focus=story` 和 `format=mp4`，发送结果里的 `video_artifact.mp4_path`，并按需发送 `video_artifact.scene_images` 中的独立 PNG。视频串联当前所有有有效记录的体重、睡眠、生命体征、摄入和活动域；现有 `story_artifact.svg_path` 仅作为最佳单域的兼容中间产物。用户明确点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的兼容动作 `generate-weight-story-card` 并传对应 `domain`；动作名虽然保留 weight，但产品能力不是体重专属。普通健康记录卡仍默认发送 PNG，家庭健康记录卡不附带个人故事产物。
+调用边界：用户要近期整体健康概览时，走 `mediwise-health-tracker` 的 `generate-health-card`（兼容动作 `generate-report`）；用户点名八域之一、指定模板或要求单独导出 HTML/PNG/SVG 时，走 `weight-manager` 的 `generate-domain-health-card` 并传对应 `domain`。`generate-weight-story-card` 仅作为旧 action ID 兼容。所有输出都是静态健康卡片，不生成视频。
 
 ### ✅ 2. 饮食追踪 (diet-tracker)
 - 每餐记录与食物条目管理
@@ -37,7 +37,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 ### ✅ 3. 体重管理 (weight-manager)
 - 目标设定：减重/增重/维持
 - 体重翻译器：区分单日波动与稳健长期趋势
-- 「MediWise 体重译报」展示案例：观察体重稳健方向与同期已有的摄入、活动、睡眠记录，生成默认脱敏的本地 HTML、动画 SVG 和 1080×1440 冻结 PNG
+- 「MediWise 体重健康卡片」展示案例：观察体重稳健方向与同期已有的摄入、活动、睡眠记录，生成默认脱敏的本地 HTML、SVG 和 1080×1440 PNG
 - 24 套差异化模板的可解释选择：按可用信号、场景、偏好、历史和探索概率推荐；每套有独立构图与主导内容，原经典航向版兼容入口继续保留
 - BMI/BMR/TDEE 计算
 - 运动记录与消耗追踪
@@ -59,6 +59,12 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 ### ✅ 6. 睡眠追踪 (sleep-tracker)
 - 睡眠时长与深睡、浅睡、REM、清醒分期记录
 - 每日分析、周趋势与历史查询
+
+### ✅ 7. 健康目标 (health-goals)
+- 仅在用户明确确认后创建行动目标，不根据普通健康读数推导目标
+- 自愿打卡、周期与累计进度、幂等里程碑
+- 手动运动和明确的设备活动记录可关联活动目标；普通步数不会自动打卡
+- 只在出现新行为含义时生成默认脱敏、使用冻结快照的静态目标证据卡；普通打卡不发卡
 
 ## 快速开始
 
@@ -84,9 +90,9 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
    "帮我记录今天血压 130/85，心率 72"
    ```
 
-3. **生成健康记录卡片**
+3. **生成健康卡片**
    ```
-   "帮我生成最近 7 天的健康记录卡片"
+   "帮我生成最近 7 天的健康卡片"
    ```
 
 4. **饮食记录**
@@ -99,11 +105,11 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
    "帮我设定一个减重目标，从 70kg 减到 65kg"
    ```
 
-6. **生成健康译报**
+6. **生成个性化单域健康卡片**
    ```
-   "根据最近 14 天的睡眠记录生成一张默认脱敏的动画译报"
+   "根据最近 14 天的睡眠记录生成一张默认脱敏的健康卡片"
    "用体重展示案例观察同期已有的体重、摄入、活动和睡眠记录"
-   "生成家庭记录译报，不显示姓名，也不比较成员"
+   "生成家庭健康卡片，不显示姓名，也不比较成员"
    ```
 
 7. **就医前准备**
@@ -119,8 +125,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **操作系统**: Linux / macOS / Windows
 - **Agent**: 能够加载 Skills、访问本地文件并执行脚本
 - **OpenClaw（如使用）**: 2026.3.0+
-- **Chrome / Chromium**: 生成本地 PNG 健康记录卡片、健康译报冻结 PNG、综合译报分镜、旧体重真相卡或 PDF 时需要；健康译报 HTML、动画 SVG 和纯文字记录、查询不需要
-- **FFmpeg / ffprobe**: 把综合译报分镜编码为本地 MP4 时需要；缺失时仍保留已生成的独立 PNG
+- **Chrome / Chromium**: 生成本地 PNG 健康卡片、目标证据卡、旧体重真相卡或 PDF 时需要；HTML、SVG 和纯文字记录、查询不需要
 
 ## 数据隐私
 
@@ -227,7 +232,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - **数据库**: SQLite（`medical.db` 与 `lifestyle.db` 分域存储，兼容旧版 `health.db`）
 - **脚本语言**: Python 3.8+
 - **Skill 框架**: 支持 Skills 的 AI Agent；OpenClaw 另有 action 路由适配
-- **模块化设计**: 6 个 skills（健康档案、饮食、体重、睡眠、监测、可穿戴）
+- **模块化设计**: 7 个 skills（健康档案、饮食、体重、睡眠、目标、监测、可穿戴）
 - **可选功能**: 后端 API、向量搜索（默认关闭）
 
 ## 许可证
@@ -240,4 +245,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**关键词**: 健康管理、医疗记录、家庭健康、健康译报、观察叙事、饮食追踪、体重管理、health management, medical records, family health, health story, observation, narration, diet tracking, weight management
+**关键词**: 健康管理、医疗记录、家庭健康、健康卡片、健康目标、打卡、目标证据卡、饮食追踪、体重管理、health management, medical records, family health, health cards, goals, check-ins, evidence cards, diet tracking, weight management

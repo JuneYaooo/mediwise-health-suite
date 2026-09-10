@@ -25,6 +25,7 @@ from health_db import (
     verify_member_ownership,
 )
 from validators import validate_date_optional
+from goal_engine import record_activity_source
 
 VALID_EXERCISE_TYPES = [
     "running", "walking", "cycling", "swimming", "strength", "yoga", "hiit", "other",
@@ -87,6 +88,20 @@ def add_exercise(args):
             output_json({"status": "error", "message": "运动时长必须为整数（分钟）"})
             return
 
+    distance_meters = None
+    if args.distance_meters is not None:
+        try:
+            distance_meters = float(args.distance_meters)
+            if distance_meters < 0 or distance_meters > 1000000:
+                output_json({"status": "error", "message": "运动距离应在 0-1000000 米范围内"})
+                return
+        except (ValueError, TypeError):
+            output_json({"status": "error", "message": "运动距离必须为数值（米）"})
+            return
+
+    source = str(args.source or "manual").strip()[:40] or "manual"
+    source_record_id = str(args.source_record_id or "").strip()[:120] or None
+
     calories_burned = 0
     if args.calories_burned is not None:
         try:
@@ -103,16 +118,27 @@ def add_exercise(args):
         now = now_iso()
         conn.execute(
             """INSERT INTO exercise_records
-               (id, member_id, exercise_type, exercise_name, duration, calories_burned,
-                exercise_date, exercise_time, intensity, note, created_at, is_deleted)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+               (id, member_id, exercise_type, exercise_name, duration, distance_meters,
+                calories_burned, exercise_date, exercise_time, intensity, source,
+                source_record_id, note, created_at, is_deleted)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
             (record_id, args.member_id, args.exercise_type, args.exercise_name,
-             duration, calories_burned, exercise_date, args.exercise_time,
-             args.intensity, args.note, now)
+             duration, distance_meters, calories_burned, exercise_date, args.exercise_time,
+             args.intensity, source, source_record_id, args.note, now)
         )
         conn.commit()
 
         record = row_to_dict(conn.execute("SELECT * FROM exercise_records WHERE id=?", (record_id,)).fetchone())
+
+    occurred_at = exercise_date + ((" " + args.exercise_time) if args.exercise_time else "")
+    goal_updates = record_activity_source(
+        args.member_id,
+        source_record_type="exercise_record",
+        source_record_id=record_id,
+        occurred_at=occurred_at,
+        duration_minutes=duration,
+        owner_id=args.owner_id,
+    )
 
     type_name = EXERCISE_TYPE_NAMES.get(args.exercise_type, args.exercise_type)
     msg_parts = [f"已记录{m['name']}的运动: {type_name}"]
@@ -125,6 +151,7 @@ def add_exercise(args):
         "status": "ok",
         "message": "，".join(msg_parts),
         "record": record,
+        "goal_updates": goal_updates,
     })
 
 
@@ -259,10 +286,13 @@ def main():
     p_add.add_argument("--exercise-type", required=True, help=f"运动类型: {', '.join(VALID_EXERCISE_TYPES)}")
     p_add.add_argument("--exercise-name", default=None, help="自定义名称（如'跑步5公里'）")
     p_add.add_argument("--duration", default=None, help="时长（分钟）")
+    p_add.add_argument("--distance-meters", default=None, help="距离（米）")
     p_add.add_argument("--calories-burned", default=None, help="消耗热量 kcal")
     p_add.add_argument("--exercise-date", default=None, help="运动日期 YYYY-MM-DD")
     p_add.add_argument("--exercise-time", default=None, help="运动时间 HH:MM")
     p_add.add_argument("--intensity", default=None, help="强度: low/medium/high")
+    p_add.add_argument("--source", default="manual", help="记录来源（默认 manual）")
+    p_add.add_argument("--source-record-id", default=None, help="外部来源记录 ID")
     p_add.add_argument("--note", default=None)
     p_add.add_argument("--owner-id", default=None)
 

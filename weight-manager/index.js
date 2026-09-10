@@ -208,10 +208,13 @@ const ROUTES = {
     const p = inputs.params ?? {};
     if (p.exercise_name) args.push('--exercise-name', p.exercise_name);
     if (p.duration != null) args.push('--duration', String(p.duration));
+    if (p.distance_meters != null) args.push('--distance-meters', String(p.distance_meters));
     if (p.calories_burned != null) args.push('--calories-burned', String(p.calories_burned));
     if (p.exercise_date) args.push('--exercise-date', p.exercise_date);
     if (p.exercise_time) args.push('--exercise-time', p.exercise_time);
     if (p.intensity) args.push('--intensity', p.intensity);
+    if (p.source) args.push('--source', p.source);
+    if (p.source_record_id) args.push('--source-record-id', p.source_record_id);
     if (p.note) args.push('--note', p.note);
     return { script: 'exercise.py', args };
   },
@@ -271,6 +274,10 @@ const ROUTES = {
     args: ['body-summary', '--member-id', inputs.member_id],
   }),
 };
+
+// Product-facing names; legacy weight/story action ids remain compatibility aliases.
+ROUTES['generate-domain-health-card'] = ROUTES['generate-weight-story-card'];
+ROUTES['select-health-card-style'] = ROUTES['select-weight-card-style'];
 
 /**
  * Run a Python script and return parsed JSON output.

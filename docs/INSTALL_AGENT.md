@@ -36,7 +36,7 @@ node --version
 - Git
 - 可用的 `pip`
 - 可用的 SQLite 3.x 命令行工具
-- 如需本地 PNG 健康记录卡片或 PDF：Chrome 或 Chromium
+- 如需本地 PNG 健康卡片或 PDF：Chrome 或 Chromium
 - 当前工具能够加载 Skills、访问本地文件并执行脚本
 - 如果使用 OpenClaw：OpenClaw 2026.3.0+
 
@@ -186,6 +186,6 @@ bash install-check.sh
 5. 已告诉用户重启或重新加载当前 Agent 的 Skills。
 6. 没有把 API Key、密码或健康数据写进仓库、聊天或测试文件。
 
-如用户要求本地健康记录卡片或 PDF，安装结果还必须报告 Chrome/Chromium 是否可用，并分别完成一次脱敏 PNG 和 PDF 冒烟；浏览器缺失时不得声称这两项功能可用。
+如用户要求本地健康卡片或 PDF，安装结果还必须报告 Chrome/Chromium 是否可用，并分别完成一次脱敏 PNG 和 PDF 冒烟；浏览器缺失时不得声称这两项功能可用。
 
 图片/PDF fallback 不属于基础安装完成标准。若本次明确配置了 fallback，则相应的 `test-vision` 或 `test-paddleocr`、`test-pdf` 与 `test-intake --input both` 必须通过；失败时只能报告该可选能力未启用，不能影响已经通过的基础安装结论。

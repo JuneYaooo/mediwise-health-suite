@@ -1,4 +1,4 @@
-"""Dynamic renderers for the MediWise 译报 card system.
+"""Dynamic renderers for the MediWise health-card system.
 
 Professional analysis is supplied by each domain's analysis module.  This module
 only changes narrative form and visual structure.  All 24 styles use the same

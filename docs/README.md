@@ -35,6 +35,7 @@ mediwise-health-suite/
 ├── mediwise-health-tracker/   # 成员、医疗记录、指标、用药、提醒和卡片
 ├── diet-tracker/              # 饮食记录与营养数据汇总
 ├── weight-manager/            # 体重、围度、运动和用户目标记录
+├── health-goals/              # 用户确认的行动目标、打卡、进度和目标证据卡
 ├── sleep-tracker/             # 睡眠记录与趋势汇总
 ├── health-monitor/            # 用户阈值和规则提醒
 ├── wearable-sync/             # 可穿戴导出文件导入
@@ -44,13 +45,14 @@ mediwise-health-suite/
 └── CHANGELOG.md               # 版本变更记录
 ```
 
-## 六个领域 Skill
+## 七个领域 Skill
 
 | 模块 | 职责 | 模块文档 |
 |---|---|---|
-| `mediwise-health-tracker` | 家庭成员、健康档案、指标、用药、提醒、附件和健康记录卡片 | [SKILL.md](../mediwise-health-tracker/SKILL.md) |
+| `mediwise-health-tracker` | 家庭成员、健康档案、指标、用药、提醒、附件和健康卡片 | [SKILL.md](../mediwise-health-tracker/SKILL.md) |
 | `diet-tracker` | 饮食记录、食物数据来源和营养汇总 | [SKILL.md](../diet-tracker/SKILL.md) |
 | `weight-manager` | 体重、围度、运动记录和用户目标 | [SKILL.md](../weight-manager/SKILL.md) |
+| `health-goals` | 用户确认的行动目标、打卡、进度和有意义阶段的目标证据卡 | [SKILL.md](../health-goals/SKILL.md) |
 | `sleep-tracker` | 睡眠时长、分期和趋势 | [SKILL.md](../sleep-tracker/SKILL.md) |
 | `health-monitor` | 配置阈值、趋势检查和提醒优先级 | [SKILL.md](../health-monitor/SKILL.md) |
 | `wearable-sync` | Apple Health、Gadgetbridge 和实验性设备来源 | [SKILL.md](../wearable-sync/SKILL.md) |

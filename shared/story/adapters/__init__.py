@@ -93,10 +93,10 @@ def lexicon_for_analysis(
     return reader(dict(analysis or {}))
 
 
-# The lexicon fills the subject slot: 体重译报 / 睡眠译报 / 记录译报.  It lives here
+# The lexicon fills the subject slot: 体重健康卡片 / 睡眠健康卡片 / 记录健康卡片.
 # rather than in `render` because both the renderer and the CLI envelope build the
 # name from it, and a second spelling of the template is a second thing to drift.
-PRODUCT_NAME_TEMPLATE = "MediWise %s译报"
+PRODUCT_NAME_TEMPLATE = "MediWise %s健康卡片"
 
 
 def product_name_for(domain: str = DEFAULT_DOMAIN) -> str:
