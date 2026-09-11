@@ -220,14 +220,18 @@ def calorie_balance(args):
     try:
         # Get daily calorie intake from diet_records
         rows = lifestyle_conn.execute(
-            """SELECT meal_date, SUM(total_calories) as calories
+            """SELECT meal_date, SUM(total_calories) as calories,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0
                GROUP BY meal_date
                ORDER BY meal_date""",
             (args.member_id, start.isoformat(), end.isoformat())
         ).fetchall()
-        date_map = {r["meal_date"]: r["calories"] or 0 for r in rows}
+        # 只有已解析日进入摄入统计。未解析日的摄入是"不知道"，不是 0——
+        # 计入分母等于把"不知道吃了多少"平均成"吃得很少"，直接污染热量收支。
+        date_map = {r["meal_date"]: r["calories"] for r in rows if not r["calories_unknown"]}
+        unresolved_days = sum(1 for r in rows if r["calories_unknown"])
 
         # Get daily exercise calories burned
         exercise_rows = lifestyle_conn.execute(
@@ -245,24 +249,25 @@ def calorie_balance(args):
     current = start
     while current <= end:
         ds = current.isoformat()
-        intake = date_map.get(ds, 0)
+        intake = date_map.get(ds)      # None = 该日没有可用的摄入记录
         burned = burned_map.get(ds, 0)
         entry = {
             "date": ds,
-            "intake": round(intake, 1),
+            "intake": round(intake, 1) if intake is not None else None,
             "burned": round(burned, 1),
         }
         if daily_target:
             entry["target"] = daily_target
-            entry["balance"] = round(intake - daily_target, 1)
+            entry["balance"] = round(intake - daily_target, 1) if intake is not None else None
         daily.append(entry)
         current += timedelta(days=1)
 
-    total_intake = sum(d["intake"] for d in daily)
+    known_intake = [d["intake"] for d in daily if d["intake"] is not None]
+    total_intake = sum(known_intake) if known_intake else None
     total_burned = sum(d["burned"] for d in daily)
     intake_days = len(date_map)
     activity_days = len(burned_map)
-    avg_intake = round(total_intake / intake_days, 1) if intake_days else 0
+    avg_intake = round(total_intake / intake_days, 1) if intake_days else None
     avg_burned = round(total_burned / activity_days, 1) if activity_days else 0
 
     result = {
@@ -271,9 +276,13 @@ def calorie_balance(args):
         "days": days,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "daily": daily,
-        "total_intake": round(total_intake, 1),
+        "total_intake": round(total_intake, 1) if total_intake is not None else None,
         "total_burned": round(total_burned, 1),
-        "intake_record_days": intake_days,
+        "intake_record_days": len(rows),
+        # 平均值的分母是"摄入已解析的天数"，不是"有记录的天数"——
+        # 两个数字都给出来，调用方才能判断这个均值覆盖了多少天。
+        "intake_resolved_days": intake_days,
+        "intake_unresolved_days": unresolved_days,
         "activity_record_days": activity_days,
         "average_intake_on_recorded_days": avg_intake,
         "average_activity_burn_on_recorded_days": avg_burned,
@@ -281,7 +290,9 @@ def calorie_balance(args):
     }
     if daily_target:
         result["daily_calorie_target"] = daily_target
-        result["average_balance"] = round(avg_intake - daily_target, 1)
+        result["average_balance"] = (
+            round(avg_intake - daily_target, 1) if avg_intake is not None else None
+        )
     output_json(result)
 
 
@@ -315,7 +326,8 @@ def weekly_report(args):
             """SELECT meal_date, SUM(total_calories) as calories,
                       SUM(total_protein) as protein,
                       SUM(total_fat) as fat,
-                      SUM(total_carbs) as carbs
+                      SUM(total_carbs) as carbs,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0
                GROUP BY meal_date
@@ -324,7 +336,14 @@ def weekly_report(args):
         ).fetchall()
         diet_daily = rows_to_list(diet_rows)
         diet_days = len(diet_daily)
-        avg_calories = round(sum(d["calories"] or 0 for d in diet_daily) / diet_days, 1) if diet_days > 0 else 0
+        # 未解析日不进日均：否则"不知道吃了多少"会被当成"吃得少"，
+        # 进而产出"低于用户设置目标"这类凭空结论。
+        resolved_daily = [d for d in diet_daily if not d["calories_unknown"]]
+        diet_unresolved_days = diet_days - len(resolved_daily)
+        avg_calories = (
+            round(sum(d["calories"] for d in resolved_daily) / len(resolved_daily), 1)
+            if resolved_daily else None
+        )
 
         # Exercise data
         exercise_rows = lifestyle_conn.execute(
@@ -358,7 +377,8 @@ def weekly_report(args):
     suggestions = []
     if goal:
         target = goal["daily_calorie_target"]
-        if target and avg_calories > 0:
+        # avg_calories 为 None 时（本周没有已解析的摄入记录）不下任何比较结论
+        if target and avg_calories is not None:
             if avg_calories > target * 1.1:
                 suggestions.append(f"本周饮食记录日日均热量 {avg_calories} kcal，高于用户设置目标 {target} kcal")
             elif avg_calories < target * 0.8:
@@ -382,8 +402,12 @@ def weekly_report(args):
 
     if not weight_records:
         suggestions.append("本周无体重记录")
-    if diet_days < 3:
-        suggestions.append(f"本周只有 {diet_days} 个饮食记录日，汇总可能不完整")
+    if diet_unresolved_days:
+        suggestions.append(
+            f"本周有 {diet_unresolved_days} 个饮食记录日的营养数据未解析，未计入日均热量"
+        )
+    if diet_days and len(resolved_daily) < 3:
+        suggestions.append(f"本周只有 {len(resolved_daily)} 个营养已解析的饮食日，汇总可能不完整")
 
     # Exercise suggestions
     if exercise_count == 0:
@@ -403,7 +427,9 @@ def weekly_report(args):
         },
         "diet": {
             "days_recorded": diet_days,
-            "daily": diet_daily,
+            "days_unresolved": diet_unresolved_days,
+            "days_resolved": len(resolved_daily),
+            "daily": [{k: v for k, v in d.items() if k != "calories_unknown"} for d in diet_daily],
             "average_calories": avg_calories,
         },
         "exercise": {
@@ -516,7 +542,8 @@ def diet_weight_correlation(args):
     lifestyle_conn = get_lifestyle_connection()
     try:
         diet_rows = lifestyle_conn.execute(
-            """SELECT meal_date, SUM(total_calories) as intake
+            """SELECT meal_date, SUM(total_calories) as intake,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as intake_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date BETWEEN ? AND ? AND is_deleted=0
                GROUP BY meal_date""",
@@ -532,7 +559,12 @@ def diet_weight_correlation(args):
     finally:
         lifestyle_conn.close()
 
-    intake_by_day = {r["meal_date"]: round(r["intake"] or 0, 1) for r in diet_rows}
+    # 未解析日不进相关性分析：摄入是"不知道"，把它当 0 会凭空造出一条数据点
+    intake_by_day = {
+        r["meal_date"]: round(r["intake"] or 0, 1)
+        for r in diet_rows if not r["intake_unknown"]
+    }
+    diet_unresolved_days = sum(1 for r in diet_rows if r["intake_unknown"])
     burned_by_day = {r["exercise_date"]: round(r["burned"] or 0, 1) for r in exercise_rows}
 
     daily = []
@@ -561,6 +593,7 @@ def diet_weight_correlation(args):
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "actual_weight_change": actual_change,
         "diet_days_recorded": diet_days_count,
+        "diet_days_unresolved": diet_unresolved_days,
         "activity_days_recorded": activity_days_count,
         "daily": daily,
         "note": "仅并列展示已记录数据，不推断热量缺口、因果关系或理论体重变化",

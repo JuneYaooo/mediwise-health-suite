@@ -259,12 +259,35 @@ def _query_lifestyle_summary(member_id: str, days: int) -> dict:
         row = conn.execute(
             """SELECT COUNT(DISTINCT meal_date) AS days, SUM(total_calories) AS calories,
                       SUM(total_protein) AS protein, SUM(total_fat) AS fat,
-                      SUM(total_carbs) AS carbs, SUM(total_fiber) AS fiber
+                      SUM(total_carbs) AS carbs, SUM(total_fiber) AS fiber,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) AS calories_unknown,
+                      MAX(CASE WHEN total_protein  IS NULL THEN 1 ELSE 0 END) AS protein_unknown,
+                      MAX(CASE WHEN total_fat      IS NULL THEN 1 ELSE 0 END) AS fat_unknown,
+                      MAX(CASE WHEN total_carbs    IS NULL THEN 1 ELSE 0 END) AS carbs_unknown,
+                      MAX(CASE WHEN total_fiber    IS NULL THEN 1 ELSE 0 END) AS fiber_unknown,
+                      COUNT(DISTINCT CASE WHEN total_calories IS NOT NULL THEN meal_date END) AS calories_days,
+                      COUNT(DISTINCT CASE WHEN total_protein  IS NOT NULL THEN meal_date END) AS protein_days,
+                      COUNT(DISTINCT CASE WHEN total_fat      IS NOT NULL THEN meal_date END) AS fat_days,
+                      COUNT(DISTINCT CASE WHEN total_carbs    IS NOT NULL THEN meal_date END) AS carbs_days,
+                      COUNT(DISTINCT CASE WHEN total_fiber    IS NOT NULL THEN meal_date END) AS fiber_days
                FROM diet_records WHERE member_id=? AND is_deleted=0 AND meal_date>=?""", (member_id, cutoff)).fetchone()
+        # diet_days 保持"有记录即计"的原义：它门控饮食段落是否出现
+        # （_has_lifestyle_data / _has_timeline_data），改义会让饮食段落静默消失。
         diet_days = int(row["days"] or 0)
         result["diet_days"] = diet_days
+        nutrition_days = int(row["calories_days"] or 0)
+        result["diet_nutrition_days"] = nutrition_days
+        result["diet_days_unresolved"] = diet_days - nutrition_days
         if diet_days:
-            result["diet"] = {key: float(row[key] or 0) / diet_days for key in ("calories", "protein", "fat", "carbs", "fiber")}
+            # 日均逐字段用自己的"已解析天数"作分母：条目没给 fiber 是常态，
+            # 用统一分母必然对某一项说谎。未知一律为 None，由渲染层印成 —。
+            result["diet"] = {}
+            for key in ("calories", "protein", "fat", "carbs", "fiber"):
+                field_days = int(row[f"{key}_days"] or 0)
+                result["diet"][key] = (
+                    None if row[f"{key}_unknown"] or not field_days
+                    else float(row[key]) / field_days
+                )
             recent_diet = conn.execute(
                 """SELECT meal_date, SUM(total_calories) AS calories, SUM(total_protein) AS protein,
                           SUM(total_fat) AS fat, SUM(total_carbs) AS carbs, SUM(total_fiber) AS fiber
@@ -655,7 +678,7 @@ def _lifestyle_sleep(lifestyle: dict, sleep: dict, locale: str, section_number: 
     if diet:
         intake = f'''<div class="{intake_class}"><div class="eyebrow">{c["recorded_intake"]}</div>
           <div class="big blue">{_fmt_number(diet["calories"])} <small>kcal</small></div>
-          <div class="muted">{c["daily_average"]} · {_count_phrase(locale, lifestyle["diet_days"], "个饮食记录日", "food log day")}</div>
+          <div class="muted">{c["daily_average"]} · {_count_phrase(locale, lifestyle.get("diet_nutrition_days", 0), "个营养记录日", "nutrition log day")}</div>
           <div class="macro"><span>{c["protein"]}<b>{_fmt_number(diet["protein"])}g</b></span><span>{c["carbs"]}<b>{_fmt_number(diet["carbs"])}g</b></span><span>{c["fat"]}<b>{_fmt_number(diet["fat"])}g</b></span><span>{c["fiber"]}<b>{_fmt_number(diet["fiber"])}g</b></span></div></div>'''
     else:
         intake = f'<div class="{intake_class}"><div class="eyebrow">{c["recorded_intake"]}</div><div class="empty compact">{c["no_diet"]}</div></div>'

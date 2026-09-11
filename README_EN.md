@@ -219,6 +219,8 @@ MediWise does not write nutrition values from model memory. It looks up a tracea
 
 The repository does not bundle a food database. Without one of the configured sources above, photo-based food recognition can identify candidate foods but cannot save nutrition values until the user supplies a label or approves a source.
 
+The meal itself is still recorded when nutrition cannot be resolved — recording *what* was eaten is the point, and throwing the entry away would lose it. What is never recorded is a made-up number: the nutrition columns are stored as `NULL` (unknown), not `0`, the affected items are flagged `[未解析营养]` in their note, and the response carries `nutrition_status: "unresolved"` plus an `action_required` field telling the host agent to ask the user for a label or to point at a data source. `0` is reserved for a confirmed zero, such as water or black coffee. Summaries treat a `NULL` day as unknown: it is reported as an unresolved day and left out of every average, so a meal with no resolvable source can never turn into a fabricated calorie balance.
+
 To keep food lookup fully offline, say:
 
 ```text

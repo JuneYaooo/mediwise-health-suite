@@ -27,6 +27,11 @@ from health_db import (
     verify_member_ownership,
 )
 
+# 与 diet.py 的记录级营养列一致。NULL = 未知（未解析），0 = 确认是零。
+_NUTRITION_FIELDS = ("calories", "protein", "fat", "carbs", "fiber")
+_FIELD_LABELS = {"calories": "热量", "protein": "蛋白质", "fat": "脂肪",
+                 "carbs": "碳水", "fiber": "膳食纤维"}
+
 
 def _get_active_goal(conn, member_id: str) -> dict | None:
     row = conn.execute(
@@ -39,7 +44,14 @@ def _get_active_goal(conn, member_id: str) -> dict | None:
 
 
 def _get_daily_intake(member_id: str, date_str: str) -> dict:
-    """从 diet_records 获取指定日期的营养摄入合计。"""
+    """从 diet_records 获取指定日期的营养摄入合计。
+
+    字段值 None 表示未知（当天有记录但营养未解析），0 表示确认是零。
+    两种"零摄入"必须分开：
+      has_records False — 当天没有任何记录
+      has_records True + 字段为 None — 记了，但营养未解析
+    旧写法把两者都返回 0，于是"不知道吃了多少"被当成"没吃"参与目标对比。
+    """
     conn = get_lifestyle_connection()
     try:
         row = conn.execute(
@@ -48,24 +60,42 @@ def _get_daily_intake(member_id: str, date_str: str) -> dict:
                  SUM(total_protein)  as protein,
                  SUM(total_fat)      as fat,
                  SUM(total_carbs)    as carbs,
-                 SUM(total_fiber)    as fiber
+                 SUM(total_fiber)    as fiber,
+                 COUNT(*) as record_count,
+                 MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown,
+                 MAX(CASE WHEN total_protein  IS NULL THEN 1 ELSE 0 END) as protein_unknown,
+                 MAX(CASE WHEN total_fat      IS NULL THEN 1 ELSE 0 END) as fat_unknown,
+                 MAX(CASE WHEN total_carbs    IS NULL THEN 1 ELSE 0 END) as carbs_unknown,
+                 MAX(CASE WHEN total_fiber    IS NULL THEN 1 ELSE 0 END) as fiber_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date=? AND is_deleted=0""",
             (member_id, date_str)
         ).fetchone()
     finally:
         conn.close()
-    return {
-        "calories": round(row["calories"] or 0, 1),
-        "protein":  round(row["protein"]  or 0, 1),
-        "fat":      round(row["fat"]      or 0, 1),
-        "carbs":    round(row["carbs"]    or 0, 1),
-        "fiber":    round(row["fiber"]    or 0, 1),
-    } if row else {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0}
+
+    has_records = bool(row and row["record_count"])
+    intake = {}
+    unresolved_fields = []
+    for f in _NUTRITION_FIELDS:
+        if not has_records or row[f"{f}_unknown"]:
+            intake[f] = None
+            if has_records:
+                unresolved_fields.append(f)
+        else:
+            intake[f] = round(row[f], 1)
+    intake["has_records"] = has_records
+    intake["unresolved"] = bool(unresolved_fields)
+    intake["unresolved_fields"] = unresolved_fields
+    return intake
 
 
 def _compare(intake: dict, goal: dict) -> dict:
-    """计算摄入与目标的差距和达标情况。"""
+    """计算摄入与目标的差距和达标情况。
+
+    未知字段一律跳过：把 None 当 0 对比，会凭空产出
+    "记录值为用户设置目标的 0.0%"这类结论。
+    """
     result = {}
     fields = {
         "calories": ("kcal", 0.9, 1.1),   # 达标区间：90-110%
@@ -76,8 +106,8 @@ def _compare(intake: dict, goal: dict) -> dict:
     }
     for field, (unit, lo, hi) in fields.items():
         target = goal.get(f"{field}_g") if field != "calories" else goal.get("calories")
-        actual = intake.get(field, 0)
-        if target is None or target == 0:
+        actual = intake.get(field)
+        if target is None or target == 0 or actual is None:
             continue
         pct = round(actual / target * 100, 1)
         gap = round(actual - target, 1)
@@ -210,13 +240,14 @@ def cmd_daily(args):
     issues = []
     for field, data in comparison.items():
         if data["status"] == "low":
-            label = {"calories": "热量", "protein": "蛋白质",
-                     "fat": "脂肪", "carbs": "碳水", "fiber": "膳食纤维"}.get(field, field)
-            issues.append(f"{label}记录值为用户设置目标的 {data['pct']}%（低于目标范围）")
+            issues.append(f"{_FIELD_LABELS.get(field, field)}记录值为用户设置目标的 {data['pct']}%（低于目标范围）")
         elif data["status"] == "high":
-            label = {"calories": "热量", "protein": "蛋白质",
-                     "fat": "脂肪", "carbs": "碳水", "fiber": "膳食纤维"}.get(field, field)
-            issues.append(f"{label}记录值为用户设置目标的 {data['pct']}%（高于目标范围）")
+            issues.append(f"{_FIELD_LABELS.get(field, field)}记录值为用户设置目标的 {data['pct']}%（高于目标范围）")
+
+    # 没有可判断的摄入值就不下"是否达标"的结论——未知不是未达标，也不是达标。
+    # 当天根本没记录同样不可判断，`_compare` 只会得到一个空对比表。
+    unresolved_fields = intake["unresolved_fields"]
+    judgeable = intake["has_records"] and not unresolved_fields
 
     output_json({
         "status": "ok",
@@ -225,7 +256,8 @@ def cmd_daily(args):
         "goal_id": goal["id"],
         "comparison": comparison,
         "issues": issues,
-        "on_track": len(issues) == 0,
+        "unresolved_fields": unresolved_fields,
+        "on_track": len(issues) == 0 if judgeable else None,
     })
 
 
@@ -252,34 +284,45 @@ def cmd_weekly(args):
 
     daily = []
     on_track_days = 0
+    judged_days = 0
     current = start
     while current <= end:
         ds = current.isoformat()
         intake = _get_daily_intake(args.member_id, ds)
-        has_data = intake["calories"] > 0
-        if has_data:
+        if not intake["has_records"]:
+            # 没记录：与"记了但未解析"是两回事，分开表达
+            daily.append({"date": ds, "intake": intake, "on_track": None, "no_data": True})
+        elif intake["unresolved"]:
+            # 未解析：没有可判断的摄入值，不下达标结论，也不进达标率分母
+            daily.append({
+                "date": ds, "intake": intake, "on_track": None,
+                "unresolved": True, "unresolved_fields": intake["unresolved_fields"],
+            })
+        else:
             comparison = _compare(intake, goal)
-            on_track = all(v["status"] == "ok" for v in comparison.values())
+            on_track = all(v["status"] == "ok" for v in comparison.values()) if comparison else None
             if on_track:
                 on_track_days += 1
+            if on_track is not None:
+                judged_days += 1
             daily.append({
                 "date": ds,
                 "intake": intake,
                 "on_track": on_track,
                 "issues": [f for f, d in comparison.items() if d["status"] != "ok"],
             })
-        else:
-            daily.append({"date": ds, "intake": intake, "on_track": None, "no_data": True})
         current += timedelta(days=1)
 
-    recorded_days = sum(1 for d in daily if not d.get("no_data"))
     output_json({
         "status": "ok",
         "days": days,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "recorded_days": recorded_days,
+        "recorded_days": sum(1 for d in daily if not d.get("no_data")),
+        "unresolved_days": sum(1 for d in daily if d.get("unresolved")),
+        "judged_days": judged_days,
         "on_track_days": on_track_days,
-        "on_track_rate": round(on_track_days / recorded_days * 100, 1) if recorded_days else 0,
+        # 分母是"能判断的天数"：未解析天既非达标也非未达标，计入会凭空拉低达标率
+        "on_track_rate": round(on_track_days / judged_days * 100, 1) if judged_days else None,
         "goal": goal,
         "daily": daily,
     })

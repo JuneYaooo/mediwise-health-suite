@@ -15,6 +15,9 @@ setup_mediwise_path()
 from health_db import ensure_db, get_medical_connection, get_lifestyle_connection, rows_to_list, output_json, verify_member_ownership
 from metric_utils import get_member_or_error
 
+# 与 diet.py 的记录级营养列一致。NULL = 未知（未解析），0 = 确认是零。
+_NUTRITION_FIELDS = ("calories", "protein", "fat", "carbs", "fiber")
+
 
 def _get_member(member_id, owner_id=None):
     medical_conn = get_medical_connection()
@@ -49,7 +52,12 @@ def weekly_summary(args):
                       SUM(total_protein) as protein,
                       SUM(total_fat) as fat,
                       SUM(total_carbs) as carbs,
-                      SUM(total_fiber) as fiber
+                      SUM(total_fiber) as fiber,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown,
+                      MAX(CASE WHEN total_protein  IS NULL THEN 1 ELSE 0 END) as protein_unknown,
+                      MAX(CASE WHEN total_fat      IS NULL THEN 1 ELSE 0 END) as fat_unknown,
+                      MAX(CASE WHEN total_carbs    IS NULL THEN 1 ELSE 0 END) as carbs_unknown,
+                      MAX(CASE WHEN total_fiber    IS NULL THEN 1 ELSE 0 END) as fiber_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0
                GROUP BY meal_date
@@ -60,24 +68,31 @@ def weekly_summary(args):
         lifestyle_conn.close()
     daily = rows_to_list(rows)
 
-    # Compute weekly averages
-    days_with_data = len(daily)
-    if days_with_data > 0:
-        avg = {
-            "calories": round(sum(d["calories"] or 0 for d in daily) / days_with_data, 1),
-            "protein": round(sum(d["protein"] or 0 for d in daily) / days_with_data, 1),
-            "fat": round(sum(d["fat"] or 0 for d in daily) / days_with_data, 1),
-            "carbs": round(sum(d["carbs"] or 0 for d in daily) / days_with_data, 1),
-            "fiber": round(sum(d["fiber"] or 0 for d in daily) / days_with_data, 1),
-        }
-    else:
-        avg = {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0}
+    # 未解析日不进均值：把它当 0 等于把"不知道吃了多少"平均成"吃得很少"。
+    # 分母逐字段各算——同一天可能热量已知而 fiber 未知（条目没给 fiber），
+    # 用一个统一分母就必然对某一项说谎。
+    # 逐日标记而非只依赖 SUM：SQLite 的 SUM 仅在整组皆 NULL 时返回 NULL，
+    # 混合组会漏出部分和，而部分和读起来就是一个真实的数字。
+    avg = {}
+    days_averaged = {}
+    for f in _NUTRITION_FIELDS:
+        known = [d[f] for d in daily if not d.get(f"{f}_unknown")]
+        days_averaged[f] = len(known)
+        avg[f] = round(sum(known) / len(known), 1) if known else None
+
+    unresolved_days = sum(1 for d in daily if d.get("calories_unknown"))
+    # daily 只保留公开列，unknown 标记已由 unresolved_days 与 average 的 null 表达
+    for d in daily:
+        for f in _NUTRITION_FIELDS:
+            d.pop(f"{f}_unknown", None)
 
     output_json({
         "status": "ok",
         "member_name": m["name"],
         "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "days_with_data": days_with_data,
+        "days_with_data": len(daily),
+        "unresolved_days": unresolved_days,
+        "days_averaged": days_averaged,
         "daily": daily,
         "average": avg,
     })
@@ -98,7 +113,8 @@ def calorie_trend(args):
     lifestyle_conn = get_lifestyle_connection()
     try:
         rows = lifestyle_conn.execute(
-            """SELECT meal_date, SUM(total_calories) as calories
+            """SELECT meal_date, SUM(total_calories) as calories,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown
                FROM diet_records
                WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0
                GROUP BY meal_date
@@ -109,23 +125,27 @@ def calorie_trend(args):
         lifestyle_conn.close()
     daily = rows_to_list(rows)
 
-    # Fill in missing days with 0
-    date_map = {d["meal_date"]: d["calories"] or 0 for d in daily}
+    # 只收已解析日。未解析日既不入 trend 也不入分母——
+    # 旧写法把未记录日和未解析日都按 0 计入，等于用"没吃"拉低均值。
+    date_map = {d["meal_date"]: d["calories"] for d in daily if not d.get("calories_unknown")}
     trend = []
     current = start
     while current <= end:
         ds = current.isoformat()
-        trend.append({"date": ds, "calories": date_map.get(ds, 0)})
+        # 缺失即为 null（不知道），不是 0（没吃）
+        trend.append({"date": ds, "calories": date_map.get(ds)})
         current += timedelta(days=1)
 
-    total = sum(d["calories"] for d in trend)
-    avg = round(total / days, 1) if days > 0 else 0
+    recorded = [t["calories"] for t in trend if t["calories"] is not None]
+    total = sum(recorded) if recorded else None
+    avg = round(total / len(recorded), 1) if recorded else None
 
     output_json({
         "status": "ok",
         "member_name": m["name"],
         "days": days,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
+        "days_recorded": len(recorded),
         "trend": trend,
         "total_calories": total,
         "average_daily": avg,
@@ -151,27 +171,54 @@ def nutrition_balance(args):
                       SUM(total_protein) as protein,
                       SUM(total_fat) as fat,
                       SUM(total_carbs) as carbs,
-                      SUM(total_fiber) as fiber
+                      SUM(total_fiber) as fiber,
+                      MAX(CASE WHEN total_calories IS NULL THEN 1 ELSE 0 END) as calories_unknown,
+                      MAX(CASE WHEN total_protein  IS NULL THEN 1 ELSE 0 END) as protein_unknown,
+                      MAX(CASE WHEN total_fat      IS NULL THEN 1 ELSE 0 END) as fat_unknown,
+                      MAX(CASE WHEN total_carbs    IS NULL THEN 1 ELSE 0 END) as carbs_unknown,
+                      MAX(CASE WHEN total_fiber    IS NULL THEN 1 ELSE 0 END) as fiber_unknown,
+                      COUNT(DISTINCT CASE WHEN total_calories IS NOT NULL THEN meal_date END) as calories_days,
+                      COUNT(DISTINCT CASE WHEN total_protein  IS NOT NULL THEN meal_date END) as protein_days,
+                      COUNT(DISTINCT CASE WHEN total_fat      IS NOT NULL THEN meal_date END) as fat_days,
+                      COUNT(DISTINCT CASE WHEN total_carbs    IS NOT NULL THEN meal_date END) as carbs_days,
+                      COUNT(DISTINCT CASE WHEN total_fiber    IS NOT NULL THEN meal_date END) as fiber_days
                FROM diet_records
                WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0""",
             (args.member_id, start.isoformat(), end.isoformat())
         ).fetchone()
+
+        # 有记录的日子（含未解析）——用来区分"整周没记"与"记了但没解析"
+        days_with_data = lifestyle_conn.execute(
+            """SELECT COUNT(DISTINCT meal_date) FROM diet_records
+               WHERE member_id=? AND meal_date>=? AND meal_date<=? AND is_deleted=0""",
+            (args.member_id, start.isoformat(), end.isoformat())
+        ).fetchone()[0]
     finally:
         lifestyle_conn.close()
-    protein = (row["protein"] or 0) if row else 0
-    fat = (row["fat"] or 0) if row else 0
-    carbs = (row["carbs"] or 0) if row else 0
-    fiber = (row["fiber"] or 0) if row else 0
-    calories = (row["calories"] or 0) if row else 0
 
-    total_macro_g = protein + fat + carbs
+    # 窗口内任一记录该字段未知，则合计未知——绝不把部分和当成合计。
+    # 窗口内一条记录都没有时 SUM 本就为 NULL，与"未知"同义（days_with_data 加以区分）。
+    def _field(f):
+        if row is None or row[f"{f}_unknown"]:
+            return None
+        return row[f]
+
+    protein = _field("protein")
+    fat = _field("fat")
+    carbs = _field("carbs")
+    fiber = _field("fiber")
+    calories = _field("calories")
+
+    # 三者皆已知才算比例。任一为 NULL 时算出来的是被未知拉歪的假比例。
     ratio = {}
-    if total_macro_g > 0:
-        ratio = {
-            "protein_pct": round(protein / total_macro_g * 100, 1),
-            "fat_pct": round(fat / total_macro_g * 100, 1),
-            "carbs_pct": round(carbs / total_macro_g * 100, 1),
-        }
+    if protein is not None and fat is not None and carbs is not None:
+        total_macro_g = protein + fat + carbs
+        if total_macro_g > 0:
+            ratio = {
+                "protein_pct": round(protein / total_macro_g * 100, 1),
+                "fat_pct": round(fat / total_macro_g * 100, 1),
+                "carbs_pct": round(carbs / total_macro_g * 100, 1),
+            }
 
     # Built-in comparison ranges. These are displayed as reference differences,
     # not interpreted as nutrition therapy or diet advice.
@@ -196,19 +243,19 @@ def nutrition_balance(args):
         "member_name": m["name"],
         "days": days,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
+        "days_with_data": days_with_data,
         "totals": {
-            "calories": round(calories, 1),
-            "protein": round(protein, 1),
-            "fat": round(fat, 1),
-            "carbs": round(carbs, 1),
-            "fiber": round(fiber, 1),
+            "calories": round(calories, 1) if calories is not None else None,
+            "protein": round(protein, 1) if protein is not None else None,
+            "fat": round(fat, 1) if fat is not None else None,
+            "carbs": round(carbs, 1) if carbs is not None else None,
+            "fiber": round(fiber, 1) if fiber is not None else None,
         },
+        # 分母是"该字段已知的日数"，不是窗口天数——用窗口天数会把未记录日算成没吃
         "daily_average": {
-            "calories": round(calories / days, 1) if days > 0 else 0,
-            "protein": round(protein / days, 1) if days > 0 else 0,
-            "fat": round(fat / days, 1) if days > 0 else 0,
-            "carbs": round(carbs / days, 1) if days > 0 else 0,
-            "fiber": round(fiber / days, 1) if days > 0 else 0,
+            f: (round(v / (row[f"{f}_days"] or 0), 1) if v is not None and row[f"{f}_days"] else None)
+            for f, v in (("calories", calories), ("protein", protein), ("fat", fat),
+                         ("carbs", carbs), ("fiber", fiber))
         },
         "macro_ratio": ratio,
         "assessment": assessment,

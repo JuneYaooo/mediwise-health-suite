@@ -653,6 +653,47 @@ def get_by_name(name: str) -> dict | None:
     return None
 
 
+def lookup(name: str) -> dict:
+    """单条食物解析入口，供写入路径使用。
+
+    与 get_by_name 的差别：不把"没有数据源"和"该食物不存在"混为一谈——两者
+    都返回 None，而调用方需要据此决定是让用户配置数据源还是提供营养标签。
+    状态语义沿用 search()，不另造词汇：
+      ok          — 命中，result 为营养记录
+      unavailable — 未配置任何数据源
+      not_found   — 数据源可用，但没有这个食物
+      error       — 已配置的来源查询失败
+    """
+    exact = get_by_name(name)
+    if exact:
+        return {
+            'status': 'ok', 'query': name,
+            'result': exact, 'source': exact.get('source'),
+        }
+
+    hit = search(name, limit=1, source='auto')
+    results = hit.get('results') or []
+    # search() 在 source='cfcd'/'brands' 分支会返回 status:'ok' 但 results 为空，
+    # 所以 status 与 results 要一起判断。
+    if hit.get('status') == 'ok' and results:
+        first = results[0]
+        return {
+            'status': 'ok', 'query': name, 'result': first,
+            'source': first.get('source') or hit.get('source'),
+        }
+
+    status = hit.get('status')
+    if status not in ('unavailable', 'not_found', 'error'):
+        # 'partial' 等模式的键名是 cfcd_results/usda_results，没有 results
+        status = 'not_found'
+    return {
+        'status': status,
+        'query': name,
+        'message': hit.get('message', ''),
+        'results': [],
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 数据库概况
 # ══════════════════════════════════════════════════════════════════════════════

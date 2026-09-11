@@ -7,6 +7,11 @@ import { join } from 'node:path';
 const dataDir = mkdtempSync(join(tmpdir(), 'mediwise-actions-'));
 process.env.MEDIWISE_DATA_DIR = dataDir;
 process.env.MEDIWISE_SINGLE_USER = '1';
+// Inherited from the developer's shell, these would silently turn "no source
+// configured" into "resolved", flipping the nutrition assertions below.
+delete process.env.USDA_API_KEY;
+delete process.env.OPENFOODFACTS_ENABLED;
+delete process.env.MEDIWISE_USDA_API_KEY;
 
 const health = await import('../mediwise-health-tracker/index.js');
 const diet = await import('../diet-tracker/index.js');
@@ -98,6 +103,32 @@ test('action adapters preserve fields, propagate errors, and complete core workf
     },
   }, context);
   assert.equal(meal.status, 'ok');
+  // Explicit values are an assertion: stored as given, never re-queried.
+  assert.equal(meal.result.nutrition_status, 'resolved');
+  assert.equal(meal.result.record.total_calories, 200);
+  assert.deepEqual(meal.result.unresolved_items, []);
+  // fiber was not supplied, so it stays unknown (NULL) rather than becoming 0.
+  // The field list documents that per-field contract: calories resolved while
+  // fiber is still pending.
+  assert.deepEqual(meal.result.nutrition_fields_pending, ['fiber']);
+  assert.equal(meal.result.record.total_fiber, null);
+
+  // No nutrition supplied and no data source configured: the meal is still
+  // saved, but nothing is invented — no 0 kcal, no ratio, and the caller is
+  // told what to ask the user for.
+  const unresolvedMeal = await diet.execute({
+    action: 'add-meal', member_id: member.id,
+    params: {
+      meal_type: 'dinner', meal_date: '2026-07-22',
+      items: [{ food_name: '未解析食物', amount: 100, unit: 'g' }],
+    },
+  }, context);
+  assert.equal(unresolvedMeal.status, 'ok');
+  assert.equal(unresolvedMeal.result.nutrition_status, 'unresolved');
+  assert.equal(unresolvedMeal.result.record.total_calories, null);
+  assert.equal(unresolvedMeal.result.unresolved_items[0].reason, 'unavailable');
+  assert.match(unresolvedMeal.result.action_required, /营养标签|数据源/);
+  assert.doesNotMatch(unresolvedMeal.result.message, /0(\.0)?\s*kcal/);
 
   const exercise = await weight.execute({
     action: 'add-exercise', member_id: member.id,

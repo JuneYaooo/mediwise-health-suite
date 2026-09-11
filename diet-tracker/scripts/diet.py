@@ -34,48 +34,110 @@ VALID_MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"]
 
 _GRAM_UNITS = {'g', '克', 'gram', 'grams'}
 
+# 记录级与条目级共用的营养列，顺序即响应中列出待补字段的顺序
+_NUTRITION_FIELDS = ("calories", "protein", "fat", "carbs", "fiber")
 
-def _autofill_item_nutrition(item: dict) -> dict:
-    """Auto-fill nutrition from food_lookup when user didn't provide calorie data."""
-    if item.get('calories'):
-        return item
+# diet_items 列名 → food_lookup 结果字段名
+_SOURCE_FIELDS = {
+    "calories": "kcal",
+    "protein": "protein",
+    "fat": "fat",
+    "carbs": "carbs",
+    "fiber": "fiber",
+}
+
+# 未解析条目的 note 前缀，对齐既有的 [自动填充] 惯例。
+# 落库的人文标记：NULL 是给机器看的信号，note 是给人看的。
+_UNRESOLVED_NOTES = {
+    "unavailable": "[未解析营养] 未配置食物数据源，营养值未知",
+    "not_found": "[未解析营养] 数据源中未找到该食物，营养值未知",
+    "error": "[未解析营养] 数据源查询失败，营养值未知",
+    "source_missing_field": "[未解析营养] 数据源命中但缺少热量等关键字段",
+}
+
+# 给宿主 Agent 转述用户的一句话，按未解析原因区分措辞——
+# "去配置数据源"和"这个食物不在库里"需要问用户的事情完全不同。
+_ACTION_REQUIRED = {
+    "unavailable": (
+        "请向用户索取包装营养标签（每 100g 或每份的热量/蛋白质/脂肪/碳水/膳食纤维），"
+        "或由配置 Agent 在取得用户同意后启用数据源（本地数据包 / USDA_API_KEY / "
+        "OPENFOODFACTS_ENABLED=1），然后用 add-item 补全。"
+    ),
+    "not_found": (
+        "数据源本身可用，但其中没有这些食物。"
+        "请向用户索取对应食物的营养标签，或用 add-item 补录已知营养值。"
+    ),
+    "error": "营养数据源查询失败，请稍后重试；确认数据源可用后再补录。",
+    "source_missing_field": (
+        "数据源命中了该食物，但缺少热量等关键字段。"
+        "请向用户核对包装营养标签后补录。"
+    ),
+}
+
+
+def _fmt_kcal(v):
+    """未知热量渲染为 —，绝不把 None 印成 0。"""
+    if v is None:
+        return "—"
+    return f"{v:g}"
+
+
+def _autofill_item_nutrition(item: dict) -> tuple[dict, dict]:
+    """解析条目的营养值，返回 (item, verdict)。
+
+    verdict 形如 {'reason': ...}，reason 取值：
+      provided             — 调用方已给出热量，不查询
+      resolved             — 从数据源解析成功
+      unavailable          — 未配置任何数据源
+      not_found            — 数据源可用，但没有这个食物
+      error                — 已配置的来源查询失败
+      source_missing_field — 命中但缺热量等关键字段
+
+    绝不用 0 代替未知：解析不到就不写营养键，由调用方落 NULL。
+    0 只能来自调用方的显式断言（如水、黑咖啡）。
+    """
+    if item.get('calories') is not None:
+        return item, {'reason': 'provided'}
     food_name = item.get('food_name', '')
     if not food_name:
-        return item
+        return item, {'reason': 'not_found', 'reason_text': '食物名称为空'}
+
     try:
         import food_lookup as _fl
-        result = _fl.get_by_name(food_name)
-        if not result:
-            # Exact match failed; try search and take the best result
-            hits = _fl.search(food_name, limit=1, source='auto')
-            if hits and hits.get('results'):
-                result = hits['results'][0]
-        if not result:
-            return item
-        # Scale per-100g sources by amount if user specified grams
-        amount = item.get('amount')
-        unit = (item.get('unit') or '').lower().strip()
-        scale = 1.0
-        if result.get('per') == '100g' and amount and unit in _GRAM_UNITS:
-            scale = float(amount) / 100.0
-
-        def _val(field):
-            v = result.get(field)
-            return round(v * scale, 1) if v is not None else 0
-
-        item = dict(item)
-        item['calories'] = _val('kcal')
-        item['protein'] = _val('protein')
-        item['fat'] = _val('fat')
-        item['carbs'] = _val('carbs')
-        item['fiber'] = _val('fiber')
-        if not item.get('note'):
-            item['note'] = f"[自动填充] 营养数据来源: {result.get('source_name', result.get('source', ''))}"
-        else:
-            item['note'] = f"[自动填充] {item['note']}"
+        found = _fl.lookup(food_name)
     except Exception as e:
-        _logger.warning("food_lookup auto-fill failed for '%s': %s", food_name, e)
-    return item
+        _logger.warning("food_lookup lookup failed for '%s': %s", food_name, e)
+        return item, {'reason': 'error', 'reason_text': str(e)}
+
+    if found.get('status') != 'ok' or not found.get('result'):
+        status = found.get('status')
+        if status not in _UNRESOLVED_NOTES:
+            status = 'not_found'
+        return item, {'reason': status, 'reason_text': found.get('message', '')}
+
+    result = found['result']
+    # Scale per-100g sources by amount if user specified grams
+    amount = item.get('amount')
+    unit = (item.get('unit') or '').lower().strip()
+    scale = 1.0
+    if result.get('per') == '100g' and amount and unit in _GRAM_UNITS:
+        scale = float(amount) / 100.0
+
+    item = dict(item)
+    for col, src in _SOURCE_FIELDS.items():
+        v = result.get(src)
+        item[col] = round(v * scale, 1) if v is not None else None
+
+    # 命中但热量为空 —— 不能假装解析成功。已知的其余字段照常保留。
+    if item.get('calories') is None:
+        return item, {'reason': 'source_missing_field'}
+
+    source_name = result.get('source_name', result.get('source', ''))
+    if item.get('note'):
+        item['note'] = f"[自动填充] {item['note']}"
+    else:
+        item['note'] = f"[自动填充] 营养数据来源: {source_name}"
+    return item, {'reason': 'resolved'}
 
 MEAL_TYPE_NAMES = {
     "breakfast": "早餐",
@@ -86,9 +148,13 @@ MEAL_TYPE_NAMES = {
 
 
 def _parse_items(items_json):
-    """Parse and validate items JSON array."""
+    """Parse and validate items JSON array.
+
+    返回 (items, unresolved)。unresolved 是未能解析营养的条目清单，
+    每项带 index/food_name/amount/unit/reason/reason_text，供响应透出。
+    """
     if not items_json:
-        return []
+        return [], []
     if isinstance(items_json, str):
         items = json.loads(items_json)
     else:
@@ -100,28 +166,105 @@ def _parse_items(items_json):
             raise ValueError(f"items[{i}] 必须为对象")
         if not item.get("food_name"):
             raise ValueError(f"items[{i}].food_name 不能为空")
-    return [_autofill_item_nutrition(item) for item in items]
+
+    resolved_items = []
+    unresolved = []
+    for i, item in enumerate(items):
+        filled, verdict = _autofill_item_nutrition(item)
+        reason = verdict.get('reason')
+        if reason not in ('provided', 'resolved'):
+            filled = dict(filled)
+            if not filled.get('note'):
+                filled['note'] = _UNRESOLVED_NOTES.get(reason, _UNRESOLVED_NOTES['not_found'])
+            unresolved.append({
+                "index": i,
+                "food_name": item.get("food_name", ""),
+                "amount": item.get("amount"),
+                "unit": item.get("unit"),
+                "reason": reason,
+                **({'reason_text': verdict['reason_text']} if verdict.get('reason_text') else {}),
+            })
+        resolved_items.append(filled)
+    return resolved_items, unresolved
+
+
+def _nutrition_summary(record, known, unresolved):
+    """构造响应的营养解析契约字段。
+
+    nutrition_status 只以热量为准，且描述的是**记录**而非单次操作——
+    add_item 追加一个已解析条目时，记录里原有的未解析条目依然存在。
+    record.total_calories 正是下游唯一能看到的信号，故以它为准：
+      resolved   — 记录级热量已知
+      partial    — 记录级热量未知，但至少有一个条目已知
+      unresolved — 所有条目热量都未知
+    nutrition_fields_pending 列出其余为 NULL 的记录级总计——只给了热量、
+    没给 fiber 的条目不应把整体判成"未解析"。
+    """
+    if record.get("total_calories") is not None:
+        status = "resolved"
+    elif known:
+        status = "partial"
+    else:
+        status = "unresolved"
+
+    pending = [c for c in _NUTRITION_FIELDS if record.get(f"total_{c}") is None]
+
+    summary = {
+        "nutrition_status": status,
+        "nutrition_fields_pending": pending,
+        "unresolved_items": unresolved,
+    }
+    if status != "resolved":
+        # 去重后拼接：一餐里可能同时存在"没有数据源"和"库里没这个食物"
+        seen = []
+        for u in unresolved:
+            action = _ACTION_REQUIRED.get(u["reason"])
+            if action and action not in seen:
+                seen.append(action)
+        summary["action_required"] = " ".join(seen)
+    return summary
+
+
+def _meal_message(member_name, meal_date, meal_name, items, record, summary):
+    """如实描述这次记录——未解析时绝不印出 "共0.0kcal"。"""
+    head = f"已记录{member_name}的{meal_date}{meal_name}（{len(items)}个食物"
+    status = summary["nutrition_status"]
+    if status == "resolved":
+        return f"{head}，共 {_fmt_kcal(record['total_calories'])}kcal）"
+    if status == "unresolved":
+        return f"{head}）。营养数据未解析，热量记为未知（未按 0 计）。"
+    known = sum(it["calories"] for it in items if it.get("calories") is not None)
+    return (
+        f"{head}，共 {len(summary['unresolved_items'])} 个未解析营养数据）。"
+        f"已知部分合计 {_fmt_kcal(known)}kcal，实际热量高于该值。"
+    )
 
 
 def _compute_totals(conn, record_id):
-    """Recompute and update totals for a diet record from its items."""
+    """Recompute and update totals for a diet record from its items.
+
+    未知（NULL）逐字段向上传播：只要有一个条目缺该项，记录级该项即 NULL。
+    部分和会静默低估（300 已知 + 未知 报成 300 会被读成真实的 300），
+    比"未知"更危险。空记录仍为 0（空和，数学上正确）。
+    """
     rows = conn.execute(
         "SELECT calories, protein, fat, carbs, fiber FROM diet_items WHERE record_id=? AND is_deleted=0",
         (record_id,)
     ).fetchall()
-    totals = {"total_calories": 0, "total_protein": 0, "total_fat": 0, "total_carbs": 0, "total_fiber": 0}
-    for r in rows:
-        totals["total_calories"] += r["calories"] or 0
-        totals["total_protein"] += r["protein"] or 0
-        totals["total_fat"] += r["fat"] or 0
-        totals["total_carbs"] += r["carbs"] or 0
-        totals["total_fiber"] += r["fiber"] or 0
+    totals = {}
+    for col in _NUTRITION_FIELDS:
+        vals = [r[col] for r in rows]
+        if any(v is None for v in vals):
+            totals[f"total_{col}"] = None
+        else:
+            s = sum(vals)
+            # 保持既有约定：total_calories 不取整，其余四项取一位小数
+            totals[f"total_{col}"] = s if col == "calories" else round(s, 1)
     conn.execute(
         """UPDATE diet_records SET total_calories=?, total_protein=?, total_fat=?, total_carbs=?, total_fiber=?
            WHERE id=?""",
-        (totals["total_calories"], round(totals["total_protein"], 1),
-         round(totals["total_fat"], 1), round(totals["total_carbs"], 1),
-         round(totals["total_fiber"], 1), record_id)
+        (totals["total_calories"], totals["total_protein"], totals["total_fat"],
+         totals["total_carbs"], totals["total_fiber"], record_id)
     )
     return totals
 
@@ -150,7 +293,7 @@ def add_meal(args):
         return
 
     try:
-        items = _parse_items(args.items)
+        items, unresolved = _parse_items(args.items)
     except (ValueError, json.JSONDecodeError) as e:
         output_json({"status": "error", "message": f"食物条目格式错误: {e}"})
         return
@@ -168,10 +311,11 @@ def add_meal(args):
             member_check.close()
 
         record_id = generate_id()
+        # 总计先置 NULL，随即由 _compute_totals 按条目重算覆盖
         conn.execute(
             """INSERT INTO diet_records
                (id, member_id, meal_type, meal_date, meal_time, total_calories, total_protein, total_fat, total_carbs, total_fiber, note, created_at, is_deleted)
-               VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, 0)""",
+               VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, 0)""",
             (record_id, args.member_id, args.meal_type, meal_date, args.meal_time, args.note, now_iso())
         )
 
@@ -183,8 +327,8 @@ def add_meal(args):
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
                 (item_id, record_id, item["food_name"],
                  item.get("amount"), item.get("unit"),
-                 item.get("calories", 0), item.get("protein", 0), item.get("fat", 0),
-                 item.get("carbs", 0), item.get("fiber", 0),
+                 item.get("calories"), item.get("protein"), item.get("fat"),
+                 item.get("carbs"), item.get("fiber"),
                  item.get("note"), now_iso())
             )
 
@@ -198,11 +342,15 @@ def add_meal(args):
         record["items"] = item_rows
 
     meal_name = MEAL_TYPE_NAMES.get(args.meal_type, args.meal_type)
-    output_json({
+    known = sum(1 for it in items if it.get("calories") is not None)
+    summary = _nutrition_summary(record, known, unresolved)
+    payload = {
         "status": "ok",
-        "message": f"已记录{m['name']}的{meal_date}{meal_name}（{len(items)}个食物，共{record['total_calories']}kcal）",
-        "record": record
-    })
+        "message": _meal_message(m['name'], meal_date, meal_name, items, record, summary),
+        "record": record,
+    }
+    payload.update(summary)
+    output_json(payload)
 
 
 def add_item(args):
@@ -227,19 +375,32 @@ def add_item(args):
             output_json({"status": "error", "message": "食物名称不能为空"})
             return
 
-        # Auto-fill nutrition from food_lookup if not provided
-        if not args.calories:
-            _filled = _autofill_item_nutrition({
+        # 仅在调用方未给出热量时解析。--calories 0 是显式断言（如水），不查询。
+        unresolved = []
+        if args.calories is None:
+            _filled, _verdict = _autofill_item_nutrition({
                 'food_name': args.food_name,
                 'amount': args.amount,
                 'unit': args.unit,
             })
-            args.calories = args.calories or _filled.get('calories', 0)
-            args.protein = args.protein or _filled.get('protein', 0)
-            args.fat = args.fat or _filled.get('fat', 0)
-            args.carbs = args.carbs or _filled.get('carbs', 0)
-            args.fiber = args.fiber or _filled.get('fiber', 0)
+            args.calories = _filled.get('calories')
+            args.protein = _filled.get('protein')
+            args.fat = _filled.get('fat')
+            args.carbs = _filled.get('carbs')
+            args.fiber = _filled.get('fiber')
             args.note = args.note or _filled.get('note')
+            _reason = _verdict.get('reason')
+            if _reason not in ('provided', 'resolved'):
+                if not args.note:
+                    args.note = _UNRESOLVED_NOTES.get(_reason, _UNRESOLVED_NOTES['not_found'])
+                unresolved.append({
+                    "index": 0,
+                    "food_name": args.food_name,
+                    "amount": args.amount,
+                    "unit": args.unit,
+                    "reason": _reason,
+                    **({'reason_text': _verdict['reason_text']} if _verdict.get('reason_text') else {}),
+                })
 
         item_id = generate_id()
         conn.execute(
@@ -248,8 +409,8 @@ def add_item(args):
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
             (item_id, args.record_id, args.food_name,
              args.amount, args.unit,
-             args.calories or 0, args.protein or 0, args.fat or 0,
-             args.carbs or 0, args.fiber or 0,
+             args.calories, args.protein, args.fat,
+             args.carbs, args.fiber,
              args.note, now_iso())
         )
 
@@ -257,11 +418,26 @@ def add_item(args):
         conn.commit()
 
         item = row_to_dict(conn.execute("SELECT * FROM diet_items WHERE id=?", (item_id,)).fetchone())
-        output_json({
+        record_row = row_to_dict(conn.execute(
+            "SELECT * FROM diet_records WHERE id=?", (args.record_id,)
+        ).fetchone())
+        # 状态描述整条记录：记录里可能还有别的未解析条目
+        stats = conn.execute(
+            "SELECT SUM(CASE WHEN calories IS NOT NULL THEN 1 ELSE 0 END) AS known "
+            "FROM diet_items WHERE record_id=? AND is_deleted=0", (args.record_id,)
+        ).fetchone()
+        summary = _nutrition_summary(record_row, stats["known"] or 0, unresolved)
+        payload = {
             "status": "ok",
-            "message": f"已向餐次 {args.record_id} 添加食物: {args.food_name}",
-            "item": item
-        })
+            "message": (
+                f"已向餐次 {args.record_id} 添加食物: {args.food_name}"
+                f"（{_fmt_kcal(item['calories'])}kcal）"
+            ),
+            "item": item,
+            "record": record_row,
+        }
+        payload.update(summary)
+        output_json(payload)
 
 
 def list_meals(args):
@@ -415,35 +591,40 @@ def daily_summary(args):
                     {"food_name": item["food_name"], "calories": item["calories"]}
                 )
 
-        totals = {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0}
-        meals = []
-        for rec in records:
-            totals["calories"] += rec["total_calories"] or 0
-            totals["protein"] += rec["total_protein"] or 0
-            totals["fat"] += rec["total_fat"] or 0
-            totals["carbs"] += rec["total_carbs"] or 0
-            totals["fiber"] += rec["total_fiber"] or 0
+        # 逐字段独立传播未知：当日任一条记录该字段为 NULL，合计即为 NULL。
+        # 部分和（300 已知 + 未知）会被下游读成真实的 300，比"未知"更糟。
+        # 当日无记录时 any([]) 为 False、合计为 0——"没记"由 meal_count 表达。
+        totals = {}
+        for f in _NUTRITION_FIELDS:
+            vals = [rec[f"total_{f}"] for rec in records]
+            if any(v is None for v in vals):
+                totals[f] = None
+            else:
+                s = sum(vals)
+                totals[f] = s if f == "calories" else round(s, 1)
 
+        meals = []
+        unresolved_records = 0
+        for rec in records:
+            if rec["total_calories"] is None:
+                unresolved_records += 1
             meals.append({
                 "meal_type": rec["meal_type"],
                 "meal_type_name": MEAL_TYPE_NAMES.get(rec["meal_type"], rec["meal_type"]),
-                "calories": rec["total_calories"] or 0,
+                "calories": rec["total_calories"],
                 "items": items_by_record.get(rec["id"], []),
             })
 
-        # Round totals
-        for k in ("protein", "fat", "carbs", "fiber"):
-            totals[k] = round(totals[k], 1)
-
-        # Macronutrient ratio
-        total_macro_g = totals["protein"] + totals["fat"] + totals["carbs"]
+        # 三大营养素比例：三者皆已知才算。任一为 NULL 时给出的是被未知拉歪的假比例。
         ratio = {}
-        if total_macro_g > 0:
-            ratio = {
-                "protein_pct": round(totals["protein"] / total_macro_g * 100, 1),
-                "fat_pct": round(totals["fat"] / total_macro_g * 100, 1),
-                "carbs_pct": round(totals["carbs"] / total_macro_g * 100, 1),
-            }
+        if all(totals[k] is not None for k in ("protein", "fat", "carbs")):
+            total_macro_g = totals["protein"] + totals["fat"] + totals["carbs"]
+            if total_macro_g > 0:
+                ratio = {
+                    "protein_pct": round(totals["protein"] / total_macro_g * 100, 1),
+                    "fat_pct": round(totals["fat"] / total_macro_g * 100, 1),
+                    "carbs_pct": round(totals["carbs"] / total_macro_g * 100, 1),
+                }
 
         output_json({
             "status": "ok",
@@ -453,6 +634,7 @@ def daily_summary(args):
             "meals": meals,
             "totals": totals,
             "macro_ratio": ratio,
+            "unresolved_records": unresolved_records,
         })
     finally:
         conn.close()

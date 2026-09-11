@@ -21,11 +21,11 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 | meal_type | 餐次: breakfast/lunch/dinner/snack |
 | meal_date | 日期 YYYY-MM-DD |
 | meal_time | 时间 HH:MM（可选） |
-| total_calories | 总热量 kcal |
-| total_protein | 总蛋白质 g |
-| total_fat | 总脂肪 g |
-| total_carbs | 总碳水 g |
-| total_fiber | 总膳食纤维 g |
+| total_calories | 总热量 kcal（见下方三态说明） |
+| total_protein | 总蛋白质 g（见下方三态说明） |
+| total_fat | 总脂肪 g（见下方三态说明） |
+| total_carbs | 总碳水 g（见下方三态说明） |
+| total_fiber | 总膳食纤维 g（见下方三态说明） |
 | note | 备注 |
 
 ### diet_items（食物条目）
@@ -36,12 +36,22 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 | food_name | 食物名称 |
 | amount | 数量 |
 | unit | 单位（g/ml/份/个等） |
-| calories | 热量 kcal |
-| protein | 蛋白质 g |
-| fat | 脂肪 g |
-| carbs | 碳水 g |
-| fiber | 膳食纤维 g |
+| calories | 热量 kcal（见下方三态说明） |
+| protein | 蛋白质 g（见下方三态说明） |
+| fat | 脂肪 g（见下方三态说明） |
+| carbs | 碳水 g（见下方三态说明） |
+| fiber | 膳食纤维 g（见下方三态说明） |
 | note | 备注 |
+
+**营养字段的三态语义（饮食数据完整性的基础，读取方必须按此解释）：**
+
+| 存储值 | 含义 | 产生方式 |
+|--------|------|----------|
+| `NULL` | **未知**——没查过、查询失败、或数据源里没有 | 未提供营养值时尝试补全，补全失败即写 `NULL`，并在 `note` 标注 `[未解析营养]` |
+| `0` | **确为零**——用户或数据源明确给出 0 | 只在显式传入 `0` 时写入（水、黑咖啡、无糖茶等） |
+| `> 0` | 已确认的数值 | 由数据源或用户标签提供 |
+
+`NULL` 与 `0` **不可互换**：把未知当成 0 会在下游凭空造出「热量收支」。因此按日汇总时，**只要当天任一餐的某字段为 `NULL`，该字段当天的总计就是未知**（混合餐次会同时给出已知部分的合计，但不得对外报成完整值），未解析的日期**不进入任何平均值分母**，只作为「未解析天数」单独报告。逐字段判断，不要只看热量——否则一个未解析的 `fat` 会被当成 0 系统性拉低三大营养素比例。
 
 ## 功能列表
 
@@ -49,8 +59,8 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 | 动作 | 子命令 | 必要参数 | 可选参数 | 说明 |
 |------|--------|----------|----------|------|
-| add-meal | add-meal | --member-id, --meal-type, --meal-date | --meal-time, --note, --items (JSON) | 添加一餐记录（可同时包含多个食物条目） |
-| add-item | add-item | --record-id, --food-name | --amount, --unit, --calories, --protein, --fat, --carbs, --fiber, --note | 向已有餐次追加食物条目 |
+| add-meal | add-meal | --member-id, --meal-type, --meal-date | --meal-time, --note, --items (JSON) | 添加一餐记录（可同时包含多个食物条目），返回 `nutrition_status` 等字段，见下方响应契约 |
+| add-item | add-item | --record-id, --food-name | --amount, --unit, --calories, --protein, --fat, --carbs, --fiber, --note | 向已有餐次追加食物条目；也可用于事后补全未解析的营养值（补全后餐次自动重新汇总） |
 | list | list | --member-id | --date, --start-date, --end-date, --meal-type, --limit | 查看饮食记录 |
 | delete | delete | --id | --type (record/item) | 删除记录或条目 |
 | daily-summary | daily-summary | --member-id, --date | | 某日营养摘要 |
@@ -77,6 +87,8 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 
 `food-stats` 会返回每个数据源的可用状态、来源网址、许可证和本地数据目录。所有在线来源都可用 `MEDIWISE_FOOD_ONLINE_ENABLED=0` 强制关闭。远程 API 只收到食物查询词及语言/分页参数，不得发送 `owner_id`、`member_id`、餐次记录或健康数据。没有任何来源可用时，查询返回 `status: unavailable`，不得把“数据源不可用”当成“该食物不存在”。
 
+同一区分在写入路径上逐条透出：`add-meal` / `add-item` 的 `unresolved_items[].reason` 为 `unavailable`（没有可用数据源）或 `not_found`（数据源可用但没有这个食物），`reason_text` 是原始中文说明，`action_required` 给出对应的追问措辞。两种情形的用户可见说法不同，不得混用。
+
 ## 使用流程
 
 **记录一餐的标准流程（不得跳步）：**
@@ -93,6 +105,25 @@ description: "Diet and nutrition tracking: log meals, manage food items, view da
 **禁止用 AI 自身知识直接估算营养数值写入数据库。** 记录每种食物之前，必须先调用 `food-lookup search` 查询，用数据库返回的数据填充 `--items`。
 
 > **自动填充说明**：若 `--items` 中某条目未提供热量数据，`diet.py` 会尝试调用本地 food_lookup 数据包补全营养值，并在 `note` 字段标注 `[自动填充]` 及数据来源。仓库默认不捆绑本地数据包；数据源不可用时必须请用户补充营养标签或显式配置在线来源，不能凭模型知识写入估算值。
+
+### add-meal / add-item 的写入响应契约
+
+**餐次照常保存，但营养值不会被编造。** 补全失败时营养字段存 `NULL`（不是 `0`），并在条目 `note` 前加 `[未解析营养]` 标记；`note` 是给人看的，`NULL` 是给程序看的。
+
+响应始终包含：
+
+| 字段 | 含义 |
+|------|------|
+| `nutrition_status` | `resolved`（记录级热量已知）/ `partial`（热量未知，但至少一个条目已知）/ `unresolved`（所有条目热量都未知）。**只以热量为准** |
+| `nutrition_fields_pending` | 记录级总计中仍为 `NULL` 的字段列表。只给了热量没给 fiber 时，`nutrition_status` 仍是 `resolved`，而 `fiber` 会出现在这里 |
+| `unresolved_items` | 未解析条目数组（全部解析时为 `[]`），每项含 `index` / `food_name` / `amount` / `unit` / `reason`，以及数据源给出的说明 `reason_text`（如有）。同一餐里不同条目的 `reason` 可能不同 |
+| `action_required` | `nutrition_status` 非 `resolved` 时给出，指明下一步该向用户要什么 |
+| `record` | 落库后的完整记录，营养字段直接暴露 `null` |
+| `message` | 面向用户的描述。**未解析时不会出现 `0 kcal`**；混合餐次会说明「已知部分合计 N kcal，实际热量高于该值」 |
+
+`nutrition_status` 非 `resolved` 时**必须**照 `action_required` 向用户追问（索取包装营养标签，或说明数据源未配置并提供启用路径），不得把它当成一次普通的成功记录一带而过，更不得用模型知识补一个数值。
+
+补录路径（没有 `update-item`，条目不可原地修改）：用户给出标签后，用 `delete --type item` 删掉那条未解析条目，再用 `add-item` 按标签数值重新加入同一食物。每次条目增删都会重算餐次总计，未解析条目一旦消失，记录级 `total_*` 即自行恢复为已知值，无需手工修 `diet_records`。
 
 ```bash
 # 步骤 1：先查每种食物
