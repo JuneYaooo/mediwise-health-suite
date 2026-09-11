@@ -91,6 +91,22 @@ python3 {baseDir}/scripts/smart_intake.py extract --pdf /path/to/report.pdf --me
 python3 {baseDir}/scripts/smart_intake.py extract --text "今天血压135/88，心率72" --member-id <id>
 ```
 
+**图片输入的规范形式是文件路径**（`--image`，也可写作 `--image-path`）。路径形式优先使用：临时文件的生命周期、格式校验和清理都由调用方掌控。
+
+宿主 Agent 只持有图片字节、没有路径可指时（例如附件只存在于聊天上下文），可用 `--image-base64` 传 base64：
+
+```bash
+python3 {baseDir}/scripts/smart_intake.py extract --image-base64 "$B64" --member-id <id>
+cat image.b64 | python3 {baseDir}/scripts/smart_intake.py extract --image-base64 - --member-id <id>
+```
+
+- 传 `-` 表示从 stdin 读取。**大图务必用 `-`**：base64 撑大 1/3 后，手机拍的化验单（2–5MB）会超出 `ARG_MAX`，直接 `spawn E2BIG`，Python 根本没启动。
+- 可带 `data:image/png;base64,` 前缀，也可传裸 base64；base64 中的换行会被自动剔除。
+- 上限 **10MB（按解码后的字节计）**，超限报错且不落盘。
+- 扩展名由魔数嗅探决定（PNG/JPEG/GIF/BMP，其余依次参考 `data:` URI 提示、退回 `.jpg`），所以 PNG 不会被当成 JPEG 送给模型。
+- 脚本会把 base64 物化为临时文件、调用视觉链路、然后删除；异常路径同样清理。该临时文件只在本次调用内有效，不得在调用返回后继续引用。
+- `--image-base64` 与 `--image` / `--pdf` / `--text` 互斥，同时给出会由 argparse 直接报错。
+
 ## 多附件处理流程
 
 用户连续发送多张图片时：

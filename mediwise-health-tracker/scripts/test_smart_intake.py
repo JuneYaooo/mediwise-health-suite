@@ -1,9 +1,15 @@
 """Tests for smart_intake module — no real LLM calls needed."""
 
 import argparse
+import base64
+import contextlib
+import glob
+import io
 import json
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 from datetime import date
@@ -324,6 +330,252 @@ class TestImageToBase64(unittest.TestCase):
     def test_nonexistent_file_raises(self):
         with self.assertRaises(FileNotFoundError):
             smart_intake._image_to_base64("/nonexistent/image.jpg")
+
+    def test_round_trip_and_mime_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            png = os.path.join(tmp, "scan.png")
+            with open(png, "wb") as f:
+                f.write(_PNG_1PX)
+            encoded, mime = smart_intake._image_to_base64(png)
+            self.assertEqual(base64.b64decode(encoded), _PNG_1PX)
+            self.assertEqual(mime, "image/png")
+
+            # The extension is the *only* thing that picks the MIME here, which
+            # is why the base64 path has to sniff before materialising.
+            unknown = os.path.join(tmp, "scan.tmp")
+            with open(unknown, "wb") as f:
+                f.write(_PNG_1PX)
+            self.assertEqual(smart_intake._image_to_base64(unknown)[1], "image/jpeg")
+
+
+_PNG_1PX = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+class TestBase64Input(unittest.TestCase):
+    """The `--image-base64` path: the entry point that used to be unreachable.
+
+    JS sent `--image-base64` while argparse only declared `--text/--image/--pdf`,
+    so every image call died in argparse (`unrecognized arguments`) before any
+    code ran.  These tests drive `main()` with a patched `sys.argv` — the layer
+    the mismatch lived at — rather than calling the helper directly.
+    """
+
+    def setUp(self):
+        # These tests are about argument parsing and temp-file lifetime, not
+        # about storage: stub the two DB calls `main()` makes first so the suite
+        # neither creates a database in the user's real data dir nor depends on
+        # a member existing.
+        conn = patch.object(smart_intake.health_db, "get_connection")
+        self.addCleanup(conn.stop)
+        conn.start()
+        ownership = patch.object(smart_intake.health_db, "verify_member_ownership",
+                                 return_value=True)
+        self.addCleanup(ownership.stop)
+        ownership.start()
+
+    def _argv(self, *extra):
+        return ["smart_intake.py", "extract", "--member-id", "mem_test"] + list(extra)
+
+    def _run_main(self, *extra):
+        """Drive the CLI, returning the JSON it printed (output stays out of the log)."""
+        buf = io.StringIO()
+        with patch.object(sys, "argv", self._argv(*extra)), \
+             contextlib.redirect_stdout(buf):
+            smart_intake.main()
+        return json.loads(buf.getvalue())
+
+    def _temp_intake_files(self):
+        return set(glob.glob(os.path.join(tempfile.gettempdir(), "mediwise-intake-*")))
+
+    def test_sniffing_prefers_magic_bytes_over_the_extension(self):
+        """A PNG must not go out as image/jpeg just because the temp file is .tmp."""
+        self.assertEqual(smart_intake._sniff_image_suffix(_PNG_1PX), ".png")
+        self.assertEqual(smart_intake._sniff_image_suffix(b"\xff\xd8\xff\xe0" + b"\x00" * 8), ".jpg")
+        self.assertEqual(smart_intake._sniff_image_suffix(b"GIF89a" + b"\x00" * 8), ".gif")
+
+    def test_a_data_uri_prefix_supplies_the_hint_when_magic_is_absent(self):
+        self.assertEqual(
+            smart_intake._sniff_image_suffix(b"\x00\x01\x02", "data:image/webp;base64"),
+            ".webp",
+        )
+        # Unknown bytes fall back to the historical default, not to an error
+        self.assertEqual(smart_intake._sniff_image_suffix(b"\x00\x01\x02"), ".jpg")
+
+    def test_the_data_uri_prefix_is_stripped_before_decoding(self):
+        """`data:image/png;base64,` 是 Agent 天然会产出的形式，必须能吃下。"""
+        hint, encoded = smart_intake._split_data_uri(" data:image/png;base64, QUJD ")
+        self.assertEqual(encoded, "QUJD")
+        self.assertIn("image/png", hint)
+        # 裸 base64 与带前缀的都归一到同一对返回值
+        self.assertEqual(smart_intake._split_data_uri("QUJD"), ("", "QUJD"))
+
+    def test_wrapped_base64_is_decoded_rather_than_rejected(self):
+        """换行在 base64 里不承载信息——JSON 字符串中的 `\\n` 会还原成真换行。"""
+        wrapped = "\n".join(
+            base64.b64encode(_PNG_1PX).decode()[i:i + 16] for i in range(0, 96, 16)
+        )
+        seen = {}
+
+        def fake_extract(kind, path, member_id):
+            with open(path, "rb") as f:
+                seen["bytes"] = f.read()
+            return {"records": [], "source_summary": "stub"}
+
+        with patch.object(smart_intake, "extract", side_effect=fake_extract):
+            self._run_main("--image-base64", wrapped)
+
+        self.assertEqual(seen["bytes"], _PNG_1PX)
+
+    def test_an_empty_or_payloadless_data_uri_is_rejected(self):
+        for payload in ("data:image/png;base64,", "   ", ""):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    smart_intake._split_data_uri(payload)
+
+    def test_a_data_uri_payload_materialises_through_main(self):
+        seen = {}
+
+        def fake_extract(kind, path, member_id):
+            seen["suffix"] = os.path.splitext(path)[1]
+            with open(path, "rb") as f:
+                seen["bytes"] = f.read()
+            return {"records": [], "source_summary": "stub"}
+
+        payload = "data:image/png;base64," + base64.b64encode(_PNG_1PX).decode()
+        with patch.object(smart_intake, "extract", side_effect=fake_extract):
+            self._run_main("--image-base64", payload)
+
+        self.assertEqual(seen["suffix"], ".png")
+        self.assertEqual(seen["bytes"], _PNG_1PX)
+
+    def test_the_materialized_file_is_an_image_and_is_removed_afterwards(self):
+        before = self._temp_intake_files()
+        seen = {}
+
+        def fake_extract(kind, path, member_id):
+            seen["kind"] = kind
+            seen["path"] = path
+            seen["exists_during"] = os.path.isfile(path)
+            seen["suffix"] = os.path.splitext(path)[1]
+            # MIME is derived from the extension downstream, so this is what the
+            # provider will actually be told.
+            seen["mime"] = smart_intake._image_to_base64(path)[1]
+            return {"records": [], "source_summary": "stub"}
+
+        with patch.object(smart_intake, "extract", side_effect=fake_extract):
+            self._run_main("--image-base64", base64.b64encode(_PNG_1PX).decode())
+
+        # .png, not the .jpg fallback: sniffing ran, so the provider gets the
+        # right MIME instead of a 400 that looks like a model problem.
+        self.assertEqual(seen["suffix"], ".png")
+        self.assertEqual(seen["mime"], "image/png")
+        self.assertEqual(seen["kind"], "image")
+        self.assertTrue(seen["exists_during"])
+        self.assertFalse(os.path.exists(seen["path"]), "临时文件必须在调用后删除")
+        self.assertEqual(self._temp_intake_files() - before, set())
+
+    def test_the_file_is_removed_even_when_extraction_raises(self):
+        """PaddleOCR 缺失或视觉调用失败都会抛——异常路径同样不能留档。"""
+        before = self._temp_intake_files()
+        leaked = {}
+
+        def boom(kind, path, member_id):
+            leaked["path"] = path
+            raise RuntimeError("vision call failed")
+
+        # main() 自己吞掉异常并输出错误 JSON
+        with patch.object(smart_intake, "extract", side_effect=boom):
+            output = self._run_main("--image-base64",
+                                    base64.b64encode(_PNG_1PX).decode())
+
+        self.assertEqual(output["error"], "vision call failed")
+        self.assertFalse(os.path.exists(leaked["path"]))
+        self.assertEqual(self._temp_intake_files() - before, set())
+
+    def test_an_oversized_payload_is_rejected_without_touching_disk(self):
+        before = self._temp_intake_files()
+        oversize = base64.b64encode(
+            b"\x89PNG\r\n\x1a\n" + b"\x00" * (smart_intake._MAX_INLINE_IMAGE_BYTES + 1)
+        ).decode()
+
+        with patch.object(smart_intake, "extract") as extract_mock:
+            output = self._run_main("--image-base64", oversize)
+            extract_mock.assert_not_called()
+
+        self.assertIn("图片过大", output["error"])
+        self.assertEqual(self._temp_intake_files() - before, set())
+
+    def test_invalid_base64_is_rejected_and_does_not_reach_extract(self):
+        with patch.object(smart_intake, "extract") as extract_mock:
+            output = self._run_main("--image-base64", "!!!not base64!!!")
+            extract_mock.assert_not_called()
+        self.assertIn("解码失败", output["error"])
+
+    def test_image_and_image_base64_together_is_an_argparse_error(self):
+        """互斥由 argparse 保证——同时给两个输入是调用方的错，不是静默取其一。"""
+        with patch.object(sys, "argv", self._argv("--image", "/tmp/x.png",
+                                                  "--image-base64", "AAAA")), \
+             contextlib.redirect_stderr(io.StringIO()) as err:
+            with self.assertRaises(SystemExit) as ctx:
+                smart_intake.main()
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("not allowed with", err.getvalue())
+
+    def test_image_path_is_an_alias_for_image(self):
+        """`--image-path` 与 `--image` 必须落到同一个属性，不应各写各的。"""
+        for flag in ("--image", "--image-path"):
+            with self.subTest(flag=flag):
+                captured = {}
+
+                def fake_extract(kind, path, member_id):
+                    captured["kind"] = kind
+                    captured["path"] = path
+                    return {"records": [], "source_summary": "stub"}
+
+                with patch.object(smart_intake, "extract", side_effect=fake_extract):
+                    self._run_main(flag, "/tmp/x.png")
+                self.assertEqual(captured["path"], "/tmp/x.png")
+                self.assertEqual(captured["kind"], "image")
+
+
+class TestSmartExtractCliSmoke(unittest.TestCase):
+    """One subprocess test, deliberately: only it reproduces the original failure.
+
+    The 52 tests above all call the Python API directly, which is exactly why an
+    argparse/route mismatch could sit here unnoticed — the CLI layer was the one
+    layer nothing exercised.  Asserting "not exit 2" rather than "success",
+    because extraction itself may legitimately fail in a test environment.
+    """
+
+    def test_the_declared_flags_are_accepted_by_the_cli(self):
+        script = os.path.join(os.path.dirname(__file__), "smart_intake.py")
+        payload = base64.b64encode(_PNG_1PX).decode()
+        cases = [
+            ["--image", "/tmp/does-not-exist.png"],
+            ["--image-base64", payload],
+            ["--image-base64", "-"],
+        ]
+        with tempfile.TemporaryDirectory() as data_dir:
+            env = {**os.environ, "MEDIWISE_DATA_DIR": data_dir}
+            env.pop("MEDIWISE_OWNER_ID", None)
+            for extra in cases:
+                with self.subTest(flags=extra[0]):
+                    proc = subprocess.run(
+                        [sys.executable, script, "extract",
+                         "--member-id", "mem_smoke"] + extra,
+                        input=payload if extra[-1] == "-" else "",
+                        capture_output=True, text=True, timeout=60, env=env,
+                    )
+                    self.assertNotEqual(
+                        proc.returncode, 2,
+                        f"{extra[0]} must be a recognised flag; stderr={proc.stderr.strip()}",
+                    )
+                    self.assertNotIn("unrecognized arguments", proc.stderr)
+                    # The CLI must fail as JSON, not as a traceback: whatever
+                    # goes wrong downstream, `index.js` parses this stdout.
+                    json.loads(proc.stdout)
 
 
 class TestBuildPayloads(unittest.TestCase):

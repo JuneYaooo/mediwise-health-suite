@@ -136,20 +136,39 @@ const ROUTES = {
     args: ['statistics'],
   }),
   'smart-extract': (inputs) => {
+    const p = inputs.params ?? {};
+    const memberId = inputs.member_id ?? p.member_id;
     const args = ['extract'];
-    if (inputs.params?.text) {
-      args.push('--text', inputs.params.text);
+    // Exactly one input flag, by construction — the Python side declares these
+    // mutually exclusive, and pushing two would be an argparse error rather
+    // than the caller's intent.
+    //
+    // A path is the canonical form.  `image_base64` exists for agents that hold
+    // bytes with no path to point at (a chat attachment); the payload travels
+    // over stdin because it does not fit in argv — ARG_MAX caps a single argv
+    // element at ~700KB of base64, while a phone photo of a lab report is
+    // 2.7–6.8MB encoded, which fails as `spawn E2BIG` before Python starts.
+    let stdin = null;
+    if (p.text) {
+      args.push('--text', p.text);
+    } else if (p.image_path) {
+      args.push('--image', p.image_path);
+    } else if (p.image_base64) {
+      args.push('--image-base64', '-');
+      stdin = p.image_base64;
+    } else if (p.pdf_path) {
+      args.push('--pdf', p.pdf_path);
+    } else {
+      return {
+        script: 'smart_intake.py',
+        args,
+        error: '缺少输入：text / image_path / image_base64 / pdf_path 之一',
+      };
     }
-    if (inputs.params?.image_base64) {
-      args.push('--image-base64', inputs.params.image_base64);
+    if (memberId) {
+      args.push('--member-id', memberId);
     }
-    if (inputs.params?.pdf_path) {
-      args.push('--pdf', inputs.params.pdf_path);
-    }
-    if (inputs.member_id) {
-      args.push('--member-id', inputs.member_id);
-    }
-    return { script: 'smart_intake.py', args };
+    return { script: 'smart_intake.py', args, stdin };
   },
   'smart-confirm': (inputs) => ({
     script: 'smart_intake.py',
@@ -638,6 +657,40 @@ async function runScript(script, args, env = {}) {
 }
 
 /**
+ * Run a Python script with a payload on stdin and return parsed JSON output.
+ *
+ * Separate from `runScript` because `promisify(execFile)` never exposes the
+ * child's stdin — `options.input` is synchronous-only — so the callback form is
+ * required to call `child.stdin.end(data)`.  Errors must keep `stderr` and
+ * `code`, since `execute()` reads `err.stderr` as the user-visible message;
+ * without them every failure on this route degrades to a generic
+ * "Python 脚本执行失败（exit=unknown）".
+ */
+function runScriptStdin(script, args, stdinData, env = {}) {
+  const scriptPath = resolve(SCRIPTS_DIR, script);
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = execFile('python3', [scriptPath, ...args], {
+      timeout: 60_000,
+      env: { ...process.env, PYTHONPATH: SCRIPTS_DIR, ...env },
+      maxBuffer: 16 * 1024 * 1024,
+      encoding: 'utf8',
+    }, (err, stdout) => {
+      if (err) {
+        rejectPromise(err);
+        return;
+      }
+      try {
+        resolvePromise(JSON.parse(String(stdout).trim()));
+      } catch (parseErr) {
+        rejectPromise(parseErr);
+      }
+    });
+    child.stdin.on('error', () => {}); // the child may exit before we finish writing
+    child.stdin.end(stdinData);
+  });
+}
+
+/**
  * OpenClaw Skill entry point.
  *
  * @param {object} inputs - { action: string, member_id?: string, params?: object }
@@ -656,7 +709,10 @@ export async function execute(inputs, context) {
   }
 
   try {
-    const { script, args } = routeFn(inputs);
+    const { script, args, stdin, error } = routeFn(inputs);
+    if (error) {
+      return { status: 'error', error };
+    }
 
     // Build subprocess environment: inject MEDIWISE_OWNER_ID for all scripts
     // so isolation is enforced automatically regardless of which script is called.
@@ -675,7 +731,9 @@ export async function execute(inputs, context) {
 
     log(`[mediwise-health-tracker] script=${script}`);
 
-    const result = await runScript(script, args, subEnv);
+    const result = stdin != null
+      ? await runScriptStdin(script, args, stdin, subEnv)
+      : await runScript(script, args, subEnv);
     return actionResult(result);
   } catch (err) {
     const stderr = typeof err?.stderr === 'string' ? err.stderr.trim() : '';

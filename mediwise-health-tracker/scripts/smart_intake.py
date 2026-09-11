@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import contextlib
 import io
 import json
 import os
 import re
 import sys
+import tempfile
 import urllib.request
 import urllib.error
 from datetime import date
@@ -290,6 +292,87 @@ _MIME_MAP = {
     ".png": "image/png", ".gif": "image/gif",
     ".webp": "image/webp", ".bmp": "image/bmp",
 }
+
+# 与 attachment.py 的 MAX_BASE64_FILE_SIZE 同值（就地定义，不 import——
+# 那是同级 CLI 模块，import 会连带引入它自己的参数面）。
+_MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB，按**解码后**的字节计
+
+# 魔数前缀 → 扩展名。`_MIME_MAP` 只看扩展名，而 base64 输入没有扩展名，
+# 写 .tmp 会把 PNG 化验单按 image/jpeg 发出去，换来一个看起来像模型问题的 400。
+_MAGIC_SIGNATURES = (
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"\xff\xd8\xff", ".jpg"),
+    (b"GIF87a", ".gif"),
+    (b"GIF89a", ".gif"),
+    (b"BM", ".bmp"),
+)
+
+
+def _sniff_image_suffix(data: bytes, hint: str = "") -> str:
+    """按内容推断扩展名，顺序：魔数 → data: URI/MIME 提示 → .jpg 兜底。
+
+    `.jpg` 兜底恰好等同于今天的默认行为，所以拿不准时不会比以前更差。
+    """
+    for magic, suffix in _MAGIC_SIGNATURES:
+        if data.startswith(magic):
+            return suffix
+    lowered = (hint or "").lower()
+    for suffix, mime in _MIME_MAP.items():
+        if mime in lowered:
+            return suffix
+    if "png" in lowered:
+        return ".png"
+    return ".jpg"
+
+
+def _split_data_uri(payload: str) -> tuple[str, str]:
+    """拆出 (mime 提示, 纯 base64)，两种形式都接受：
+      · data:image/png;base64,AAAA…
+      · AAAA…（裸 base64）
+
+    空白一律剔除：JSON 字符串里的 `\\n` 会还原成真换行，而换行在 base64 里
+    不承载任何信息，`validate=True` 却会因此拒掉一张完好的图片。
+    """
+    stripped = payload.strip()
+    hint = ""
+    if stripped.startswith("data:"):
+        hint, _, stripped = stripped.partition(",")
+    encoded = re.sub(r"\s+", "", stripped)
+    if not encoded:
+        raise ValueError("图片 base64 负载为空")
+    return hint, encoded
+
+
+@contextlib.contextmanager
+def _materialize_base64(payload: str):
+    """把 base64 图片落到临时文件，yield 路径，退出时删除。
+
+    宿主 Agent 常只持有字节（聊天里的附件）而没有路径可指，所以要有这条路。
+    但临时文件的生命周期属于**本进程**——`index.js` 有意不含任何文件系统代码，
+    把清理逻辑放到拥有它的进程之外是错的，因此解码与删档都在这里做。
+
+    用上下文管理器而非裸 try/finally：块要覆盖整个 `extract()` 调用
+    （PaddleOCR 缺失、视觉调用失败都可能抛），异常路径也必须清干净。
+    """
+    hint, encoded = _split_data_uri(payload)
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise ValueError(f"图片 base64 解码失败: {e}") from e
+    # 先解码后校验再落盘：100MB 的 blob 不碰磁盘
+    if len(data) > _MAX_INLINE_IMAGE_BYTES:
+        raise ValueError(
+            f"图片过大 ({len(data)} bytes)，最大允许 {_MAX_INLINE_IMAGE_BYTES} bytes"
+        )
+    suffix = _sniff_image_suffix(data, hint)
+    fd, path = tempfile.mkstemp(suffix=suffix, prefix="mediwise-intake-")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        yield path
+    finally:
+        if os.path.isfile(path):
+            os.unlink(path)
 
 
 def _image_to_base64(path):
@@ -1159,7 +1242,13 @@ def main():
     p_ext.add_argument("--owner-id", default=os.environ.get("MEDIWISE_OWNER_ID"), help="所有者 ID")
     input_group = p_ext.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--text", help="自由文本输入")
-    input_group.add_argument("--image", help="图片文件路径")
+    # --image-path 与 --image 是同一个选项的两种写法（共享 dest），
+    # 让路径形式与 --pdf 对称；路径是规范形式，base64 供只持有字节的 Agent 使用。
+    input_group.add_argument("--image", "--image-path", dest="image", help="图片文件路径")
+    input_group.add_argument(
+        "--image-base64", dest="image_base64",
+        help="图片 base64（可带 data:image/...;base64, 前缀）；传 - 表示从 stdin 读取",
+    )
     input_group.add_argument("--pdf", help="PDF 文件路径")
 
     # confirm command
@@ -1183,6 +1272,16 @@ def main():
                 result = extract("text", args.text, args.member_id)
             elif args.image:
                 result = extract("image", args.image, args.member_id)
+            elif args.image_base64:
+                # argv 放不下图片：ARG_MAX 下 base64 上限约 700KB，而手机拍的
+                # 化验单 base64 后通常 2.7–6.8MB，走 argv 会 spawn E2BIG
+                # （Python 根本没启动）。所以 payload 由 stdin 传入。
+                payload = (
+                    sys.stdin.read() if args.image_base64 == "-" else args.image_base64
+                )
+                # 物化后流入既有的 image 分支，不新建第二条图像处理路径
+                with _materialize_base64(payload) as tmp_path:
+                    result = extract("image", tmp_path, args.member_id)
             elif args.pdf:
                 result = extract("pdf", args.pdf, args.member_id)
             health_db.output_json(result)
