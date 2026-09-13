@@ -15,7 +15,7 @@ Keep personal and family health records in one place, including chat notes, medi
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-compatible-7c3aed.svg)](https://openclaw.ai)
 [![GitHub stars](https://img.shields.io/github/stars/JuneYaooo/mediwise-health-suite?style=flat)](https://github.com/JuneYaooo/mediwise-health-suite/stargazers)
 
-[How it works](#how-mediwise-works) · [Health cards](#health-cards) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
+[How it works](#how-mediwise-works) · [Common scenarios](#three-common-scenarios) · [Health cards](#health-cards) · [Quick setup](#quick-setup) · [Features](#features) · [Screenshots](#screenshots) · [Privacy](#privacy-and-network-access) · [Documentation center](docs/README.md)
 
 </div>
 
@@ -60,37 +60,155 @@ Share information through chat, photos, PDFs, or wearable exports. MediWise orga
 
 These screenshots show MediWise Health Suite running in OpenClaw through Feishu. They use the current Chinese interface. Hermes, Claude Code, Codex, WorkBuddy, and other agent tools may look different, but the conversation and record-keeping flow is the same.
 
-### Health record card
+## Three common scenarios
 
-Ask MediWise to create a health record card for a recent period:
+### 1. Log meals from a photo, log exercise by chat
+
+Photograph a meal before you eat it and MediWise can identify the food, ask about portion size, and turn it into a meal record; after exercise, send one sentence or an activity screenshot and it records the activity, duration, distance, and burn. Over time you can review daily totals, weekly trends, and goal progress.
+
+**You say:**
 
 ```text
-Create my health record card for the last 7 days.
+[Upload a lunch photo] Identify this meal and record the calories and nutrition after I confirm.
+Record today's exercise: a 45-minute brisk walk, 3.8 km.
+[Upload an activity screenshot] Record this workout in my profile.
+Show me how my diet, exercise, and weight moved over the last 7 days.
 ```
-
-The personal card keeps metric trends, recorded food intake, activity burn, steps, and sleep in a compact overview. A dated personal health timeline then combines metric updates, recent food and activity logs, sleep, visits, lab results, and imaging. It is generated in English when the conversation or requested locale is English.
 
 <p align="center">
-  <img src="docs/images/health-card-example-en.png" width="720" alt="English MediWise personal health record card with compact metrics, intake and activity, sleep, a personal health timeline, and medication">
+  <img src="docs/images/meal-photo-example.jpg" width="420" alt="Photographing a meal in chat, with the food identified and a calorie range returned">
 </p>
 
-The card highlights recent records and reminders. Food averages use logged days only, activity burn shows recorded activity rather than a calorie deficit, and lab flags are shown only when the original report explicitly marks them.
+<p align="center"><sub>A real conversation logging a meal from a photo. Image recognition and calorie results assist the record; confirm the food, portion size, and packaging before saving.</sub></p>
 
-MediWise also has a compact family card for one local user who manages several family profiles. It shows each person's current status, active medications and medication schedules, due or upcoming reminders, and explicit attention items. It does not include a family timeline. Members with alerts, flagged results, or due reminders appear first. Ask for it explicitly:
+Food recognition can use the image understanding the current Agent already has. Calorie and nutrition values must come from a verifiable source, and the repository bundles no food database, so nothing is written from model memory. When no source is configured and no label is supplied, the meal is still recorded but its nutrition is stored as unknown rather than `0`; see [Nutrition data sources](#nutrition-data-sources).
+
+### 2. Upload medical records for a local archive and reminders
+
+Photograph a health check report, a lab sheet, a prescription, or visit paperwork and MediWise extracts the key information, asks you to confirm it, then writes it into the local archive. **One archive per member**: you and everyone else can each keep a separate one, and once you name the person the record goes to that person's archive and is never mixed with another. Afterwards you can look up history, manage active medication, set medication or follow-up reminders, and pull the recent picture together before a visit.
+
+Reminders are saved as local to-do records. When the current Agent supports scheduled tasks and they are configured, they can also be delivered when they come due; MediWise itself has no background daemon, SMS, or phone push.
+
+**You say:**
 
 ```text
-Create a family health card for the last 7 days.
+[Upload a health check report] Extract the key measurements, let me confirm them, then save them to my profile.
+I started taking this medication today, one in the morning and one at night — remind me to take it on time.
+Remind me next Wednesday to get a complete blood count.
+I have a doctor's appointment coming up. Pull together my recent symptoms, measurements, and active medication.
 ```
 
-The example uses a fictional member and fictional health data. It was produced by the same local card generation path used by the skill. Its trend charts are inline SVG and do not require a chart service or CDN.
+#### Case walkthrough: local case management
 
-If the local record contains only one self profile, MediWise can select it by default. Once you add another family member, include the person's name:
+> Teaching simulation case: the hospital is 青竹市第一虚构医院 ("Qingzhu City First Fictional Hospital") and the patient is 熊猫 ("Panda", male, 89). All seven pages carry a 教学模拟病例｜非医疗凭证 stamp. Every number below comes from those pages, and the images are the originals.
+>
+> The walkthrough follows one patient. Several people are stored the same way, each in their own archive with nothing mixed together — same rules, same flow.
+
+##### Input: seven photographs
+
+Two admissions' worth of paperwork. Click any page to see it full size.
+
+<table>
+  <tr>
+    <td width="25%" align="center"><a href="docs/images/case-01-admission-20260908.jpg"><img src="docs/images/case-01-admission-20260908.jpg" alt="Admission record 2026-09-08"></a></td>
+    <td width="25%" align="center"><a href="docs/images/case-02-lab-20260908.jpg"><img src="docs/images/case-02-lab-20260908.jpg" alt="Laboratory report 2026-09-08"></a></td>
+    <td width="25%" align="center"><a href="docs/images/case-03-ct-20260909.jpg"><img src="docs/images/case-03-ct-20260909.jpg" alt="Chest CT report 2026-09-09"></a></td>
+    <td width="25%" align="center"><a href="docs/images/case-04-readmission-20261020.jpg"><img src="docs/images/case-04-readmission-20261020.jpg" alt="Second admission record 2026-10-20"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>① Admission record · 2026-09-08<br>3 diagnoses</sub></td>
+    <td align="center"><sub>② Laboratory report · 2026-09-08<br>13 items, 6 flagged H/L</sub></td>
+    <td align="center"><sub>③ Chest CT · 2026-09-09<br>4 diagnostic impressions</sub></td>
+    <td align="center"><sub>④ Second admission · 2026-10-20<br>4 diagnoses</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center"><a href="docs/images/case-05-lab-20261020.jpg"><img src="docs/images/case-05-lab-20261020.jpg" alt="Laboratory report 2026-10-20"></a></td>
+    <td width="25%" align="center"><a href="docs/images/case-06-carotid-ultrasound-20261021.jpg"><img src="docs/images/case-06-carotid-ultrasound-20261021.jpg" alt="Carotid ultrasound report 2026-10-21"></a></td>
+    <td width="25%" align="center"><a href="docs/images/case-07-discharge-20261023.jpg"><img src="docs/images/case-07-discharge-20261023.jpg" alt="Discharge record and follow-up advice 2026-10-23"></a></td>
+    <td width="25%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>⑤ Laboratory report · 2026-10-20<br>11 items, 5 flagged H/L</sub></td>
+    <td align="center"><sub>⑥ Carotid ultrasound · 2026-10-21<br>atherosclerosis with plaque</sub></td>
+    <td align="center"><sub>⑦ Discharge record · 2026-10-23<br>4 diagnoses, 5 pieces of advice</sub></td>
+    <td></td>
+  </tr>
+</table>
+
+##### How: one sentence to the AI
+
+**You say:**
 
 ```text
-Create Zhang Jianguo's health card for the last 30 days.
+Create a profile for 熊猫, male, 89. Record these seven pages into it,
+and show me what you read before you save.
 ```
 
-Missing measurements are shown as missing. MediWise does not invent values to fill the card.
+**The AI lists what it read and asks before writing anything**: the dates and diagnoses of both admissions, the blood pressure / glucose / heart rate / temperature from each admission examination, how many items each lab report flags H/L, the conclusions of both imaging reports, and the follow-up advice in the discharge record. Only after you say "Go ahead, save it" does anything land in the archive.
+
+It does not fill in what the pages do not say: there is no drug name or dose anywhere, so no medication record is invented; 呼吸 18 次/分 (respiratory rate 18/min) is not a metric type the card draws, so it stays in the examination text instead of being forced into the metric table; and the two admissions word the same diagnosis differently (极高危 / 很高危), each kept as written.
+
+##### Result 1: what the archive holds
+
+| Record | Contents |
+|---|---|
+| Visits | 2 admissions; the discharge record on page 7 is written back onto the October admission, whose 4 discharge diagnoses become that visit's diagnoses |
+| Symptoms | 6 (头晕 dizziness, 口渴 thirst, 多饮 polydipsia, 乏力 fatigue, 夜尿增多 nocturia — 头晕 once per admission) |
+| Lab reports | 2 reports, 24 items, of which 11 carry an H/L printed on the original |
+| Imaging reports | 2: chest CT and carotid ultrasound |
+| Measurements | 10: four from each admission examination, plus the blood pressure and fasting glucose from the discharge record |
+| Source images | 7, each attached to the record it belongs to, so a record leads back to its page |
+| Medication | 0 (the pages hold no drug name or dose, so nothing is invented) |
+| Reminders | 1: a follow-up on 2026-11-06 09:00, taken from the discharge record's advice |
+
+##### Result 2: one health card
+
+**You say "Create 熊猫's health card for the last 90 days"** and get a card, plus an HTML copy of the same content.
+
+<p align="center">
+  <img src="docs/images/case-health-card.png" width="720" alt="Personal health card for the teaching case: clinical snapshot, personal health timeline, metric trend charts">
+</p>
+
+Every block on the card comes from the records above: diagnoses and flagged items from the two visits and the H/L items in the two lab reports, the trend charts from those 10 measurements, the timeline from 2 admissions + 2 lab reports + 2 imaging reports. Abnormality on the card has exactly two sources — an H/L flag printed on the original, and a threshold you configured; there is no reference band, and no point is coloured by how high or low it is.
+
+*This card was generated on 2026-09-13 while the case's second admission is dated 2026-10: the card does not drop a record for being dated later than the day it is generated, so the header date and the chart's own "2026-09-08 to 2026-10-23" appear together. In real use a record is not dated later than the day the card is generated.*
+
+##### Result 3: follow-up questions
+
+Same archive, just ask:
+
+**You:** What diagnoses does 熊猫 have now, and which lab items did the reports flag?
+
+> **AI:** The most recent visit is the admission of 2026-10-20 to 10-23, with four discharge diagnoses: 原发性高血压（3级，很高危）"essential hypertension, grade 3, very high risk", 2型糖尿病 "type 2 diabetes", 血脂异常 "dyslipidaemia", 双侧颈动脉粥样硬化伴斑块 "bilateral carotid atherosclerosis with plaque". No active medication is on record. Across the two lab reports, 11 items carry an H or L printed on the original (6 + 5), covering blood glucose, HbA1c, kidney function, blood lipids, and urine protein. Those flags are printed on the reports; I am only copying them over.
+
+**You:** How did blood pressure and glucose move between the two admissions?
+
+> **AI:** Three recorded values for each. Blood pressure 178/96 (09-08) → 166/92 (10-20) → 148/84 (10-23); glucose 13.8 (09-08, random) → 11.2 (10-20, random) → 7.6 (10-23, fasting). The last glucose is fasting and the first two are random, so the situations are not the same. I am listing values, dates, and situations — whether that is good or bad is a question for a doctor.
+
+**You:** When is the next follow-up appointment?
+
+> **AI:** There is one follow-up reminder at 2026-11-06 09:00, "复诊：老年医学科或内分泌科门诊" — follow-up: geriatrics or endocrinology clinic — taken from the discharge record's advice.
+
+**You:** Walk me through everything that happened to 熊猫.
+
+> **AI:** Six events: two admissions (each with its diagnoses and examination values), two lab reports, two imaging reports (chronic bronchial change and fibrous scarring on chest CT; carotid atherosclerosis with plaque). These are the extracted events and results — the full text (history of present illness, examination, treatment plan, follow-up advice) is in the archive too and can be brought up at any time.
+
+**Every answer only transcribes fields the archive already holds.** Abnormality has two sources: an H/L flag printed on the original, and a threshold you configured. Nothing else is judged here.
+
+### 3. Bring in device data for trends and reminders
+
+Hand MediWise an Apple Health or Gadgetbridge export and its steps, heart rate, sleep, and weight records join the same archive, where you can ask about trends in natural language and set reminders for the measurements you care about.
+
+**You say:**
+
+```text
+[Upload an Apple Health export] Import it into my profile and tell me which metrics were added.
+Show me my resting heart rate and sleep trend for the last 30 days.
+If my blood pressure goes outside the range I set, flag it in my health summary.
+Create my health card for the last 7 days.
+```
+
+Apple Health and Gadgetbridge file imports are verified; Garmin Connect is still experimental. The current status and export instructions for other devices are in [the wearable import guide](docs/WEARABLES.md).
 
 ## Health cards
 
@@ -103,13 +221,35 @@ MediWise produces two kinds of card:
 
 Both kinds state only what was recorded, where dates are blank, and how the recorded values moved; neither turns correlation into a cause or makes a medical judgment. Each states the shape of the record first, then lists days, counts, and the latest date.
 
-The record cards are local artifacts meant for you: they show member names and exact dates, so review one before sharing it. The weight truth card is share-safe by default, hiding names, absolute and goal weight, and exact dates. Cards export as self-contained HTML and a 1080×1440 PNG, which needs Chrome or Chromium locally.
+The record cards are local artifacts meant for you: they show member names and exact dates, so review one before sharing it. The weight truth card is share-safe by default, hiding names, absolute and goal weight, and exact dates. Record cards export as self-contained HTML and a PNG whose height follows the content; the weight truth card is a fixed 1080×1440. Rendering needs Chrome or Chromium locally.
 
 ```text
 Create my health record card for the last 7 days.
 Generate a weight truth card — has the recent movement actually changed direction?
 Generate a share-safe weight truth card with just the trend and movement.
 ```
+
+What a card actually looks like, and where each block on it comes from, is in the [case walkthrough](#case-walkthrough-local-case-management) above.
+
+### The personal card in detail
+
+The personal card keeps recorded food intake, activity burn, steps, and sleep in a compact overview, and draws a trend chart for every metric holding two or more records. A dated personal health timeline combines metric updates, recent food and activity logs, sleep, visits, lab results, and imaging. It is generated in English when the conversation or requested locale is English.
+
+The chart shows the axis, the dates, and the recorded values and nothing else: no reference band, and no colour that depends on how high or low a reading is. A metric holding a single record is printed as one line with its latest value instead. The charts are inline SVG, so the card draws them with no chart service or CDN. The card highlights recent records and reminders, food averages use logged days only, activity burn shows recorded activity rather than a calorie deficit, and lab flags are shown only when the original report explicitly marks them.
+
+MediWise also has a compact family card for one local user who manages several family profiles. It shows each person's current status, active medications and medication schedules, due or upcoming reminders, and explicit attention items. It does not include a family timeline. Members with alerts, flagged results, or due reminders appear first. Ask for it explicitly:
+
+```text
+Create a family health card for the last 7 days.
+```
+
+If the local record contains only one self profile, MediWise can select it by default. Once you add another family member, include the person's name:
+
+```text
+Create Zhang Jianguo's health card for the last 30 days.
+```
+
+Missing measurements are shown as missing. MediWise does not invent values to fill the card.
 
 ## Features
 
@@ -305,16 +445,6 @@ Backups contain complete health records and are not encrypted. Keep them in a pr
 - [Changelog](CHANGELOG.md) lists published changes.
 - [Contributing guide](CONTRIBUTING.md) explains how to submit changes safely.
 
-## Requirements
-
-- Python 3.8 or newer
-- Node.js 18 or newer
-- SQLite 3.x
-- Chrome or Chromium for local PNG health cards, the weight truth card, and PDF rendering; HTML, text records, and queries do not require it
-- An agent that can load Skills, access local files, and run scripts
-- OpenClaw 2026.3.0 or newer when using OpenClaw
-- Linux, macOS, or Windows
-
 ## Contributing
 
 Bug reports, data source adapters, and documentation improvements are welcome. Do not include real names, reports, account credentials, databases, or other personal health information in an issue, log, or test fixture. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -328,11 +458,3 @@ Bug reports, data source adapters, and documentation improvements are welcome. D
 The code is available under the [MIT License](LICENSE).
 
 MediWise Health Suite only records, organizes, searches, displays, summarizes, and reminds you about health information. It does not provide diagnoses, treatment advice, medication advice, nutrition therapy, clinical judgment, any other medical guidance, or emergency medical services. Report flags and threshold reminders are informational only. Contact a qualified medical professional for medical judgment and local emergency services for urgent symptoms.
-
----
-
-<div align="center">
-
-[GitHub](https://github.com/JuneYaooo/mediwise-health-suite) · [v2.0.9](https://github.com/JuneYaooo/mediwise-health-suite/releases/tag/v2.0.9)
-
-</div>
