@@ -25,7 +25,7 @@ description: "Private local health assistant for Skills-compatible AI agents. Us
 - 体重真相卡把同日多次测量折叠为中位数，用 Theil–Sen 稳健趋势区分单日波动与长期方向，并说明最新一次称重与趋势相差多少；记录不足以支撑趋势时只说明线索仍在积累
 - 只陈述有记录日、次数、最新日期和数字方向；空白日期不补零，不把同期变化写成原因
 - 记录卡片是本地自用产物，会显示成员姓名和真实日期；体重真相卡默认脱敏，可对外分享
-- 卡片导出为自包含 HTML 和 1080×1440 PNG
+- 卡片导出为自包含 HTML 和 PNG：记录卡片按内容自适应高度（宽度默认 1040，可传 `--width`），体重真相卡固定 1080×1440
 
 调用边界：用户要近期整体健康概览或家庭概览时，走 `mediwise-health-tracker` 的 `generate-health-card`（兼容动作 `generate-report`）；用户点名体重趋势或体重真相卡时，走 `weight-manager` 的 `weight-truth` 和 `generate-weight-card`。
 

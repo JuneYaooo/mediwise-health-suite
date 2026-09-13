@@ -22,7 +22,8 @@ from datetime import datetime, timedelta
 
 import health_db
 import reminder as reminder_mod
-from metric_utils import parse_metric_value, calculate_age as _calculate_age_shared
+from metric_utils import parse_metric_value, resolve_age
+
 
 _logger = logging.getLogger(__name__)
 
@@ -107,11 +108,6 @@ def _parse_metric_value(value_str: str) -> dict:
     return parse_metric_value(value_str)
 
 
-def _calculate_age(birth_date_str: str) -> int | None:
-    """Calculate age from birth date string (YYYY-MM-DD)."""
-    return _calculate_age_shared(birth_date_str)
-
-
 def _deep_merge(base: dict, override: dict) -> dict:
     """Deep merge override into base (non-destructive)."""
     result = copy.deepcopy(base)
@@ -130,7 +126,8 @@ def get_metric_ranges(member_id: str) -> dict:
     conn = health_db.get_connection()
     try:
         row = conn.execute(
-            "SELECT birth_date, custom_metric_ranges FROM members WHERE id=? AND is_deleted=0",
+            """SELECT birth_date, age_years, age_recorded_at, custom_metric_ranges
+               FROM members WHERE id=? AND is_deleted=0""",
             (member_id,)
         ).fetchone()
     finally:
@@ -139,8 +136,9 @@ def get_metric_ranges(member_id: str) -> dict:
     if not row:
         return ranges
 
-    # Age-based adjustments
-    age = _calculate_age(row["birth_date"])
+    # Age-based adjustments (a recorded age counts too, so an elderly member
+    # without a birth date still gets elderly thresholds)
+    age, _approximate = resolve_age(row["birth_date"], row["age_years"], row["age_recorded_at"])
     if age is not None:
         if age >= 65:
             ranges = _deep_merge(ranges, _AGE_ADJUSTMENTS["elderly"])

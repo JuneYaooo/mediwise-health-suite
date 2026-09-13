@@ -111,6 +111,40 @@ def calculate_age(birth_date_str: str) -> int | None:
         return None
 
 
+def resolve_age(birth_date, age_years=None, age_recorded_at=None):
+    """Resolve a member's age, preferring an exact birth date over a recorded age.
+
+    A birth date is strictly more precise and never goes stale, so it always
+    wins when both are present. A standalone age is only valid as of the day it
+    was recorded, so elapsed years are added back and the result is marked
+    approximate.
+
+    Returns:
+        (age, is_approximate). Age is None when nothing usable is on file.
+    """
+    age = calculate_age(birth_date)
+    if age is not None:
+        return age, False
+
+    if age_years is None or isinstance(age_years, bool):
+        return None, False
+    try:
+        age = int(str(age_years).strip())
+    except (TypeError, ValueError):
+        return None, False
+    if not 0 <= age <= 130:
+        return None, False
+
+    if age_recorded_at:
+        try:
+            recorded = datetime.strptime(str(age_recorded_at)[:10], "%Y-%m-%d")
+            elapsed = datetime.now().year - recorded.year
+            age = max(0, age + elapsed)
+        except (ValueError, TypeError):
+            pass
+    return age, True
+
+
 def calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
     """Calculate Basal Metabolic Rate using Mifflin-St Jeor formula.
 

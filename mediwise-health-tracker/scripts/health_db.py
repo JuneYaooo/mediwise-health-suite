@@ -26,7 +26,7 @@ def is_api_mode():
     """Check if backend API mode is enabled."""
     return is_backend_mode()
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 MEDICAL_TABLES = {
     "schema_version",
@@ -132,6 +132,8 @@ CREATE TABLE IF NOT EXISTS members (
     relation TEXT NOT NULL,
     gender TEXT,
     birth_date TEXT,
+    age_years INTEGER,
+    age_recorded_at TEXT,
     blood_type TEXT,
     allergies TEXT,
     medical_history TEXT,
@@ -1354,6 +1356,20 @@ CREATE INDEX IF NOT EXISTS idx_chronic_disease_member
     ON chronic_disease_profiles(member_id, disease_type, is_active);
 """)
                     conn.execute("UPDATE schema_version SET version=?", (15,))
+                    conn.commit()
+                # Migrate: add standalone age to members (v15 -> v16)
+                # age_recorded_at 与 age_years 成对存储：单独的年岁会随时间失效，
+                # 「89 岁」是记录当时的观测值，两年后不再正确。
+                member_cols = [row[1] for row in conn.execute("PRAGMA table_info(members)").fetchall()]
+                v16_migrated = False
+                if "age_years" not in member_cols:
+                    conn.execute("ALTER TABLE members ADD COLUMN age_years INTEGER")
+                    v16_migrated = True
+                if "age_recorded_at" not in member_cols:
+                    conn.execute("ALTER TABLE members ADD COLUMN age_recorded_at TEXT")
+                    v16_migrated = True
+                if v16_migrated:
+                    conn.execute("UPDATE schema_version SET version=?", (16,))
                     conn.commit()
     finally:
         conn.close()

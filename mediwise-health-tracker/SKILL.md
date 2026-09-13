@@ -64,18 +64,22 @@ python3 {baseDir}/scripts/query.py family-overview
 
 | 动作 | 说明 | 关键参数 |
 |------|------|----------|
-| `add-member` | 创建家庭成员档案 | name、relation；可选 gender、birth_date、blood_type、allergies、medical_history、phone、emergency_contact、emergency_phone、timezone |
+| `add-member` | 创建家庭成员档案 | name、relation；可选 gender、birth_date、age_years、age_recorded_at、blood_type、allergies、medical_history、phone、emergency_contact、emergency_phone、timezone |
 | `get-member` / `update-member` / `delete-member` | 查看、更新或删除成员档案 | member_id；更新时只传需要修改的字段 |
 | `resolve-member` | 按姓名/身份解析目标成员 | 可选 name、relation；多成员时用于消歧 |
-| `add-visit` | 添加就诊记录 | member_id, visit_type, visit_date；可选 hospital/department/diagnosis |
+| `add-visit` | 添加就诊记录 | member_id, visit_type, visit_date；可选 hospital/department/chief_complaint/diagnosis，以及逐字保留原文的 summary（卡片不展示） |
 | `add-symptom` | 添加症状记录 | member_id, symptom；可选 severity/visit_id/onset_date |
 | `add-medication` | 添加用药记录 | member_id, name；可选 dosage/frequency/visit_id/purpose |
-| `add-metric` | 添加健康指标 | member_id, type, value；可选 measured_at/source/context |
+| `add-metric` | 添加健康指标 | member_id, type, value；可选 measured_at/source/context/related_visit_id |
 | `get-metrics` / `delete-metric` | 按类型与日期范围查询或删除指标 | 查询可选 type/start_date/end_date/limit；删除传记录 id |
 | `add-lab-result` / `add-imaging` | 直接写入已确认的检验或影像结构化结果 | member_id、名称、日期与已确认内容 |
 | `snapshot-save` / `snapshot-get` / `snapshot-history` / `snapshot-trend` | 保存或查询每日健康快照 | member_id；查询单日时传 date，历史和趋势可传 days |
 
 自然语言或图片输入走 `smart-extract` → `smart-confirm` 流程；短文本指标走 `quick-entry-save`。
+
+就诊时测到的指标要带上 `related_visit_id` 指向该次就诊，主诉写进 `chief_complaint`——健康时间轴的「就医」事件靠这两个字段展示该次就诊的主诉与测量值，不靠日期或原文推断。
+
+只有用户给出年岁、没有出生日期时才传 `age_years`（0-130 的整数），`age_recorded_at` 默认当天；**不要由年龄反推 `birth_date`**。健康卡片会按记录日期把这个年龄推算到当前，并标注“（记录日期）”。同时有出生日期与年龄时以出生日期为准。
 
 ### 快速录入指标
 
@@ -271,7 +275,9 @@ dream.py unlock   → 释放锁，标记完成
 4. 用户明确说“家庭健康卡片”“全家健康卡片”时，调用 `generate-health-card` 并传入 `view=family`，不要传 `member_id`。家庭版用于一个本地用户管理本人及家人的概览，不代表多人共享服务。
 5. 英文请求使用 `locale=en-US`，中文请求使用 `locale=zh-CN`。个人版对外名称统一为 “Health Card” / “健康卡片”，家庭版统一为 “Family Health Card” / “家庭健康卡片”。“健康简报”“健康小报”等只作为意图触发词，不作为回复或卡片标题。
 
-个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药，并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。`focus=auto` 必须使用生成器返回的确定性布局：先按 alert / warning、明确标记异常和到期提醒决定安全优先级，再按各模块的实际记录量决定主模块；重点模块前置，重点指标或数据最多的生活方式面板可放大，空且与本次问题无关的模块省略。没有可读记录的模块直接省略，不补零、不自行推断。不得让模型根据数值自行推断异常，也不得仅因记录多就把明确异常压到后面。
+个人版按真实记录展示指标趋势、饮食摄入、运动消耗、步数、睡眠和在用药。指标区对每条有两条以上记录的指标画一张趋势图（坐标轴、日期刻度、每条记录的数值，首图整宽、其余两列），只有一条记录的指标退化成一行最新值；趋势图固定回看最近 90 天（不短于卡片自己的时间范围），头部标注实际画出的条数与日期跨度，`layout_profile["metrics_window_days"]` 给出这个天数。图上不画参考范围带，也不按数值高低给点上色。并用个人健康时间轴按日期倒序合并指标更新、饮食、运动、睡眠、就医、检验和检查，最多展示 10 条，同一天内医疗事件优先。时间轴只呈现记录里已有的结构化字段：就医 = 就诊类型/医院/科室 + 主诉 + 该次就诊关联的测量值，检验 = 全部标记异常项，检查 = 报告结论；现病史、入院查体、处理计划、影像所见等原文一律不上卡片（仍完整保留在数据库与 `query timeline` 中）。已画进就医事件的测量值不再单列为「健康指标更新」事件。`focus=auto` 必须使用生成器返回的确定性布局：先按 alert / warning、明确标记异常和到期提醒决定安全优先级，再按各模块的实际记录量决定主模块；重点模块前置，被告警点名的指标排在趋势图最前并整宽展示，数据最多的生活方式面板可放大，空且与本次问题无关的模块省略。没有可读记录的模块直接省略，不补零、不自行推断。不得让模型根据数值自行推断异常，也不得仅因记录多就把明确异常压到后面。
+
+个人版在可排序模块之前固定渲染「病情速览」区块（诊断、报告标记的异常、阈值告警、既往史与过敏史），它不参与 `focus` 与 `section_order` 排序，且不受 `days` 时间窗限制 —— 慢性病诊断和较早的化验标记仍然临床相关。该区块逐项列出全部标记异常，不截断；报告标记的异常与阈值告警必须分组呈现，不合并计数。用 `layout_profile["snapshot"]` 校验该区块。计数条四个数字口径互不重叠：警告数只含 alert/warning 级提示，明确异常数只含报告标记项，报告标记项不计入警告数或提醒数。
 
 家庭版是成员状态看板，不展示时间轴，也不纵向拼接多张个人卡片。每位成员只展示当前状态、有限的最新指标、在用药及服药计划、提醒和明确注意事项。成员顺序由生成器自动决定：有 alert 的成员最优先，其次是 warning、明确标记异常或到期提醒；均无风险时，再优先展示有在用药、计划提醒或近期记录的成员。检验异常仅认原始数据中的明确标记。详细布局规则见 `mediwise-health-tracker/references/drug-safety-health-card.md`。
 

@@ -38,6 +38,22 @@ def validate_date_optional(value, field_name="日期"):
     return validate_date(value, field_name)
 
 
+def validate_age_optional(value, field_name="年龄"):
+    """Validate an optional age in whole years (0-130).
+
+    Returns validated int or None if empty/None.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        age = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} 应为整数年岁，收到: {value}")
+    if not 0 <= age <= 130:
+        raise ValueError(f"{field_name} 超出合理范围（0-130），收到: {value}")
+    return age
+
+
 def validate_datetime_optional(value, field_name="日期时间"):
     """Validate an optional YYYY-MM-DD HH:MM datetime string.
 

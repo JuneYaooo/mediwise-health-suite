@@ -9,22 +9,44 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 from health_db import ensure_db, get_medical_connection, generate_id, now_iso, row_to_dict, rows_to_list, output_json, is_api_mode, transaction, verify_member_ownership
-from validators import validate_date_optional
+from validators import validate_date_optional, validate_age_optional
 import api_client
 
 # Whitelist of column names allowed in UPDATE statements for the members table.
 # Values are always bound via ? placeholders; this set guards the column names.
 _MEMBER_UPDATE_FIELDS = frozenset([
-    "name", "relation", "gender", "birth_date", "blood_type",
+    "name", "relation", "gender", "birth_date", "age_years", "age_recorded_at", "blood_type",
     "allergies", "medical_history", "phone", "emergency_contact", "emergency_phone",
     "custom_metric_ranges", "timezone",
 ])
 
 
+def _prep_age(args):
+    """Validate a standalone age and stamp when it was recorded.
+
+    A recorded age is only true as of the day it was taken, so it is stored
+    alongside that date; the card ages it forward from there. Returns an error
+    message, or None when the values are usable.
+    """
+    try:
+        args.age_years = validate_age_optional(getattr(args, 'age_years', None))
+    except ValueError as e:
+        return str(e)
+    args.age_recorded_at = validate_date_optional(
+        getattr(args, 'age_recorded_at', None), "年龄记录日期")
+    if args.age_years is not None and not args.age_recorded_at:
+        args.age_recorded_at = now_iso()[:10]
+    return None
+
+
 def add_member(args):
+    err = _prep_age(args)
+    if err:
+        output_json({"status": "error", "message": err})
+        return
     if is_api_mode():
         data = {"name": args.name, "relation": args.relation}
-        for field in ["gender", "birth_date", "blood_type", "allergies",
+        for field in ["gender", "birth_date", "age_years", "age_recorded_at", "blood_type", "allergies",
                        "medical_history", "phone", "emergency_contact", "emergency_phone",
                        "custom_metric_ranges", "timezone"]:
             val = getattr(args, field, None)
@@ -48,11 +70,13 @@ def add_member(args):
         ts = now_iso()
         owner_id = getattr(args, 'owner_id', None)
         conn.execute(
-            """INSERT INTO members (id, name, relation, gender, birth_date, blood_type,
+            """INSERT INTO members (id, name, relation, gender, birth_date, age_years,
+               age_recorded_at, blood_type,
                allergies, medical_history, phone, emergency_contact, emergency_phone,
                custom_metric_ranges, timezone, owner_id, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (member_id, args.name, args.relation, args.gender, args.birth_date,
+             args.age_years, args.age_recorded_at,
              args.blood_type, args.allergies, args.medical_history, args.phone,
              args.emergency_contact, args.emergency_phone,
              getattr(args, 'custom_metric_ranges', None), getattr(args, 'timezone', None),
@@ -111,11 +135,15 @@ def get_member(args):
 
 
 def update_member(args):
+    err = _prep_age(args)
+    if err:
+        output_json({"status": "error", "message": err})
+        return
     if is_api_mode():
         data = {}
-        for field in ["name", "relation", "gender", "birth_date", "blood_type",
-                       "allergies", "medical_history", "phone", "emergency_contact", "emergency_phone",
-                       "custom_metric_ranges", "timezone"]:
+        for field in ["name", "relation", "gender", "birth_date", "age_years", "age_recorded_at",
+                       "blood_type", "allergies", "medical_history", "phone", "emergency_contact",
+                       "emergency_phone", "custom_metric_ranges", "timezone"]:
             val = getattr(args, field.replace("-", "_"), None)
             if val is not None:
                 data[field] = val
@@ -303,6 +331,8 @@ def main():
     p_add.add_argument("--relation", required=True, help="与用户的关系: 本人/父亲/母亲/配偶/子女/其他")
     p_add.add_argument("--gender", default=None)
     p_add.add_argument("--birth-date", default=None)
+    p_add.add_argument("--age-years", default=None, help="只有年岁、没有出生日期时使用（0-130）")
+    p_add.add_argument("--age-recorded-at", default=None, help="年岁的记录日期 YYYY-MM-DD，默认今天")
     p_add.add_argument("--blood-type", default=None)
     p_add.add_argument("--allergies", default=None)
     p_add.add_argument("--medical-history", default=None)
@@ -329,6 +359,8 @@ def main():
     p_upd.add_argument("--relation", default=None)
     p_upd.add_argument("--gender", default=None)
     p_upd.add_argument("--birth-date", default=None)
+    p_upd.add_argument("--age-years", default=None, help="只有年岁、没有出生日期时使用（0-130）")
+    p_upd.add_argument("--age-recorded-at", default=None, help="年岁的记录日期 YYYY-MM-DD，默认今天")
     p_upd.add_argument("--blood-type", default=None)
     p_upd.add_argument("--allergies", default=None)
     p_upd.add_argument("--medical-history", default=None)

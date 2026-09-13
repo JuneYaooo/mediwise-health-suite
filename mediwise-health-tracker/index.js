@@ -25,6 +25,8 @@ const ROUTES = {
     const fields = [
       ['gender', '--gender'],
       ['birth_date', '--birth-date'],
+      ['age_years', '--age-years'],
+      ['age_recorded_at', '--age-recorded-at'],
       ['blood_type', '--blood-type'],
       ['allergies', '--allergies'],
       ['medical_history', '--medical-history'],
@@ -67,6 +69,8 @@ const ROUTES = {
       ['relation', '--relation'],
       ['gender', '--gender'],
       ['birth_date', '--birth-date'],
+      ['age_years', '--age-years'],
+      ['age_recorded_at', '--age-recorded-at'],
       ['blood_type', '--blood-type'],
       ['allergies', '--allergies'],
       ['medical_history', '--medical-history'],
